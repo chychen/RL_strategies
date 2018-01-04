@@ -17,6 +17,8 @@ import numpy as np
 import random
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import scipy.misc
 import os
@@ -32,6 +34,8 @@ import os
 from gridworld import gameEnv
 
 env = gameEnv(partial=False, size=5)
+plt.imshow(env.renderEnv())
+exit()
 
 
 # Above is an example of a starting environment in our simple game. The agent controls the blue square, and can move up, down, left, or right. The goal is to move to the green square (for +1 reward) and avoid the red square (for -1 reward). The position of the three blocks is randomized every episode.
@@ -233,7 +237,7 @@ with tf.Session() as sess:
                     doubleQ = Q2[range(batch_size), Q1]
                     targetQ = trainBatch[:, 2] + (y * doubleQ * end_multiplier)
                     # Update the network with our target values.
-                    _ = sess.run(mainQN.updateModel,                         feed_dict={mainQN.scalarInput: np.vstack(
+                    _ = sess.run(mainQN.updateModel, feed_dict={mainQN.scalarInput: np.vstack(
                         trainBatch[:, 0]), mainQN.targetQ: targetQ, mainQN.actions: trainBatch[:, 1]})
 
                     # Update the target network toward the primary network.
@@ -267,6 +271,7 @@ print("Percent of succesful episodes: " + str(sum(rList) / num_episodes) + "%")
 rMat = np.resize(np.array(rList), [len(rList) // 100, 100])
 rMean = np.average(rMat, 1)
 plt.plot(rMean)
+plt.show()
 
 
 # In[ ]:
