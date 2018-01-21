@@ -9,10 +9,10 @@ from __future__ import print_function
 
 import tensorflow as tf
 import gym
-from bball_strategies.scripts import utility
+from agents.scripts import utility
+from agents import tools
 from bball_strategies.scripts import configs
 from bball_strategies import gym_bball
-from bball_strategies import tools
 
 #TODO
 #what is streaming estimation, and should we normalized the output?

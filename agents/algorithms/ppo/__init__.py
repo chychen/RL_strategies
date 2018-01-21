@@ -12,20 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tools for reinforcement learning."""
+"""Proximal Policy Optimization algorithm."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from . import wrappers
-from .attr_dict import AttrDict
-from .batch_env import BatchEnv
-from .count_weights import count_weights
-from .in_graph_batch_env import InGraphBatchEnv
-from .in_graph_env import InGraphEnv
-from .loop import Loop
-from .mock_algorithm import MockAlgorithm
-from .mock_environment import MockEnvironment
-from .simulate import simulate
-from .streaming_mean import StreamingMean
+from .ppo import PPO

@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Proximal Policy Optimization algorithm."""
+"""Main package of TensorFlow agents."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from .algorithm import PPOAlgorithm
+from . import algorithms
+from . import scripts
+from . import tools

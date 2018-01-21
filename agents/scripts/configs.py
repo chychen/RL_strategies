@@ -22,17 +22,17 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from agents import ppo
+from agents import algorithms
 from agents.scripts import networks
 
 
 def default():
   """Default configuration for PPO."""
   # General
-  algorithm = ppo.PPOAlgorithm
+  algorithm = algorithms.PPO
   num_agents = 30
   eval_episodes = 30
-  use_gpu = True
+  use_gpu = False
   # Network
   network = networks.feed_forward_gaussian
   weight_summaries = dict(
@@ -40,7 +40,7 @@ def default():
   policy_layers = 200, 100
   value_layers = 200, 100
   init_mean_factor = 0.1
-  init_logstd = -1
+  init_std = 0.35
   # Optimization
   update_every = 30
   update_epochs = 25
