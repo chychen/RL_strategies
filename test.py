@@ -1,7 +1,25 @@
 import gym
 from bball_strategies import gym_bball
+import numpy as np
 env = gym.make('bball-v0')
 env.reset()
+env.render()
+# Tuple(Discrete(2), Discrete(3), Box(1,), Box(5, 2), Box(5, 2))
+action = np.array([
+    np.array([1,0]),
+    np.array([0,0,1]),
+    np.array([0]),
+    np.array([[5,0],[0,0],[0,0],[0,0],[0,0]]),
+    np.array([[0,0],[0,0],[0,0],[0,0],[0,0]])
+])
+input()
+env.step(action)
+env.render()
+input()
+env.step(action)
+env.render()
+input()
+env.step(action)
 env.render()
 input()
 
