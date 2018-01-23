@@ -57,6 +57,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import logging
 import gym
 from gym.utils import seeding
 from gym import spaces
@@ -74,7 +75,8 @@ note :
 - velocity: scalar with direction
 - speed: scalar only
 """
-
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 FPS = 5.0
 
 
@@ -87,7 +89,7 @@ def distance(pos_a, pos_b, axis=1):
     return length(vec, axis=axis)
 
 
-class BallState(object):  # TODO
+class BallState(object):
     def __init__(self):
         self.is_passing = None
         self.handler_idx = None
@@ -108,7 +110,10 @@ class BallState(object):  # TODO
 class BBallEnv(gym.Env):
     """
     """
-    metadata = {'render.modes': ['human']}
+    metadata = {
+        'render.modes': ['human', 'rgb_array'],
+        'video.frames_per_second': FPS
+    }
 
     def __init__(self):
         # for render()
@@ -208,10 +213,6 @@ class BBallEnv(gym.Env):
         self.ball_state.reset(handler_idx=ball_handler_idx, is_passing=False)
         self.off_def_closest_map = dict()
         for idx, off_pos in enumerate(off_players_pos):
-            # vec = def_players_pos - off_pos
-            # assert vec.shape == (5, 2)
-            # dist_square = np.sum(vec * vec, axis=1)
-            # assert dist_square.shape == (5)
             self.off_def_closest_map[idx] = np.argmin(
                 distance(def_players_pos, off_pos))
 
@@ -359,13 +360,13 @@ class BBallEnv(gym.Env):
 
         if decision == DESICION_LOOKUP['SHOOT']:
             reward = self._calculate_reward()
-            return self.state, 0.0, False, None
+            return self.state, 0.0, False, dict()
         elif decision == DESICION_LOOKUP['PASS']:
 
-            return self.state, 0.0, False, None
+            return self.state, 0.0, False, dict()
         elif decision == DESICION_LOOKUP['NO_OP']:
 
-            return self.state, 0.0, False, None
+            return self.state, 0.0, False, dict()
         else:
             raise KeyError(
                 'Decision #{} have not been defined in DESICION_LOOKUP table'.format(decision))
@@ -387,6 +388,7 @@ class BBallEnv(gym.Env):
         """
         self._update_player_state(
             def_pl_dash, velocity_state, STATE_LOOKUP['DEFENSE'])
+        return self.state, 0.0, True, dict()  # TODO done !!!!
 
     def _update_player_state(self, pl_dash, velocity_state, state_idx):
         """ Update the player's movement following the physics limitation predefined
@@ -415,7 +417,7 @@ class BBallEnv(gym.Env):
         pl_velocity[indices] = pl_velocity[indices] / \
             np.stack([pl_speed[indices], pl_speed[indices]],
                      axis=-1) * self.pl_max_speed
-        self.state[state_idx] += pl_velocity
+        self.state[state_idx] = self.state[state_idx] + pl_velocity
 
     def _update_ball_state(self, decision, ball_pass_dir):
         """
@@ -424,10 +426,11 @@ class BBallEnv(gym.Env):
         decision : int
             offensive team's decision, including SHOOT, NOOP, and PASS.
         """
+
         if self.ball_state.is_passing:
             # keep same velocity
             self.state[STATE_LOOKUP['BALL']
-                       ] += self.ball_state.velocity
+                       ] = self.state[STATE_LOOKUP['BALL']] + self.ball_state.velocity
 
             # TODO if decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['PASS'] return negative reward
 
@@ -455,7 +458,7 @@ class BBallEnv(gym.Env):
                     off2ball_shortest_dist[i] = np.sin(
                         np.arccos(cos_value)) * length(vec, axis=0)
             candidates = np.argwhere(
-                off2ball_shortest_dist <= self.wingspan_radius).reshape([-1])  # TODO need verify
+                off2ball_shortest_dist <= self.wingspan_radius).reshape([-1])
             if len(candidates) != 0:
                 if len(candidates) > 1:
                     catcher_idx = candidates[
@@ -487,8 +490,10 @@ class BBallEnv(gym.Env):
             self.ball_state.update(
                 handler_idx=None, is_passing=True, velocity=new_vel)
 
+            # UNKNOWN BUG!!!!!!!!!!!!!!!!!!!!!
+            # self.state[STATE_LOOKUP['BALL']] += self.ball_state.velocity
             self.state[STATE_LOOKUP['BALL']
-                       ] += self.ball_state.velocity
+                       ] = self.state[STATE_LOOKUP['BALL']] + self.ball_state.velocity
 
     def _calculate_reward(self):
         pass

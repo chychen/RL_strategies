@@ -1,136 +1,127 @@
 import gym
 from bball_strategies import gym_bball
 import numpy as np
-env = gym.make('bball-v0')
-env.reset()
-env.render()
-# Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
-action = tuple((
-    np.array([1, 0]),
-    np.array([0, 1, 0]),
-    np.array(1 * np.pi / 4),
-    np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
-    np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
-))
-env.step(action)
-env.render()
-# action = tuple((
-#     np.array([0, 1]),
-#     np.array([0, 0, 1]),
-#     np.array(0),
-#     np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
-#     np.array([[5, -np.pi / 2], [0, 0], [0, 0], [0, 0], [0, 0]])
-# ))
-# env.step(action)
-# env.render()
-action = tuple((
-    np.array([1, 0]),
-    np.array([0, 0, 1]),
-    np.array(0),
-    np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
-    np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
-))
-env.step(action)
-env.render()
-input()
-
-##############################################################
-# from gym.envs.classic_control import rendering
-# import numpy as np
-# from os import path
-# viewer = rendering.Viewer(940,500)
-# viewer.set_bounds(0,94,0,50)
-# # background img
-# fname = path.join(path.dirname(__file__), "fullcourt.png")
-# img = rendering.Image(fname, 94, 50)
-# imgtrans = rendering.Transform(translation=(47.0, 25.0))
-# img.add_attr(imgtrans)
-# viewer.add_geom(img)
-# # defensive players
-# def_player = rendering.make_circle(radius=2.)
-# def_player.set_color(0,0,1)
-# def_trans = rendering.Transform(translation=(61.0, 39.0))
-# def_player.add_attr(def_trans)
-# viewer.add_geom(def_player)
-# # offensive players
-# off_player = rendering.make_circle(radius=2.)
-# off_player.set_color(1,0,0)
-# off_trans = rendering.Transform(translation=(60.0, 40.0))
-# off_player.add_attr(off_trans)
-# viewer.add_geom(off_player)
-# # ball
-# ball = rendering.make_circle(radius=1.)
-# ball.set_color(0,1,0)
-# ball_trans = rendering.Transform(translation=(60.0, 40.0))
-# ball.add_attr(ball_trans)
-# viewer.add_geom(ball)
-
-# # if last_u:
-# #     imgtrans.scale = (-last_u/2, np.abs(last_u)/2)
-# mode='human'
-# viewer.render(return_rgb_array = mode=='rgb_array')
-# input()
-
-# rod = rendering.make_capsule(1, .2)
-# rod.set_color(.8, .3, .3)
-# pole_transform = rendering.Transform()
-# rod.add_attr(pole_transform)
-# viewer.add_geom(rod)
-# axle = rendering.make_circle(.05)
-# axle.set_color(0,0,0)
-# viewer.add_geom(axle)
-# pole_transform.set_rotation(0 + np.pi/2)
-
-#################################################
-
-# from multiprocessing import Process
-
-# def f(x):
-#     k = 0
-#     for i in range(100000):
-#         k += x * x
-#     print('hello world', x)
-#     return x * x
 
 
-# if __name__ == '__main__':
-#     for num in range(10):
-#         Process(target=f, args=[num]).start()
-
-##################################################
-# from multiprocessing import Pool
-# import time
-
-# def f(x):
-#     k = 0
-#     for i in range(100000):
-#         k += x * x
-#     return x * x
+def no_op():
+    action = tuple((
+        np.array([1, 0]),
+        np.array([0, 0, 1]),
+        np.array(0),
+        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+    ))
+    env.step(action)
+    env.render()
 
 
-# if __name__ == '__main__':
-#     p = Pool(4)
-#     starttime = time.time()
-#     print(p.map(f, range(1000)))
-#     endtime = time.time()
-#     print(endtime-starttime)
-###################################################
-# import tensorflow as tf
+def ball_passing():
+    for i in range(5):
+        # Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        action = tuple((
+            np.array([1, 0]),
+            np.array([0, 1, 0]),
+            np.array(np.pi / 4),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+        ))
+        env.step(action)
+        env.render()
 
-# sess = tf.InteractiveSession()
+        no_op()
+        no_op()
 
-# a = tf.constant([[1,2],[3,4],[5,6]])
-# indices_1 = tf.constant([0,2,1])
-# indices_2 = tf.constant([0,2])
+        action = tuple((
+            np.array([1, 0]),
+            np.array([0, 1, 0]),
+            np.array(-np.pi / 2),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+        ))
+        env.step(action)
+        env.render()
 
-# print(a.eval())
-# permuted = tf.gather(a, indices_1)
-# print(permuted.eval())
-# gathered = tf.gather(a, indices_2)
-# print(gathered.eval())
+        no_op()
+        no_op()
+        no_op()
 
-# rows = None
-# rows = tf.range(10) if rows is None else rows
-# print(rows.eval())
+        action = tuple((
+            np.array([1, 0]),
+            np.array([0, 1, 0]),
+            np.array(np.pi * 3 / 4),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+        ))
+        env.step(action)
+        env.render()
+
+        no_op()
+        no_op()
+
+
+def moving_around():
+    for i in range(3):
+        # Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        action = tuple((
+            np.array([1, 0]),
+            np.array([0, 0, 1]),
+            np.array(0),
+            np.array(
+                [[1, np.pi / 2], [1, np.pi / 2], [1, np.pi / 2], [1, np.pi / 2], [1, np.pi / 2]]),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+        ))
+        env.step(action)
+        env.render()
+
+    for i in range(6):
+        # Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        action = tuple((
+            np.array([1, 0]),
+            np.array([0, 0, 1]),
+            np.array(0),
+            np.array(
+                [[1, -np.pi / 2], [1, -np.pi / 2], [1, -np.pi / 2], [1, -np.pi / 2], [1, -np.pi / 2]]),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+        ))
+        env.step(action)
+        env.render()
+
+    no_op()
+    no_op()
+    no_op()
+
+    for i in range(3):
+        # Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        action = tuple((
+            np.array([1, 0]),
+            np.array([0, 0, 1]),
+            np.array(0),
+            np.array(
+                [[1, np.pi / 2], [1, np.pi / 2], [1, np.pi / 2], [1, np.pi / 2], [1, np.pi / 2]]),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+        ))
+        env.step(action)
+        env.render()
+
+def collision():
+    pass
+
+def main():
+    global env
+    env = gym.make('bball-v0')
+    env = gym.wrappers.Monitor(
+        env, './test/', video_callable=lambda count: count % 1 == 0, force=True)
+    env.reset()
+    env.render()
+    # DEMO script
+    # ball_passing()
+    # moving_around()
+    collision()
+
+    env.close()
+
+
+if __name__ == '__main__':
+    main()
 
 # gather：根據一個list來取用目標
