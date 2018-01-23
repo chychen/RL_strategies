@@ -63,6 +63,7 @@ from gym import spaces
 import numpy as np
 from os import path
 import copy
+import sys
 """
 # TODO
 # check what is the screen range?
@@ -74,6 +75,8 @@ note :
 - speed: scalar only
 """
 
+FPS = 5.0
+
 
 def length(vec, axis=1):
     return np.sqrt(np.sum(vec * vec, axis=axis))
@@ -84,26 +87,22 @@ def distance(pos_a, pos_b, axis=1):
     return length(vec, axis=axis)
 
 
-def theta_between2vec(vec_a, vec_b):
-    return np.arccos(np.dot(vec_a, vec_b) / (length(vec_a) * length(vec_b)))
-
-
 class BallState(object):  # TODO
     def __init__(self):
         self.is_passing = None
         self.handler_idx = None
         self.velocity = None
-        self.passing_speed = None
+        self.passing_speed = 30 / FPS
 
     def reset(self, handler_idx, is_passing=False):
         self.is_passing = is_passing
         self.handler_idx = handler_idx
-        self.velocity = [0, 0]
-        self.passing_speed = 30
+        self.velocity = np.array([0, 0])
 
-    def update(self, handler_idx, is_passing):
+    def update(self, handler_idx, is_passing, velocity):
         self.is_passing = is_passing
         self.handler_idx = handler_idx
+        self.velocity = np.array(velocity)
 
 
 class BBallEnv(gym.Env):
@@ -117,7 +116,6 @@ class BBallEnv(gym.Env):
         self.def_pl_transforms = None
         self.off_pl_transforms = None
         self.ball_transform = None
-        self.fps = 5.0
         # court information
         self.court_length = 94
         self.court_width = 50
@@ -126,7 +124,8 @@ class BBallEnv(gym.Env):
         # physics limitations TODO per frame
         self.pl_max_speed = 100
         self.pl_max_power = 100
-        self.screen_radius = 2.0
+        # this is the distance between two players' center position
+        self.screen_radius = 2.0 * 2
         self.wingspan_radius = 3.5
         # Env information
         self.state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
@@ -152,6 +151,7 @@ class BBallEnv(gym.Env):
             velocity_state = np.subtract(self.state, self.state)
         # action decomposition
         flag = np.argmax(action[ACTION_LOOKUP['FLAG']])
+        assert flag.shape == ()
         decision = np.argmax(action[ACTION_LOOKUP['DECISION']])
         ball_pass_dir = action[ACTION_LOOKUP['BALL']]
         off_pl_dash = action[ACTION_LOOKUP['OFFENSE']]
@@ -175,18 +175,27 @@ class BBallEnv(gym.Env):
         1. init offensive team randomlu
         2. add defensive team next to each offensive player in the basket side.
         """
-        off_players_pos = self.np_random_generator.uniform(
-            low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
+        # TODO
+        # off_players_pos = self.np_random_generator.uniform(
+        #     low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
+        off_players_pos = np.array([
+            [80, 40],
+            [70, 35],
+            [60, 25],
+            [70, 15],
+            [80, 10]
+        ], dtype=np.float)
 
         def_players_pos = np.array(off_players_pos, copy=True)
         vec = self.right_basket_pos - off_players_pos
-        vec_length = length(vec)
+        vec_length = length(vec, axis=1)
         # vec_length = np.sqrt(np.sum(vec * vec, axis=1))
         u_vec = vec / np.stack([vec_length, vec_length], axis=1)
         def_players_pos = def_players_pos + u_vec * self.screen_radius
-
-        ball_handler_idx = np.floor(self.np_random_generator.uniform(
-            low=0.0, high=5.0)).astype(np.int)
+        # TODO
+        # ball_handler_idx = np.floor(self.np_random_generator.uniform(
+        #     low=0.0, high=5.0)).astype(np.int)
+        ball_handler_idx = 2
         ball_pos = np.array(off_players_pos[ball_handler_idx, :], copy=True)
 
         # reinit Env information
@@ -228,19 +237,39 @@ class BBallEnv(gym.Env):
             # defensive players
             for _ in range(5):
                 def_player = rendering.make_circle(radius=2.)
+                def_player_screen = rendering.make_circle(
+                    radius=self.screen_radius, filled=False)
+                def_player_wingspan = rendering.make_circle(
+                    radius=self.wingspan_radius, filled=False)
                 def_player.set_color(0, 0, 1)
+                def_player_screen.set_color(0, 0, 0.75)
+                def_player_wingspan.set_color(0.5, 0.5, 0.5)
                 def_trans = rendering.Transform()
                 self.def_pl_transforms.append(def_trans)
                 def_player.add_attr(def_trans)
+                def_player_screen.add_attr(def_trans)
+                def_player_wingspan.add_attr(def_trans)
                 self.viewer.add_geom(def_player)
+                self.viewer.add_geom(def_player_screen)
+                self.viewer.add_geom(def_player_wingspan)
             # offensive players
             for _ in range(5):
                 off_player = rendering.make_circle(radius=2.)
+                off_player_screen = rendering.make_circle(
+                    radius=self.screen_radius, filled=False)
+                off_player_wingspan = rendering.make_circle(
+                    radius=self.wingspan_radius, filled=False)
                 off_player.set_color(1, 0, 0)
+                off_player_screen.set_color(0.75, 0, 0)
+                off_player_wingspan.set_color(0.5, 0.5, 0.5)
                 off_trans = rendering.Transform()
                 self.off_pl_transforms.append(off_trans)
                 off_player.add_attr(off_trans)
+                off_player_screen.add_attr(off_trans)
+                off_player_wingspan.add_attr(off_trans)
                 self.viewer.add_geom(off_player)
+                self.viewer.add_geom(off_player_screen)
+                self.viewer.add_geom(off_player_wingspan)
             # ball
             ball = rendering.make_circle(radius=1.)
             ball.set_color(0, 1, 0)
@@ -256,7 +285,7 @@ class BBallEnv(gym.Env):
         # offensive players
         for trans, pos in zip(self.off_pl_transforms, self.state[STATE_LOOKUP['OFFENSE']]):
             trans.set_translation(pos[0], pos[1])
-            
+
         # ball
         ball_pos = self.state[STATE_LOOKUP['BALL']]
         self.ball_transform.set_translation(ball_pos[0], ball_pos[1])
@@ -275,14 +304,14 @@ class BBallEnv(gym.Env):
         """
         Return
         ------
-        Tuple(Discrete(2), Discrete(3), Box(1,), Box(5, 2), Box(5, 2))
+        Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
         """
         return spaces.Tuple((
             spaces.Discrete(2),  # offense or defense
             spaces.Discrete(3),  # offensive decision
             # ball theta
             spaces.Box(
-                low=-np.pi, high=np.pi, shape=[1, ]
+                low=-np.pi, high=np.pi, shape=()
             ),
             # offense player DASH(power, direction)
             spaces.Box(
@@ -326,19 +355,20 @@ class BBallEnv(gym.Env):
         self._update_player_state(
             off_pl_dash, velocity_state, STATE_LOOKUP['OFFENSE'])
         # update ball state
-        self._update_ball_state(decision)
+        self._update_ball_state(decision, ball_pass_dir)
 
-        return self.state, 0.0, False, None
+        if decision == DESICION_LOOKUP['SHOOT']:
+            reward = self._calculate_reward()
+            return self.state, 0.0, False, None
+        elif decision == DESICION_LOOKUP['PASS']:
 
-        # if decision == DESICION_LOOKUP['SHOOT']:
-        #     self._calculate_reward()
-        # elif decision == DESICION_LOOKUP['PASS']:
-        #     ...
-        # elif decision == DESICION_LOOKUP['NO_OP']:
-        #     ...
-        # else:
-        #     raise KeyError(
-        #         'Decision #{} have not been defined in DESICION_LOOKUP table'.format(decision))
+            return self.state, 0.0, False, None
+        elif decision == DESICION_LOOKUP['NO_OP']:
+
+            return self.state, 0.0, False, None
+        else:
+            raise KeyError(
+                'Decision #{} have not been defined in DESICION_LOOKUP table'.format(decision))
 
         # if episode ended
         # --A shoot decision is made,
@@ -366,7 +396,6 @@ class BBallEnv(gym.Env):
             the force of each player
         """
         # if collision TODO
-
         # update player state
         assert pl_dash.shape == (5, 2)
         # decomposing into power and direction
@@ -380,7 +409,7 @@ class BBallEnv(gym.Env):
         assert pl_velocity.shape == last_pl_velocity.shape
         pl_velocity = np.add(velocity_state[state_idx], pl_velocity)
         # pl_speed = np.sqrt(np.sum(pl_velocity * pl_velocity, axis=1))
-        pl_speed = length(pl_velocity)
+        pl_speed = length(pl_velocity, axis=1)
         # can't not exceed the limits
         indices = np.argwhere(pl_speed >= self.pl_max_speed)
         pl_velocity[indices] = pl_velocity[indices] / \
@@ -388,7 +417,7 @@ class BBallEnv(gym.Env):
                      axis=-1) * self.pl_max_speed
         self.state[state_idx] += pl_velocity
 
-    def _update_ball_state(self, decision):
+    def _update_ball_state(self, decision, ball_pass_dir):
         """
         Inputs
         ------
@@ -405,19 +434,40 @@ class BBallEnv(gym.Env):
             # check if ball caught/stolen
             off2ball_vec = self.state[STATE_LOOKUP['OFFENSE']
                                       ] - self.state[STATE_LOOKUP['BALL']]
-            theta = theta_between2vec(off2ball_vec, -self.ball_state.velocity)
-            off2ball_shortest_dist = np.sin(theta) * length(off2ball_vec)
+            off2oldball_vec = self.state[STATE_LOOKUP['OFFENSE']
+                                         ] - self.last_state[STATE_LOOKUP['BALL']]
+            off2ball_shortest_dist = np.empty(shape=(5,))
+            for i, [vec, old_vec] in enumerate(zip(off2ball_vec, off2oldball_vec)):
+                dotvalue = np.dot(vec, self.ball_state.velocity)
+                old_dotvalue = np.dot(old_vec, self.ball_state.velocity)
+                if dotvalue <= 0.0 and old_dotvalue <= 0.0:  # leave
+                    off2ball_shortest_dist[i] = sys.float_info.max
+                elif dotvalue > 0.0 and old_dotvalue > 0.0:  # come
+                    temp_dist = length(vec, axis=0)
+                    if temp_dist < self.wingspan_radius:
+                        off2ball_shortest_dist[i] = temp_dist
+                    else:
+                        off2ball_shortest_dist[i] = sys.float_info.max
+                elif dotvalue <= 0.0 and old_dotvalue > 0.0:  # in then out
+                    cos_value = np.dot(vec, np.multiply(-1, self.ball_state.velocity)) / \
+                        (length(vec, axis=0) *
+                         length(self.ball_state.velocity, axis=0))
+                    off2ball_shortest_dist[i] = np.sin(
+                        np.arccos(cos_value)) * length(vec, axis=0)
             candidates = np.argwhere(
-                off2ball_shortest_dist <= self.wingspan_radius)
-            if len(candidates) > 1:
-                catcher_idx = candidates[np.argmin(
-                    length(off2ball_vec)[candidates])]
-            else:
-                catcher_idx = candidates
-            # assign catcher pos to ball pos
-            self.state[STATE_LOOKUP['BALL']
-                       ] = STATE_LOOKUP['OFFENSE'][catcher_idx]
-            self.ball_state.update(handler_idx=catcher_idx, is_passing=False)
+                off2ball_shortest_dist <= self.wingspan_radius).reshape([-1])  # TODO need verify
+            if len(candidates) != 0:
+                if len(candidates) > 1:
+                    catcher_idx = candidates[
+                        np.argmin(length(off2ball_vec[candidates], axis=1))]
+                else:
+                    catcher_idx = candidates[0]
+                # assign catcher pos to ball pos
+                self.state[STATE_LOOKUP['BALL']
+                           ] = self.state[STATE_LOOKUP['OFFENSE']][catcher_idx]
+
+                self.ball_state.update(
+                    handler_idx=catcher_idx, is_passing=False, velocity=[0, 0])
 
             # TODO defender steal the ball
             # def2ball_dist = self.state[STATE_LOOKUP['DEFENSE']
@@ -430,12 +480,13 @@ class BBallEnv(gym.Env):
                        ] = self.state[STATE_LOOKUP['OFFENSE']][self.ball_state.handler_idx]
         elif decision == DESICION_LOOKUP['PASS']:
             assert self.ball_state.is_passing == False
-            self.ball_state.update(handler_idx=None, is_passing=True)
-
             ball_pass_dir = np.clip(
                 ball_pass_dir, -np.pi, np.pi)
-            self.ball_state.velocity = [
-                self.ball_state.passing_speed * np.cos(ball_pass_dir), self.ball_state.passing_speed * np.sin(ball_pass_dir)]
+            new_vel = [self.ball_state.passing_speed * np.cos(ball_pass_dir),
+                       self.ball_state.passing_speed * np.sin(ball_pass_dir)]
+            self.ball_state.update(
+                handler_idx=None, is_passing=True, velocity=new_vel)
+
             self.state[STATE_LOOKUP['BALL']
                        ] += self.ball_state.velocity
 
@@ -456,7 +507,7 @@ STATE_LOOKUP = {
 }
 
 ACTION_LOOKUP = {
-    # Tuple(Discrete(2), Discrete(3), Box(1,), Box(5, 2), Box(5, 2))
+    # Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
     'FLAG': 0,
     'DECISION': 1,
     'BALL': 2,

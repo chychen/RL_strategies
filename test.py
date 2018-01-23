@@ -4,21 +4,32 @@ import numpy as np
 env = gym.make('bball-v0')
 env.reset()
 env.render()
-# Tuple(Discrete(2), Discrete(3), Box(1,), Box(5, 2), Box(5, 2))
-action = np.array([
-    np.array([1,0]),
-    np.array([0,0,1]),
-    np.array([0]),
-    np.array([[5,0],[0,0],[0,0],[0,0],[0,0]]),
-    np.array([[0,0],[0,0],[0,0],[0,0],[0,0]])
-])
-input()
+# Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
+action = tuple((
+    np.array([1, 0]),
+    np.array([0, 1, 0]),
+    np.array(1 * np.pi / 4),
+    np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+    np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+))
 env.step(action)
 env.render()
-input()
-env.step(action)
-env.render()
-input()
+# action = tuple((
+#     np.array([0, 1]),
+#     np.array([0, 0, 1]),
+#     np.array(0),
+#     np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+#     np.array([[5, -np.pi / 2], [0, 0], [0, 0], [0, 0], [0, 0]])
+# ))
+# env.step(action)
+# env.render()
+action = tuple((
+    np.array([1, 0]),
+    np.array([0, 0, 1]),
+    np.array(0),
+    np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+    np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+))
 env.step(action)
 env.render()
 input()
@@ -80,7 +91,7 @@ input()
 #         k += x * x
 #     print('hello world', x)
 #     return x * x
-    
+
 
 # if __name__ == '__main__':
 #     for num in range(10):
