@@ -106,17 +106,22 @@ def moving_around():
 def collision():
     pass
 
+
 def main():
     global env
     env = gym.make('bball-v0')
     env = gym.wrappers.Monitor(
         env, './test/', video_callable=lambda count: count % 1 == 0, force=True)
-    env.reset()
+    env._reset(is_default_init=True) 
     env.render()
     # DEMO script
     # ball_passing()
     # moving_around()
-    collision()
+    ball_stealing()
+    # maxspeed()
+    # collision()
+    # random_dancing()
+    # rewards()
 
     env.close()
 
@@ -125,3 +130,4 @@ if __name__ == '__main__':
     main()
 
 # gather：根據一個list來取用目標
+# python 使用+=很可能會有不明錯誤！！！儘量避免

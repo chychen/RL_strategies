@@ -175,21 +175,31 @@ class BBallEnv(gym.Env):
         self.last_state = temp_state
         return result
 
-    def _reset(self):
+    def reset(self, **kwargs):
+        """ Override the Env.reset(), which takes no arguments
+        """
+        return self._reset(**kwargs)
+
+    def _reset(self, is_default_init=False):
         """ random init positions in the right half court
         1. init offensive team randomlu
         2. add defensive team next to each offensive player in the basket side.
         """
-        # TODO
-        # off_players_pos = self.np_random_generator.uniform(
-        #     low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
-        off_players_pos = np.array([
-            [80, 40],
-            [70, 35],
-            [60, 25],
-            [70, 15],
-            [80, 10]
-        ], dtype=np.float)
+        if is_default_init:
+            off_players_pos = np.array([
+                [80, 40],
+                [70, 35],
+                [60, 25],
+                [70, 15],
+                [80, 10]
+            ], dtype=np.float)
+            ball_handler_idx = 2
+            
+        else:
+            off_players_pos = self.np_random_generator.uniform(
+                low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
+            ball_handler_idx = np.floor(self.np_random_generator.uniform(
+                low=0.0, high=5.0)).astype(np.int)
 
         def_players_pos = np.array(off_players_pos, copy=True)
         vec = self.right_basket_pos - off_players_pos
@@ -197,10 +207,6 @@ class BBallEnv(gym.Env):
         # vec_length = np.sqrt(np.sum(vec * vec, axis=1))
         u_vec = vec / np.stack([vec_length, vec_length], axis=1)
         def_players_pos = def_players_pos + u_vec * self.screen_radius
-        # TODO
-        # ball_handler_idx = np.floor(self.np_random_generator.uniform(
-        #     low=0.0, high=5.0)).astype(np.int)
-        ball_handler_idx = 2
         ball_pos = np.array(off_players_pos[ball_handler_idx, :], copy=True)
 
         # reinit Env information
@@ -398,6 +404,7 @@ class BBallEnv(gym.Env):
             the force of each player
         """
         # if collision TODO
+
         # update player state
         assert pl_dash.shape == (5, 2)
         # decomposing into power and direction
@@ -490,8 +497,6 @@ class BBallEnv(gym.Env):
             self.ball_state.update(
                 handler_idx=None, is_passing=True, velocity=new_vel)
 
-            # UNKNOWN BUG!!!!!!!!!!!!!!!!!!!!!
-            # self.state[STATE_LOOKUP['BALL']] += self.ball_state.velocity
             self.state[STATE_LOOKUP['BALL']
                        ] = self.state[STATE_LOOKUP['BALL']] + self.ball_state.velocity
 
