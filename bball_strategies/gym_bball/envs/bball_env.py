@@ -42,16 +42,7 @@ court size: 94 by 50 (feet)
 # analized from real NBA dataset
 (maximum = mean + 3 * stddev)
 FPS = 5
-# ball TODO
-maximum speed =  m/s =  feet/s =  feet/frame
-maximum accerlation =  m/s^2 =  feet/s^2 =  feet/frame
-we set speed 30 ft/s while passing TODO
-# offensive players TODO
-maximum speed =  m/s =  feet/s =  feet/frame
-maximum accerlation =  m/s^2 =  feet/s^2 =  feet/frame
-# defensive players TODO
-maximum speed =  m/s =  feet/s =  feet/frame
-maximum accerlation =  m/s^2 =  feet/s^2 =  feet/frame
+all analized results are recorded in bball_strategies/analysis/physics_limitation.py
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -65,6 +56,7 @@ import numpy as np
 from os import path
 import copy
 import sys
+from gym.envs.classic_control import rendering
 """
 # TODO
 # check what is the screen range?
@@ -127,8 +119,8 @@ class BBallEnv(gym.Env):
         self.left_basket_pos = [0 + 5.25, 25]
         self.right_basket_pos = [94 - 5.25, 25]
         # physics limitations TODO per frame
-        self.pl_max_speed = 100
-        self.pl_max_power = 100
+        self.pl_max_speed = 38.9379818754 / FPS
+        self.pl_max_power = 24.5810950984 / FPS
         # this is the distance between two players' center position
         self.screen_radius = 2.0 * 2
         self.wingspan_radius = 3.5
@@ -194,7 +186,7 @@ class BBallEnv(gym.Env):
                 [80, 10]
             ], dtype=np.float)
             ball_handler_idx = 2
-            
+
         else:
             off_players_pos = self.np_random_generator.uniform(
                 low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
@@ -223,26 +215,91 @@ class BBallEnv(gym.Env):
                 distance(def_players_pos, off_pos))
 
         return self.state
-
-    def _render(self, mode='human', close=False):
+    
+    def _render(self, mode='human', close=False, enable_trajectory=False):
         if close:
             if self.viewer is not None:
                 self.viewer.close()
                 self.viewer = None
             return
 
-        if self.viewer is None:
-            from gym.envs.classic_control import rendering
-            self.viewer = rendering.Viewer(940, 500)
-            self.viewer.set_bounds(0, 94, 0, 50)  # feet
-            # background img
-            fname = path.join(path.dirname(__file__), "fullcourt.png")
-            img = rendering.Image(fname, 94, 50)
-            imgtrans = rendering.Transform(translation=(47.0, 25.0))
-            img.add_attr(imgtrans)
-            self.viewer.add_geom(img)
+        if not enable_trajectory:
+            if self.viewer is None:
+                self.viewer = rendering.Viewer(940, 500)
+                self.viewer.set_bounds(0, 94, 0, 50)  # feet
+                # background img
+                fname = path.join(path.dirname(__file__), "fullcourt.png")
+                img = rendering.Image(fname, 94, 50)
+                imgtrans = rendering.Transform(translation=(47.0, 25.0))
+                img.add_attr(imgtrans)
+                self.viewer.add_geom(img)
+                # defensive players
+                for _ in range(5):
+                    def_player = rendering.make_circle(radius=2.)
+                    def_player_screen = rendering.make_circle(
+                        radius=self.screen_radius, filled=False)
+                    def_player_wingspan = rendering.make_circle(
+                        radius=self.wingspan_radius, filled=False)
+                    def_player.set_color(0, 0, 1)
+                    def_player_screen.set_color(0, 0, 0.75)
+                    def_player_wingspan.set_color(0.5, 0.5, 0.5)
+                    def_trans = rendering.Transform()
+                    self.def_pl_transforms.append(def_trans)
+                    def_player.add_attr(def_trans)
+                    def_player_screen.add_attr(def_trans)
+                    def_player_wingspan.add_attr(def_trans)
+                    self.viewer.add_geom(def_player)
+                    self.viewer.add_geom(def_player_screen)
+                    self.viewer.add_geom(def_player_wingspan)
+                # offensive players
+                for _ in range(5):
+                    off_player = rendering.make_circle(radius=2.)
+                    off_player_screen = rendering.make_circle(
+                        radius=self.screen_radius, filled=False)
+                    off_player_wingspan = rendering.make_circle(
+                        radius=self.wingspan_radius, filled=False)
+                    off_player.set_color(1, 0, 0)
+                    off_player_screen.set_color(0.75, 0, 0)
+                    off_player_wingspan.set_color(0.5, 0.5, 0.5)
+                    off_trans = rendering.Transform()
+                    self.off_pl_transforms.append(off_trans)
+                    off_player.add_attr(off_trans)
+                    off_player_screen.add_attr(off_trans)
+                    off_player_wingspan.add_attr(off_trans)
+                    self.viewer.add_geom(off_player)
+                    self.viewer.add_geom(off_player_screen)
+                    self.viewer.add_geom(off_player_wingspan)
+                # ball
+                ball = rendering.make_circle(radius=1.)
+                ball.set_color(0, 1, 0)
+                ball_trans = rendering.Transform()
+                self.ball_transform = ball_trans
+                ball.add_attr(ball_trans)
+                self.viewer.add_geom(ball)
+
+            ### set translations ###
             # defensive players
-            for _ in range(5):
+            for trans, pos in zip(self.def_pl_transforms, self.state[STATE_LOOKUP['DEFENSE']]):
+                trans.set_translation(pos[0], pos[1])
+            # offensive players
+            for trans, pos in zip(self.off_pl_transforms, self.state[STATE_LOOKUP['OFFENSE']]):
+                trans.set_translation(pos[0], pos[1])
+            # ball
+            ball_pos = self.state[STATE_LOOKUP['BALL']]
+            self.ball_transform .set_translation(ball_pos[0], ball_pos[1])
+
+        elif enable_trajectory:
+            if self.viewer is None:
+                self.viewer = rendering.Viewer(940, 500)
+                self.viewer.set_bounds(0, 94, 0, 50)  # feet
+                # background img
+                fname = path.join(path.dirname(__file__), "fullcourt.png")
+                img = rendering.Image(fname, 94, 50)
+                imgtrans = rendering.Transform(translation=(47.0, 25.0))
+                img.add_attr(imgtrans)
+                self.viewer.add_geom(img)
+            # defensive players
+            for i in range(5):
                 def_player = rendering.make_circle(radius=2.)
                 def_player_screen = rendering.make_circle(
                     radius=self.screen_radius, filled=False)
@@ -252,7 +309,8 @@ class BBallEnv(gym.Env):
                 def_player_screen.set_color(0, 0, 0.75)
                 def_player_wingspan.set_color(0.5, 0.5, 0.5)
                 def_trans = rendering.Transform()
-                self.def_pl_transforms.append(def_trans)
+                pos = self.state[STATE_LOOKUP['DEFENSE']][i]
+                def_trans.set_translation(pos[0], pos[1])
                 def_player.add_attr(def_trans)
                 def_player_screen.add_attr(def_trans)
                 def_player_wingspan.add_attr(def_trans)
@@ -260,7 +318,7 @@ class BBallEnv(gym.Env):
                 self.viewer.add_geom(def_player_screen)
                 self.viewer.add_geom(def_player_wingspan)
             # offensive players
-            for _ in range(5):
+            for i in range(5):
                 off_player = rendering.make_circle(radius=2.)
                 off_player_screen = rendering.make_circle(
                     radius=self.screen_radius, filled=False)
@@ -270,7 +328,8 @@ class BBallEnv(gym.Env):
                 off_player_screen.set_color(0.75, 0, 0)
                 off_player_wingspan.set_color(0.5, 0.5, 0.5)
                 off_trans = rendering.Transform()
-                self.off_pl_transforms.append(off_trans)
+                pos = self.state[STATE_LOOKUP['OFFENSE']][i]
+                off_trans.set_translation(pos[0], pos[1])
                 off_player.add_attr(off_trans)
                 off_player_screen.add_attr(off_trans)
                 off_player_wingspan.add_attr(off_trans)
@@ -281,21 +340,10 @@ class BBallEnv(gym.Env):
             ball = rendering.make_circle(radius=1.)
             ball.set_color(0, 1, 0)
             ball_trans = rendering.Transform()
-            self.ball_transform = ball_trans
+            ball_pos = self.state[STATE_LOOKUP['BALL']]
+            ball_trans.set_translation(ball_pos[0], ball_pos[1])
             ball.add_attr(ball_trans)
             self.viewer.add_geom(ball)
-
-        ### set translations ###
-        # defensive players
-        for trans, pos in zip(self.def_pl_transforms, self.state[STATE_LOOKUP['DEFENSE']]):
-            trans.set_translation(pos[0], pos[1])
-        # offensive players
-        for trans, pos in zip(self.off_pl_transforms, self.state[STATE_LOOKUP['OFFENSE']]):
-            trans.set_translation(pos[0], pos[1])
-
-        # ball
-        ball_pos = self.state[STATE_LOOKUP['BALL']]
-        self.ball_transform.set_translation(ball_pos[0], ball_pos[1])
 
         return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 
@@ -394,7 +442,7 @@ class BBallEnv(gym.Env):
         """
         self._update_player_state(
             def_pl_dash, velocity_state, STATE_LOOKUP['DEFENSE'])
-        return self.state, 0.0, True, dict()  # TODO done !!!!
+        return self.state, 0.0, False, dict()
 
     def _update_player_state(self, pl_dash, velocity_state, state_idx):
         """ Update the player's movement following the physics limitation predefined

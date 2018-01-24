@@ -2,95 +2,95 @@
 ######## SPEED ########
 --BALL--
         ### feet ###
-                mean: 9.96812766732
-                tddev: 9.58744252436
-                maximum: 346.746883812
+                mean: 9.8898809414
+                stddev: 9.68270031134
+                maximum: 274.923652593
                 minimum: 0.0
-                mean + 3 * stddev: 38.7304552404
-                mean + 3 * stddev per frame: 6.19687283846
+                mean + 3 * stddev: 38.9379818754
+                mean + 3 * stddev per frame: 7.78759637508
         ### meter ###
-                mean: 3.038285313
-                tddev: 2.92225248142
-                maximum: 105.688450186
+                mean: 3.01443571094
+                stddev: 2.9512870549
+                maximum: 83.7967293102
                 minimum: 0.0
-                mean + 3 * stddev: 11.8050427573
-                mean + 3 * stddev per frame: 1.88880684116
+                mean + 3 * stddev: 11.8682968756
+                mean + 3 * stddev per frame: 2.37365937513
 --OFFENSIVE PLAYERS--
         ### feet ###
-                mean: 4.82228321969
-                tddev: 5.66676430718
-                maximum: 356.972509487
+                mean: 4.8631853515
+                stddev: 6.31134758487
+                maximum: 266.70375004
                 minimum: 0.0
-                mean + 3 * stddev: 21.8225761412
-                mean + 3 * stddev per frame: 3.4916121826
+                mean + 3 * stddev: 23.7972281061
+                mean + 3 * stddev per frame: 4.75944562122
         ### meter ###
-                mean: 1.46983192536
-                tddev: 1.72722976083
-                maximum: 108.805220892
+                mean: 1.48229889514
+                stddev: 1.92369874387
+                maximum: 81.2913030121
                 minimum: 0.0
-                mean + 3 * stddev: 6.65152120785
-                mean + 3 * stddev per frame: 1.06424339326
+                mean + 3 * stddev: 7.25339512674
+                mean + 3 * stddev per frame: 1.45067902535
 --DEFENSIVE PLAYERS--
         ### feet ###
-                mean: 4.0065741936
-                tddev: 4.10053463972
-                maximum: 295.220443716
-                minimum: 0.0
-                mean + 3 * stddev: 16.3081781128
-                mean + 3 * stddev per frame: 2.60930849804
+                mean: 4.03610800751
+                stddev: 4.56436216669
+                maximum: 236.550839273
+                minimum: 0.00192093727118
+                mean + 3 * stddev: 17.7291945076
+                mean + 3 * stddev per frame: 3.54583890152
         ### meter ###
-                mean: 1.22120381421
-                tddev: 1.24984295819
-                maximum: 89.9831912448
-                minimum: 0.0
-                mean + 3 * stddev: 4.97073268877
-                mean + 3 * stddev per frame: 0.795317230204
+                mean: 1.23020572069
+                stddev: 1.39121758841
+                maximum: 72.1006958105
+                minimum: 0.000585501680257
+                mean + 3 * stddev: 5.40385848591
+                mean + 3 * stddev per frame: 1.08077169718
 ##### ACCERLATION #####
 --BALL--
         ### feet ###
-                mean: 6.59227756409
-                tddev: 8.59926922199
-                maximum: 691.21559203
+                mean: 7.21773150016
+                stddev: 9.34066889272
+                maximum: 468.660892453
                 minimum: 0.0
-                mean + 3 * stddev: 32.3900852301
-                mean + 3 * stddev per frame: 5.18241363681
+                mean + 3 * stddev: 35.2397381783
+                mean + 3 * stddev per frame: 7.04794763567
         ### meter ###
-                mean: 2.00932620154
-                tddev: 2.62105725886
-                maximum: 210.682512451
+                mean: 2.19996456125
+                stddev: 2.8470358785
+                maximum: 142.84784002
                 minimum: 0.0
-                mean + 3 * stddev: 9.87249797812
-                mean + 3 * stddev per frame: 1.5795996765
+                mean + 3 * stddev: 10.7410721968
+                mean + 3 * stddev per frame: 2.14821443935
 --OFFENSIVE PLAYERS--
         ### feet ###
-                mean: 1.38937387361
-                tddev: 6.35125744014
-                maximum: 363.374842672
+                mean: 1.79004387352
+                stddev: 7.59701707495
+                maximum: 269.823520445
                 minimum: 0.0
-                mean + 3 * stddev: 20.443146194
-                mean + 3 * stddev per frame: 3.27090339104
+                mean + 3 * stddev: 24.5810950984
+                mean + 3 * stddev per frame: 4.91621901967
         ### meter ###
-                mean: 0.423481156676
-                tddev: 1.93586326775
-                maximum: 110.756652046
+                mean: 0.545605372649
+                stddev: 2.31557080444
+                maximum: 82.2422090315
                 minimum: 0.0
-                mean + 3 * stddev: 6.23107095994
-                mean + 3 * stddev per frame: 0.99697135359
+                mean + 3 * stddev: 7.49231778598
+                mean + 3 * stddev per frame: 1.4984635572
 --DEFENSIVE PLAYERS--
         ### feet ###
-                mean: 1.34141704905
-                tddev: 4.35347505948
-                maximum: 301.58107585
+                mean: 1.67604893772
+                stddev: 5.27899130646
+                maximum: 242.890393168
                 minimum: 0.0
-                mean + 3 * stddev: 14.4018422275
-                mean + 3 * stddev per frame: 2.3042947564
+                mean + 3 * stddev: 17.5130228571
+                mean + 3 * stddev per frame: 3.50260457142
         ### meter ###
-                mean: 0.408863916551
-                tddev: 1.32693919813
-                maximum: 91.9219119192
+                mean: 0.510859716218
+                stddev: 1.60903655021
+                maximum: 74.0329918377
                 minimum: 0.0
-                mean + 3 * stddev: 4.38968151094
-                mean + 3 * stddev per frame: 0.702349041751
+                mean + 3 * stddev: 5.33796936685
+                mean + 3 * stddev per frame: 1.06759387337
 """
 
 from __future__ import print_function
@@ -99,7 +99,6 @@ from __future__ import division
 
 import numpy as np
 
-FPS = 6.25
 FEET_TO_METER = 0.3048
 METER_TP_FEET = 1.0 / 0.3048
 
@@ -125,9 +124,15 @@ def analyze(x, y):
 
 
 def main():
-#     data = np.load('../data/NBA-ALL.npy')
-    data = np.load('../data/FEATURES-4.npy')
-    
+    import argparse
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--name', type=str, help='data name', default='FrameRate5')
+    parser.add_argument('--fps', type=float, help='fps', default=5.0)
+    args = parser.parse_args()
+#     data = np.load('../data/' + args.name + '.npy').reshape([1,-1,11,3])
+    data = np.load('../data/' + args.name + '.npy')
+    global FPS
+    FPS = args.fps
     print(data.shape)
     # (11863, 100, 11, 4)
     speed_x = (data[:, :-1, :, 0] - data[:, 1:, :, 0]) * FPS
