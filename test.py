@@ -114,24 +114,26 @@ def collision():
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
-    def __init__(self, env, is_default_init=False, enable_trajectory=False):
+    def __init__(self, env, if_init_by_default=False, if_vis_trajectory=False, if_vis_visual_aid=False):
         super(MonitorWrapper, self).__init__(env=env, directory='./test/',
                                              video_callable=lambda count: count % 1 == 0, force=True)
-        self.is_default_init = is_default_init
-        self.enable_trajectory = enable_trajectory
+        self.if_init_by_default = if_init_by_default
+        self.if_vis_trajectory = if_vis_trajectory
+        self.if_vis_visual_aid = if_vis_visual_aid
 
     def reset(self):
-        return self._reset(is_default_init=self.is_default_init)
+        return self._reset(if_init_by_default=self.if_init_by_default)
 
     def render(self):
-        return self.env._render(enable_trajectory=self.enable_trajectory)
+        return self.env._render(if_vis_trajectory=self.if_vis_trajectory, if_vis_visual_aid=self.if_vis_visual_aid)
 
 
 def main():
     global env
     env = gym.make('bball-v0')
-    env = MonitorWrapper(env, is_default_init=True,
-                         enable_trajectory=True)
+    env = MonitorWrapper(env, if_init_by_default=True,
+                         if_vis_trajectory=True,
+                         if_vis_visual_aid=True)
     env.reset()
     env.render()
 

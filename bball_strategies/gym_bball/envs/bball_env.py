@@ -62,6 +62,7 @@ from gym.envs.classic_control import rendering
 # check what is the screen range?
 # screen_radius = circle with radius 2.0 feets (about 0.61 meter)
 # wingspan_radius = circle with radius 3.5 feets (about 1.06 meter)
+# stolen_radius = circle with radius 5.0 feets (about 1.52 meter)
 
 note :
 - velocity: scalar with direction
@@ -124,11 +125,12 @@ class BBallEnv(gym.Env):
         # this is the distance between two players' center position
         self.screen_radius = 2.0 * 2
         self.wingspan_radius = 3.5
+        self.stolen_radius = 5.0
         # Env information
         self.state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
         self.last_state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
         self.ball_state = BallState()
-        self.off_def_closest_map = None  # dict()
+        # self.off_def_closest_map = None  # dict()
 
         # must define properties
         self.action_space = self._set_action_space()
@@ -172,12 +174,12 @@ class BBallEnv(gym.Env):
         """
         return self._reset(**kwargs)
 
-    def _reset(self, is_default_init=False):
+    def _reset(self, if_init_by_default=False):
         """ random init positions in the right half court
         1. init offensive team randomlu
         2. add defensive team next to each offensive player in the basket side.
         """
-        if is_default_init:
+        if if_init_by_default:
             off_players_pos = np.array([
                 [80, 40],
                 [70, 35],
@@ -186,7 +188,6 @@ class BBallEnv(gym.Env):
                 [80, 10]
             ], dtype=np.float)
             ball_handler_idx = 2
-
         else:
             off_players_pos = self.np_random_generator.uniform(
                 low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
@@ -209,21 +210,21 @@ class BBallEnv(gym.Env):
         self.state = np.array([ball_pos, off_players_pos, def_players_pos])
         self.last_state = None
         self.ball_state.reset(handler_idx=ball_handler_idx, is_passing=False)
-        self.off_def_closest_map = dict()
-        for idx, off_pos in enumerate(off_players_pos):
-            self.off_def_closest_map[idx] = np.argmin(
-                distance(def_players_pos, off_pos))
+        # self.off_def_closest_map = dict()
+        # for idx, off_pos in enumerate(off_players_pos):
+        #     self.off_def_closest_map[idx] = np.argmin(
+        #         distance(def_players_pos, off_pos))
 
         return self.state
     
-    def _render(self, mode='human', close=False, enable_trajectory=False):
+    def _render(self, mode='human', close=False, if_vis_trajectory=False, if_vis_visual_aid=False):
         if close:
             if self.viewer is not None:
                 self.viewer.close()
                 self.viewer = None
             return
 
-        if not enable_trajectory:
+        if not if_vis_trajectory:
             if self.viewer is None:
                 self.viewer = rendering.Viewer(940, 500)
                 self.viewer.set_bounds(0, 94, 0, 50)  # feet
@@ -236,39 +237,46 @@ class BBallEnv(gym.Env):
                 # defensive players
                 for _ in range(5):
                     def_player = rendering.make_circle(radius=2.)
-                    def_player_screen = rendering.make_circle(
-                        radius=self.screen_radius, filled=False)
-                    def_player_wingspan = rendering.make_circle(
-                        radius=self.wingspan_radius, filled=False)
                     def_player.set_color(0, 0, 1)
-                    def_player_screen.set_color(0, 0, 0.75)
-                    def_player_wingspan.set_color(0.5, 0.5, 0.5)
                     def_trans = rendering.Transform()
                     self.def_pl_transforms.append(def_trans)
                     def_player.add_attr(def_trans)
-                    def_player_screen.add_attr(def_trans)
-                    def_player_wingspan.add_attr(def_trans)
                     self.viewer.add_geom(def_player)
-                    self.viewer.add_geom(def_player_screen)
-                    self.viewer.add_geom(def_player_wingspan)
+                    if if_vis_visual_aid:
+                        def_player_screen = rendering.make_circle(
+                            radius=self.screen_radius, filled=False)
+                        def_player_wingspan = rendering.make_circle(
+                            radius=self.wingspan_radius, filled=False)
+                        def_player_screen.set_color(0, 0, 0.75)
+                        def_player_wingspan.set_color(0.5, 0.5, 0.5)
+                        def_player_screen.add_attr(def_trans)
+                        def_player_wingspan.add_attr(def_trans)
+                        self.viewer.add_geom(def_player_screen)
+                        self.viewer.add_geom(def_player_wingspan)
                 # offensive players
                 for _ in range(5):
                     off_player = rendering.make_circle(radius=2.)
-                    off_player_screen = rendering.make_circle(
-                        radius=self.screen_radius, filled=False)
-                    off_player_wingspan = rendering.make_circle(
-                        radius=self.wingspan_radius, filled=False)
                     off_player.set_color(1, 0, 0)
-                    off_player_screen.set_color(0.75, 0, 0)
-                    off_player_wingspan.set_color(0.5, 0.5, 0.5)
                     off_trans = rendering.Transform()
                     self.off_pl_transforms.append(off_trans)
                     off_player.add_attr(off_trans)
-                    off_player_screen.add_attr(off_trans)
-                    off_player_wingspan.add_attr(off_trans)
                     self.viewer.add_geom(off_player)
-                    self.viewer.add_geom(off_player_screen)
-                    self.viewer.add_geom(off_player_wingspan)
+                    if if_vis_visual_aid:
+                        off_player_screen = rendering.make_circle(
+                            radius=self.screen_radius, filled=False)
+                        off_player_wingspan = rendering.make_circle(
+                            radius=self.wingspan_radius, filled=False)
+                        off_stolen_range = rendering.make_circle(
+                            radius=self.stolen_radius, filled=False)
+                        off_player_screen.set_color(0.75, 0, 0)
+                        off_player_wingspan.set_color(0.5, 0.5, 0.5)
+                        off_stolen_range.set_color(0, 0, 0.75)
+                        off_player_screen.add_attr(off_trans)
+                        off_player_wingspan.add_attr(off_trans)
+                        off_stolen_range.add_attr(off_trans)
+                        self.viewer.add_geom(off_player_screen)
+                        self.viewer.add_geom(off_player_wingspan)
+                        self.viewer.add_geom(off_stolen_range)
                 # ball
                 ball = rendering.make_circle(radius=1.)
                 ball.set_color(0, 1, 0)
@@ -288,7 +296,7 @@ class BBallEnv(gym.Env):
             ball_pos = self.state[STATE_LOOKUP['BALL']]
             self.ball_transform .set_translation(ball_pos[0], ball_pos[1])
 
-        elif enable_trajectory:
+        elif if_vis_trajectory:
             if self.viewer is None:
                 self.viewer = rendering.Viewer(940, 500)
                 self.viewer.set_bounds(0, 94, 0, 50)  # feet
@@ -301,41 +309,48 @@ class BBallEnv(gym.Env):
             # defensive players
             for i in range(5):
                 def_player = rendering.make_circle(radius=2.)
-                def_player_screen = rendering.make_circle(
-                    radius=self.screen_radius, filled=False)
-                def_player_wingspan = rendering.make_circle(
-                    radius=self.wingspan_radius, filled=False)
                 def_player.set_color(0, 0, 1)
-                def_player_screen.set_color(0, 0, 0.75)
-                def_player_wingspan.set_color(0.5, 0.5, 0.5)
                 def_trans = rendering.Transform()
                 pos = self.state[STATE_LOOKUP['DEFENSE']][i]
                 def_trans.set_translation(pos[0], pos[1])
                 def_player.add_attr(def_trans)
-                def_player_screen.add_attr(def_trans)
-                def_player_wingspan.add_attr(def_trans)
                 self.viewer.add_geom(def_player)
-                self.viewer.add_geom(def_player_screen)
-                self.viewer.add_geom(def_player_wingspan)
+                if if_vis_visual_aid:
+                    def_player_screen = rendering.make_circle(
+                        radius=self.screen_radius, filled=False)
+                    def_player_wingspan = rendering.make_circle(
+                        radius=self.wingspan_radius, filled=False)
+                    def_player_screen.set_color(0, 0, 0.75)
+                    def_player_wingspan.set_color(0.5, 0.5, 0.5)
+                    def_player_screen.add_attr(def_trans)
+                    def_player_wingspan.add_attr(def_trans)
+                    self.viewer.add_geom(def_player_screen)
+                    self.viewer.add_geom(def_player_wingspan)
             # offensive players
             for i in range(5):
                 off_player = rendering.make_circle(radius=2.)
-                off_player_screen = rendering.make_circle(
-                    radius=self.screen_radius, filled=False)
-                off_player_wingspan = rendering.make_circle(
-                    radius=self.wingspan_radius, filled=False)
                 off_player.set_color(1, 0, 0)
-                off_player_screen.set_color(0.75, 0, 0)
-                off_player_wingspan.set_color(0.5, 0.5, 0.5)
                 off_trans = rendering.Transform()
                 pos = self.state[STATE_LOOKUP['OFFENSE']][i]
                 off_trans.set_translation(pos[0], pos[1])
                 off_player.add_attr(off_trans)
-                off_player_screen.add_attr(off_trans)
-                off_player_wingspan.add_attr(off_trans)
                 self.viewer.add_geom(off_player)
-                self.viewer.add_geom(off_player_screen)
-                self.viewer.add_geom(off_player_wingspan)
+                if if_vis_visual_aid:
+                    off_player_screen = rendering.make_circle(
+                        radius=self.screen_radius, filled=False)
+                    off_player_wingspan = rendering.make_circle(
+                        radius=self.wingspan_radius, filled=False)
+                    off_stolen_range = rendering.make_circle(
+                        radius=self.stolen_radius, filled=False)
+                    off_player_screen.set_color(0.75, 0, 0)
+                    off_player_wingspan.set_color(0.5, 0.5, 0.5)
+                    off_stolen_range.set_color(0, 0, 0.75)
+                    off_player_screen.add_attr(off_trans)
+                    off_player_wingspan.add_attr(off_trans)
+                    off_stolen_range.add_attr(off_trans)
+                    self.viewer.add_geom(off_player_screen)
+                    self.viewer.add_geom(off_player_wingspan)
+                    self.viewer.add_geom(off_stolen_range)
             # ball
             ball = rendering.make_circle(radius=1.)
             ball.set_color(0, 1, 0)
@@ -483,17 +498,29 @@ class BBallEnv(gym.Env):
         """
 
         if self.ball_state.is_passing:
-            # keep same velocity
+            # ball update with the same velocity
             self.state[STATE_LOOKUP['BALL']
                        ] = self.state[STATE_LOOKUP['BALL']] + self.ball_state.velocity
-
             # TODO if decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['PASS'] return negative reward
-
+            
             # check if ball caught/stolen
+            # Prerequisites:
+            # 1. if any defenders is close to offender (depend on stolen_radius)
+            # 2. defender is closer to ball init position than offender
+            # 3. if any in (2), check is any defender able to fetch ball (depend on defender's wingspan_radius), then go (5)
+            # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
+            # 5. if any candidates, choose the best catcher among them
+            # 6. if none candidates, ball keep flying
             off2ball_vec = self.state[STATE_LOOKUP['OFFENSE']
                                       ] - self.state[STATE_LOOKUP['BALL']]
             off2oldball_vec = self.state[STATE_LOOKUP['OFFENSE']
                                          ] - self.last_state[STATE_LOOKUP['BALL']]
+            def2ball_dist = self.state[STATE_LOOKUP['DEFENSE']
+                                       ] - self.state[STATE_LOOKUP['BALL']]
+            def2oldball_dist = self.state[STATE_LOOKUP['DEFENSE']
+                                       ] - self.last_state[STATE_LOOKUP['BALL']]
+            # 1. defender is close to offender
+
             off2ball_shortest_dist = np.empty(shape=(5,))
             for i, [vec, old_vec] in enumerate(zip(off2ball_vec, off2oldball_vec)):
                 dotvalue = np.dot(vec, self.ball_state.velocity)
@@ -523,14 +550,8 @@ class BBallEnv(gym.Env):
                 # assign catcher pos to ball pos
                 self.state[STATE_LOOKUP['BALL']
                            ] = self.state[STATE_LOOKUP['OFFENSE']][catcher_idx]
-
                 self.ball_state.update(
                     handler_idx=catcher_idx, is_passing=False, velocity=[0, 0])
-
-            # TODO defender steal the ball
-            # def2ball_dist = self.state[STATE_LOOKUP['DEFENSE']
-            #                            ] - self.state[STATE_LOOKUP['BALL']]
-            # then might use self.off_def_closest_map to get possible defender who can steal the ball
 
         elif decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['NO_OP']:
             # assign ball handler's position to ball
