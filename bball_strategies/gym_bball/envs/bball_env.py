@@ -59,6 +59,7 @@ import sys
 from gym.envs.classic_control import rendering
 """
 # TODO
+# 把一些環境資訊物件化
 # check what is the screen range?
 # screen_radius = circle with radius 2.0 feets (about 0.61 meter)
 # wingspan_radius = circle with radius 3.5 feets (about 1.06 meter)
@@ -82,24 +83,6 @@ def distance(pos_a, pos_b, axis=1):
     return length(vec, axis=axis)
 
 
-class BallState(object):
-    def __init__(self):
-        self.is_passing = None
-        self.handler_idx = None
-        self.velocity = None
-        self.passing_speed = 30 / FPS
-
-    def reset(self, handler_idx, is_passing=False):
-        self.is_passing = is_passing
-        self.handler_idx = handler_idx
-        self.velocity = np.array([0, 0])
-
-    def update(self, handler_idx, is_passing, velocity):
-        self.is_passing = is_passing
-        self.handler_idx = handler_idx
-        self.velocity = np.array(velocity)
-
-
 class BBallEnv(gym.Env):
     """
     """
@@ -109,6 +92,10 @@ class BBallEnv(gym.Env):
     }
 
     def __init__(self):
+        # config might be setup by Wrapper
+        self.if_init_by_default = False
+        self.if_vis_trajectory = False
+        self.if_vis_visual_aid = False
         # for render()
         self.viewer = None
         self.def_pl_transforms = None
@@ -129,8 +116,9 @@ class BBallEnv(gym.Env):
         # Env information
         self.state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
         self.last_state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
-        self.ball_state = BallState()
-        # self.off_def_closest_map = None  # dict()
+        self.ball_state = self.BallState()
+        self.off_def_closest_map = None  # dict()
+        self.done = None  # boolean
 
         # must define properties
         self.action_space = self._set_action_space()
@@ -166,20 +154,17 @@ class BBallEnv(gym.Env):
             raise KeyError(
                 'FLAG #{} have not been defined in FLAG_LOOPUP table'.format(flag))
 
+        # update env information
+        self.update_closest_map()
         self.last_state = temp_state
         return result
 
-    def reset(self, **kwargs):
-        """ Override the Env.reset(), which takes no arguments
-        """
-        return self._reset(**kwargs)
-
-    def _reset(self, if_init_by_default=False):
+    def _reset(self):
         """ random init positions in the right half court
         1. init offensive team randomlu
         2. add defensive team next to each offensive player in the basket side.
         """
-        if if_init_by_default:
+        if self.if_init_by_default:
             off_players_pos = np.array([
                 [80, 40],
                 [70, 35],
@@ -201,30 +186,28 @@ class BBallEnv(gym.Env):
         u_vec = vec / np.stack([vec_length, vec_length], axis=1)
         def_players_pos = def_players_pos + u_vec * self.screen_radius
         ball_pos = np.array(off_players_pos[ball_handler_idx, :], copy=True)
-
         # reinit Env information
         self.def_pl_transforms = []
         self.off_pl_transforms = []
         self.ball_transform = None
+        self.done = False
 
         self.state = np.array([ball_pos, off_players_pos, def_players_pos])
         self.last_state = None
         self.ball_state.reset(handler_idx=ball_handler_idx, is_passing=False)
-        # self.off_def_closest_map = dict()
-        # for idx, off_pos in enumerate(off_players_pos):
-        #     self.off_def_closest_map[idx] = np.argmin(
-        #         distance(def_players_pos, off_pos))
+        self.off_def_closest_map = dict()
+        self.update_closest_map()
 
         return self.state
-    
-    def _render(self, mode='human', close=False, if_vis_trajectory=False, if_vis_visual_aid=False):
+
+    def _render(self, mode='human', close=False):
         if close:
             if self.viewer is not None:
                 self.viewer.close()
                 self.viewer = None
             return
 
-        if not if_vis_trajectory:
+        if not self.if_vis_trajectory:
             if self.viewer is None:
                 self.viewer = rendering.Viewer(940, 500)
                 self.viewer.set_bounds(0, 94, 0, 50)  # feet
@@ -242,7 +225,8 @@ class BBallEnv(gym.Env):
                     self.def_pl_transforms.append(def_trans)
                     def_player.add_attr(def_trans)
                     self.viewer.add_geom(def_player)
-                    if if_vis_visual_aid:
+                    if self.if_vis_visual_aid:
+                        logger.info('{}'.format(self.if_vis_visual_aid))
                         def_player_screen = rendering.make_circle(
                             radius=self.screen_radius, filled=False)
                         def_player_wingspan = rendering.make_circle(
@@ -261,7 +245,8 @@ class BBallEnv(gym.Env):
                     self.off_pl_transforms.append(off_trans)
                     off_player.add_attr(off_trans)
                     self.viewer.add_geom(off_player)
-                    if if_vis_visual_aid:
+                    if self.if_vis_visual_aid:
+                        logger.info('{}'.format(self.if_vis_visual_aid))
                         off_player_screen = rendering.make_circle(
                             radius=self.screen_radius, filled=False)
                         off_player_wingspan = rendering.make_circle(
@@ -294,9 +279,9 @@ class BBallEnv(gym.Env):
                 trans.set_translation(pos[0], pos[1])
             # ball
             ball_pos = self.state[STATE_LOOKUP['BALL']]
-            self.ball_transform .set_translation(ball_pos[0], ball_pos[1])
+            self.ball_transform.set_translation(ball_pos[0], ball_pos[1])
 
-        elif if_vis_trajectory:
+        if self.if_vis_trajectory:
             if self.viewer is None:
                 self.viewer = rendering.Viewer(940, 500)
                 self.viewer.set_bounds(0, 94, 0, 50)  # feet
@@ -315,7 +300,7 @@ class BBallEnv(gym.Env):
                 def_trans.set_translation(pos[0], pos[1])
                 def_player.add_attr(def_trans)
                 self.viewer.add_geom(def_player)
-                if if_vis_visual_aid:
+                if self.if_vis_visual_aid:
                     def_player_screen = rendering.make_circle(
                         radius=self.screen_radius, filled=False)
                     def_player_wingspan = rendering.make_circle(
@@ -335,7 +320,7 @@ class BBallEnv(gym.Env):
                 off_trans.set_translation(pos[0], pos[1])
                 off_player.add_attr(off_trans)
                 self.viewer.add_geom(off_player)
-                if if_vis_visual_aid:
+                if self.if_vis_visual_aid:
                     off_player_screen = rendering.make_circle(
                         radius=self.screen_radius, filled=False)
                     off_player_wingspan = rendering.make_circle(
@@ -429,13 +414,13 @@ class BBallEnv(gym.Env):
 
         if decision == DESICION_LOOKUP['SHOOT']:
             reward = self._calculate_reward()
-            return self.state, 0.0, False, dict()
+            return self.state, 0.0, self.done, dict()
         elif decision == DESICION_LOOKUP['PASS']:
 
-            return self.state, 0.0, False, dict()
+            return self.state, 0.0, self.done, dict()
         elif decision == DESICION_LOOKUP['NO_OP']:
 
-            return self.state, 0.0, False, dict()
+            return self.state, 0.0, self.done, dict()
         else:
             raise KeyError(
                 'Decision #{} have not been defined in DESICION_LOOKUP table'.format(decision))
@@ -502,10 +487,10 @@ class BBallEnv(gym.Env):
             self.state[STATE_LOOKUP['BALL']
                        ] = self.state[STATE_LOOKUP['BALL']] + self.ball_state.velocity
             # TODO if decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['PASS'] return negative reward
-            
+
             # check if ball caught/stolen
             # Prerequisites:
-            # 1. if any defenders is close to offender (depend on stolen_radius)
+            # 1. if any defenders is close enough to offender (depend on stolen_radius)
             # 2. defender is closer to ball init position than offender
             # 3. if any in (2), check is any defender able to fetch ball (depend on defender's wingspan_radius), then go (5)
             # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
@@ -515,43 +500,71 @@ class BBallEnv(gym.Env):
                                       ] - self.state[STATE_LOOKUP['BALL']]
             off2oldball_vec = self.state[STATE_LOOKUP['OFFENSE']
                                          ] - self.last_state[STATE_LOOKUP['BALL']]
-            def2ball_dist = self.state[STATE_LOOKUP['DEFENSE']
-                                       ] - self.state[STATE_LOOKUP['BALL']]
-            def2oldball_dist = self.state[STATE_LOOKUP['DEFENSE']
-                                       ] - self.last_state[STATE_LOOKUP['BALL']]
-            # 1. defender is close to offender
+            def2ball_vec = self.state[STATE_LOOKUP['DEFENSE']
+                                      ] - self.state[STATE_LOOKUP['BALL']]
+            def2oldball_vec = self.state[STATE_LOOKUP['DEFENSE']
+                                         ] - self.last_state[STATE_LOOKUP['BALL']]
+            # 1. if any defenders is close enough to offender (depend on stolen_radius)
+            candidates = []
+            for key, value in self.off_def_closest_map.items():
+                if value['distance'] < self.stolen_radius:
+                    # 2. defender is closer to ball init position than offender
+                    if length(def2oldball_vec[value['idx']], axis=0) < length(off2oldball_vec[key], axis=0):
+                        candidates.append(value['idx'])
 
-            off2ball_shortest_dist = np.empty(shape=(5,))
-            for i, [vec, old_vec] in enumerate(zip(off2ball_vec, off2oldball_vec)):
-                dotvalue = np.dot(vec, self.ball_state.velocity)
-                old_dotvalue = np.dot(old_vec, self.ball_state.velocity)
-                if dotvalue <= 0.0 and old_dotvalue <= 0.0:  # leave
-                    off2ball_shortest_dist[i] = sys.float_info.max
-                elif dotvalue > 0.0 and old_dotvalue > 0.0:  # come
-                    temp_dist = length(vec, axis=0)
-                    if temp_dist < self.wingspan_radius:
-                        off2ball_shortest_dist[i] = temp_dist
+            def if_find_catcher(vecs, old_vecs, team_id):
+                # 3. if any in (2), check is any defender able to fetch ball (depend on defender's wingspan_radius), then go (5)
+                # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
+                shortest_dist = np.empty(shape=(len(vecs),))
+                for i, [vec, old_vec] in enumerate(zip(vecs, old_vecs)):
+                    dotvalue = np.dot(vec, self.ball_state.velocity)
+                    old_dotvalue = np.dot(old_vec, self.ball_state.velocity)
+                    if dotvalue <= 0.0 and old_dotvalue <= 0.0:  # leave
+                        shortest_dist[i] = sys.float_info.max
+                    elif dotvalue > 0.0 and old_dotvalue > 0.0:  # come
+                        temp_dist = length(vec, axis=0)
+                        if temp_dist < self.wingspan_radius:
+                            shortest_dist[i] = temp_dist
+                        else:
+                            shortest_dist[i] = sys.float_info.max
+                    elif dotvalue <= 0.0 and old_dotvalue > 0.0:  # in then out
+                        cos_value = np.dot(vec, np.multiply(-1, self.ball_state.velocity)) / \
+                            (length(vec, axis=0) *
+                             length(self.ball_state.velocity, axis=0))
+                        shortest_dist[i] = np.sin(
+                            np.arccos(cos_value)) * length(vec, axis=0)
+                f_candidates = np.argwhere(
+                    shortest_dist <= self.wingspan_radius).reshape([-1])
+            # 5. if any f_candidates, choose the best catcher among them
+                if len(f_candidates) != 0:
+                    if len(f_candidates) > 1:
+                        catcher_idx = f_candidates[
+                            np.argmin(length(off2ball_vec[f_candidates], axis=1))]
                     else:
-                        off2ball_shortest_dist[i] = sys.float_info.max
-                elif dotvalue <= 0.0 and old_dotvalue > 0.0:  # in then out
-                    cos_value = np.dot(vec, np.multiply(-1, self.ball_state.velocity)) / \
-                        (length(vec, axis=0) *
-                         length(self.ball_state.velocity, axis=0))
-                    off2ball_shortest_dist[i] = np.sin(
-                        np.arccos(cos_value)) * length(vec, axis=0)
-            candidates = np.argwhere(
-                off2ball_shortest_dist <= self.wingspan_radius).reshape([-1])
-            if len(candidates) != 0:
-                if len(candidates) > 1:
-                    catcher_idx = candidates[
-                        np.argmin(length(off2ball_vec[candidates], axis=1))]
+                        catcher_idx = f_candidates[0]
+                    # assign catcher pos to ball pos
+                    self.state[STATE_LOOKUP['BALL']
+                               ] = self.state[team_id][catcher_idx]
+                    self.ball_state.update(
+                        handler_idx=catcher_idx, is_passing=False, velocity=[0, 0])
+                    return True
                 else:
-                    catcher_idx = candidates[0]
-                # assign catcher pos to ball pos
-                self.state[STATE_LOOKUP['BALL']
-                           ] = self.state[STATE_LOOKUP['OFFENSE']][catcher_idx]
-                self.ball_state.update(
-                    handler_idx=catcher_idx, is_passing=False, velocity=[0, 0])
+                    return False
+
+            if_def_catch_ball = False
+            if len(candidates) != 0:
+                if_def_catch_ball = if_find_catcher(
+                    def2ball_vec[candidates], def2oldball_vec[candidates], team_id=STATE_LOOKUP['DEFENSE'])
+                # TODO if if_def_catch_ball:
+                # game ends with negative reward to offense, positive reward to defense
+                if if_def_catch_ball:
+                    logger.info('DEFENSE steals the ball QQ')
+                    self.done = True
+            if len(candidates) == 0 or not if_def_catch_ball:
+                _ = if_find_catcher(
+                    off2ball_vec, off2oldball_vec, team_id=STATE_LOOKUP['OFFENSE'])
+            # 6. if none candidates, ball keep flying
+            # do nothing
 
         elif decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['NO_OP']:
             # assign ball handler's position to ball
@@ -571,6 +584,30 @@ class BBallEnv(gym.Env):
 
     def _calculate_reward(self):
         pass
+
+    def update_closest_map(self):
+        for idx, off_pos in enumerate(self.state[STATE_LOOKUP['OFFENSE']]):
+            distances = distance(self.state[STATE_LOOKUP['DEFENSE']], off_pos)
+            temp_idx = np.argmin(distances)
+            self.off_def_closest_map[idx] = {
+                'idx': temp_idx, 'distance': distances[temp_idx]}
+
+    class BallState(object):
+        def __init__(self):
+            self.is_passing = None
+            self.handler_idx = None
+            self.velocity = None
+            self.passing_speed = 30 / FPS
+
+        def reset(self, handler_idx, is_passing=False):
+            self.is_passing = is_passing
+            self.handler_idx = handler_idx
+            self.velocity = np.array([0, 0])
+
+        def update(self, handler_idx, is_passing, velocity):
+            self.is_passing = is_passing
+            self.handler_idx = handler_idx
+            self.velocity = np.array(velocity)
 
 
 DASH_LOOKUP = {

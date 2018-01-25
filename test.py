@@ -11,11 +11,13 @@ def no_op():
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
     ))
-    env.step(action)
+    _, _, done, _ = env.step(action)
     env.render()
+    if done:
+        env.reset()
 
 
-def ball_passing():
+def ball_looping():
     for i in range(5):
         # Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
         action = tuple((
@@ -25,8 +27,10 @@ def ball_passing():
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
-        env.step(action)
+        _, _, done, _ = env.step(action)
         env.render()
+        if done:
+            env.reset()
 
         no_op()
         no_op()
@@ -38,8 +42,10 @@ def ball_passing():
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
-        env.step(action)
+        _, _, done, _ = env.step(action)
         env.render()
+        if done:
+            env.reset()
 
         no_op()
         no_op()
@@ -52,8 +58,10 @@ def ball_passing():
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
-        env.step(action)
+        _, _, done, _ = env.step(action)
         env.render()
+        if done:
+            env.reset()
 
         no_op()
         no_op()
@@ -70,8 +78,10 @@ def moving_around():
                 [[2, np.pi], [2, np.pi], [2, np.pi], [2, np.pi], [2, np.pi]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
-        env.step(action)
+        _, _, done, _ = env.step(action)
         env.render()
+        if done:
+            env.reset()
 
     no_op()
     no_op()
@@ -91,8 +101,10 @@ def moving_around():
                 [[2, 0], [2, 0], [2, 0], [2, 0], [2, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
-        env.step(action)
+        _, _, done, _ = env.step(action)
         env.render()
+        if done:
+            env.reset()
 
 
 def maxspeed():
@@ -104,9 +116,36 @@ def maxspeed():
             np.array([[0, 0], [0, 0], [5, np.pi], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
-        env.step(action)
+        _, _, done, _ = env.step(action)
         env.render()
+        if done:
+            env.reset()
     no_op()
+
+def ball_stealing():
+    # off_players_pos = np.array([
+    #     [45, 10],
+    #     [45, 40],
+    #     [0, 0],
+    #     [0, 0],
+    #     [0, 0]
+    # ], dtype=np.float)
+    # ball_handler_idx = 1
+    # def_players_pos[0] = [45, 37]
+
+    action = tuple((
+        np.array([1, 0]),
+        np.array([0, 1, 0]),
+        np.array(-np.pi/2),
+        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+    ))
+    _, _, done, _ = env.step(action)
+    env.render()
+    if done:
+        env.reset()
+    for _ in range(10):
+        no_op()
 
 
 def collision():
@@ -117,15 +156,9 @@ class MonitorWrapper(gym.wrappers.Monitor):
     def __init__(self, env, if_init_by_default=False, if_vis_trajectory=False, if_vis_visual_aid=False):
         super(MonitorWrapper, self).__init__(env=env, directory='./test/',
                                              video_callable=lambda count: count % 1 == 0, force=True)
-        self.if_init_by_default = if_init_by_default
-        self.if_vis_trajectory = if_vis_trajectory
-        self.if_vis_visual_aid = if_vis_visual_aid
-
-    def reset(self):
-        return self._reset(if_init_by_default=self.if_init_by_default)
-
-    def render(self):
-        return self.env._render(if_vis_trajectory=self.if_vis_trajectory, if_vis_visual_aid=self.if_vis_visual_aid)
+        env.if_init_by_default = if_init_by_default
+        env.if_vis_trajectory = if_vis_trajectory
+        env.if_vis_visual_aid = if_vis_visual_aid
 
 
 def main():
@@ -138,11 +171,11 @@ def main():
     env.render()
 
     # DEMO script
-    # ball_passing()
+    # ball_looping()
     # moving_around()
     # maxspeed()
-    ball_stealing()
-    # collision()
+    # ball_stealing()
+    collision()
     # random_dancing()
     # rewards()
 
