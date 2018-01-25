@@ -148,8 +148,20 @@ def ball_stealing():
         no_op()
 
 
-def collision():
-    pass
+def move_offense_right():
+    for _ in range(10):
+        action = tuple((
+            np.array([1, 0]),
+            np.array([0, 0, 1]),
+            np.array(0),
+            np.array([[5, 0], [5, 0], [5, 0], [5, 0], [5, 0]]),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+        ))
+        _, _, done, _ = env.step(action)
+        env.render()
+        if done:
+            env.reset()
+        
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
@@ -175,9 +187,9 @@ def main():
     # moving_around()
     # maxspeed()
     # ball_stealing()
-    collision()
     # random_dancing()
     # rewards()
+    move_offense_right()
 
     env.close()
 
@@ -187,3 +199,6 @@ if __name__ == '__main__':
 
 # gather：根據一個list來取用目標
 # python 使用+=很可能會有不明錯誤！！！儘量避免
+# numpy 有outer機制，計算cross-op可避免使用迴圈
+# np.op.outer(), i.e. np.subtract.outer()
+# np.inner, can broadcast itsef

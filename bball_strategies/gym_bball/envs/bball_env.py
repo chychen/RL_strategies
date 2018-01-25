@@ -65,6 +65,14 @@ from gym.envs.classic_control import rendering
 # wingspan_radius = circle with radius 3.5 feets (about 1.06 meter)
 # stolen_radius = circle with radius 5.0 feets (about 1.52 meter)
 
+    self.screen_radius = 2.0 * 2
+    self.wingspan_radius = 3.5
+    self.stolen_radius = 5.0
+    self.pl_max_speed = 38.9379818754 / FPS
+    self.pl_collision_speed = self.screen_radius / FPS # cost at least one second to cross over the opponent
+    self.pl_max_power = 24.5810950984 / FPS
+    self.passing_speed = 30.0 / FPS
+
 note :
 - velocity: scalar with direction
 - speed: scalar only
@@ -106,13 +114,15 @@ class BBallEnv(gym.Env):
         self.court_width = 50
         self.left_basket_pos = [0 + 5.25, 25]
         self.right_basket_pos = [94 - 5.25, 25]
-        # physics limitations TODO per frame
-        self.pl_max_speed = 38.9379818754 / FPS
-        self.pl_max_power = 24.5810950984 / FPS
         # this is the distance between two players' center position
         self.screen_radius = 2.0 * 2
         self.wingspan_radius = 3.5
         self.stolen_radius = 5.0
+        # physics limitations TODO per frame
+        self.pl_max_speed = 38.9379818754 / FPS
+        # cost at least one second to cross over the opponent
+        self.pl_collision_speed = self.screen_radius / FPS
+        self.pl_max_power = 24.5810950984 / FPS
         # Env information
         self.state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
         self.last_state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
@@ -451,8 +461,13 @@ class BBallEnv(gym.Env):
         pl_dash : float, shape=[5,2]
             the force of each player
         """
-        # if collision TODO
+        # 0. update the velocity_state by player's power (with max speed limit = self.pl_max_speed)
+        # 1. check if move toward opponent
+        # 2. check if move into the opponent's screen range (self.screen_radius)
+        # 3. if any collisions, calculate the discounted velocity, then update player
+        # 4. if none collisions, update with velocity
 
+        # 0. update the velocity_state by player's power (with max speed limit = self.pl_max_speed)
         # update player state
         assert pl_dash.shape == (5, 2)
         # decomposing into power and direction
@@ -461,18 +476,63 @@ class BBallEnv(gym.Env):
         pl_dir = np.clip(
             pl_dash[:, DASH_LOOKUP['DIRECTION']], -np.pi, np.pi)
         last_pl_velocity = velocity_state[state_idx]
-        pl_velocity = np.stack([np.cos(pl_dir) * pl_power,
-                                np.sin(pl_dir) * pl_power], axis=1)
-        assert pl_velocity.shape == last_pl_velocity.shape
-        pl_velocity = np.add(velocity_state[state_idx], pl_velocity)
-        # pl_speed = np.sqrt(np.sum(pl_velocity * pl_velocity, axis=1))
+        pl_acc = np.stack([np.cos(pl_dir) * pl_power,
+                           np.sin(pl_dir) * pl_power], axis=1)
+        pl_collision_vel = np.stack([np.cos(pl_dir) * self.pl_collision_speed,
+                                     np.sin(pl_dir) * self.pl_collision_speed], axis=1)
+        assert pl_acc.shape == last_pl_velocity.shape
+        pl_velocity = np.add(velocity_state[state_idx], pl_acc)
         pl_speed = length(pl_velocity, axis=1)
         # can't not exceed the limits
-        indices = np.argwhere(pl_speed >= self.pl_max_speed)
+        indices = np.argwhere(pl_speed > self.pl_max_speed)
         pl_velocity[indices] = pl_velocity[indices] / \
             np.stack([pl_speed[indices], pl_speed[indices]],
                      axis=-1) * self.pl_max_speed
-        self.state[state_idx] = self.state[state_idx] + pl_velocity
+
+        # 1. check if move toward opponent
+        # 2. check if move into the opponent's screen range (self.screen_radius)
+        if state_idx == STATE_LOOKUP['DEFENSE']:
+            opp_idx = STATE_LOOKUP['OFFENSE']
+        elif state_idx == STATE_LOOKUP['OFFENSE']:
+            opp_idx = STATE_LOOKUP['DEFENSE']
+
+        opp_pos = self.state[opp_idx]
+        for pl_idx, (pl_pos, next_pl_pos) in enumerate(zip(self.state[state_idx], self.state[state_idx] + pl_velocity)):
+            shortest_dist = np.empty(shape=(5,))
+            next_pl2oop_vec = opp_pos - next_pl_pos
+            pl2oop_vec = opp_pos - pl_pos
+            for i, (next_vec, vec) in enumerate(zip(next_pl2oop_vec, pl2oop_vec)):
+                next_dotvalue = np.dot(next_vec, pl_velocity[pl_idx])
+                dotvalue = np.dot(vec, pl_velocity[pl_idx])
+                if next_dotvalue <= 0.0 and dotvalue <= 0.0:  # leave
+                    shortest_dist[i] = sys.float_info.max
+                elif next_dotvalue > 0.0 and dotvalue > 0.0:  # come
+                    temp_dist = length(next_vec, axis=0)
+                    if temp_dist <= self.screen_radius:
+                        shortest_dist[i] = temp_dist
+                    else:
+                        shortest_dist[i] = sys.float_info.max
+                elif next_dotvalue <= 0.0 and dotvalue > 0.0:  # in then out
+                    temp = np.inner(next_vec, np.multiply(-1, pl_velocity[pl_idx])
+                                    ) / length(pl_velocity[pl_idx], axis=0)
+                    shortest_dist[i] = 0.0 if abs(length(
+                        next_vec, axis=0)**2 - temp**2) < 1e-5 else np.sqrt(length(next_vec, axis=0)**2 - temp**2)
+            f_candidates = np.argwhere(
+                shortest_dist <= self.screen_radius).reshape([-1])
+        # 3. if any collisions,choose the cloest one, calculate the discounted velocity, then update player
+            if len(f_candidates) != 0:
+                if len(f_candidates) > 1:
+                    catcher_idx = f_candidates[
+                        np.argmin(length(pl2oop_vec[f_candidates], axis=1))]
+                else:
+                    catcher_idx = f_candidates[0]
+                next_pl_pos = pl_pos + pl_collision_vel[pl_idx]
+            # a. length between player and opponent
+            # b. length between opponent and velocity vector = a dot dir
+            # c. legnth from player to circle = sqrt(aa-bb)-sqrt(rr-(aa-bb))
+            # d. final velocity = c * direction + sqrt(rr-(aa-bb)) * self.pl_collision_speed
+
+            self.state[state_idx][pl_idx] = next_pl_pos
 
     def _update_ball_state(self, decision, ball_pass_dir):
         """
@@ -507,9 +567,9 @@ class BBallEnv(gym.Env):
             # 1. if any defenders is close enough to offender (depend on stolen_radius)
             candidates = []
             for key, value in self.off_def_closest_map.items():
-                if value['distance'] < self.stolen_radius:
+                if value['distance'] <= self.stolen_radius:
                     # 2. defender is closer to ball init position than offender
-                    if length(def2oldball_vec[value['idx']], axis=0) < length(off2oldball_vec[key], axis=0):
+                    if length(def2oldball_vec[value['idx']], axis=0) <= length(off2oldball_vec[key], axis=0):
                         candidates.append(value['idx'])
 
             def if_find_catcher(vecs, old_vecs, team_id):
@@ -523,23 +583,28 @@ class BBallEnv(gym.Env):
                         shortest_dist[i] = sys.float_info.max
                     elif dotvalue > 0.0 and old_dotvalue > 0.0:  # come
                         temp_dist = length(vec, axis=0)
-                        if temp_dist < self.wingspan_radius:
+                        if temp_dist <= self.wingspan_radius:
                             shortest_dist[i] = temp_dist
                         else:
                             shortest_dist[i] = sys.float_info.max
                     elif dotvalue <= 0.0 and old_dotvalue > 0.0:  # in then out
-                        cos_value = np.dot(vec, np.multiply(-1, self.ball_state.velocity)) / \
-                            (length(vec, axis=0) *
-                             length(self.ball_state.velocity, axis=0))
-                        shortest_dist[i] = np.sin(
-                            np.arccos(cos_value)) * length(vec, axis=0)
+                        # TODO arccos cost too much computation power ?!
+                        # cos_value = np.dot(vec, np.multiply(-1, self.ball_state.velocity)) / \
+                        #     (length(vec, axis=0) *
+                        #      length(self.ball_state.velocity, axis=0))
+                        # shortest_dist[i] = np.sin(
+                        #     np.arccos(cos_value)) * length(vec, axis=0)
+                        temp = np.inner(vec, np.multiply(-1, self.ball_state.velocity)
+                                        ) / length(self.ball_state.velocity, axis=0)
+                        shortest_dist[i] = 0.0 if abs(length(
+                            vec, axis=0)**2 - temp**2) < 1e-5 else np.sqrt(length(vec, axis=0)**2 - temp**2)
                 f_candidates = np.argwhere(
                     shortest_dist <= self.wingspan_radius).reshape([-1])
             # 5. if any f_candidates, choose the best catcher among them
                 if len(f_candidates) != 0:
                     if len(f_candidates) > 1:
                         catcher_idx = f_candidates[
-                            np.argmin(length(off2ball_vec[f_candidates], axis=1))]
+                            np.argmin(length(old_vecs[f_candidates], axis=1))]
                     else:
                         catcher_idx = f_candidates[0]
                     # assign catcher pos to ball pos
@@ -597,7 +662,7 @@ class BBallEnv(gym.Env):
             self.is_passing = None
             self.handler_idx = None
             self.velocity = None
-            self.passing_speed = 30 / FPS
+            self.passing_speed = 30.0 / FPS
 
         def reset(self, handler_idx, is_passing=False):
             self.is_passing = is_passing
