@@ -149,7 +149,7 @@ def ball_stealing():
 
 
 def move_offense_right():
-    for _ in range(10):
+    for _ in range(15):
         action = tuple((
             np.array([1, 0]),
             np.array([0, 0, 1]),
