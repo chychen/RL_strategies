@@ -72,7 +72,7 @@ from gym.envs.classic_control import rendering
     # cost at least one second to cross over the opponent
     self.pl_collision_speed = self.screen_radius / FPS
     self.pl_max_power = 24.5810950984 / FPS
-    self.passing_speed = 30.0 / FPS
+    self.ball_passing_speed = 30.0 / FPS
 
 note :
 - velocity: scalar with direction
@@ -120,14 +120,13 @@ class BBallEnv(gym.Env):
         self.wingspan_radius = 3.5
         self.stolen_radius = 5.0
         # physics limitations TODO per frame
+        self.ball_passing_speed = 30.0 / FPS
         self.pl_max_speed = 38.9379818754 / FPS
         # cost at least one second to cross over the opponent
         self.pl_collision_speed = self.screen_radius / FPS
         self.pl_max_power = 24.5810950984 / FPS
         # Env information
-        self.state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
-        self.last_state = None  # Tuple(Box(2,), Box(5, 2), Box(5, 2))
-        self.ball_state = self.BallState()
+        self.states = States()
         self.off_def_closest_map = None  # dict()
         self.done = None  # boolean
 
@@ -141,12 +140,6 @@ class BBallEnv(gym.Env):
     def _step(self, action):
         """ Following gym.Env.step
         """
-        # temp_state for last_state update
-        temp_state = copy.deepcopy(self.state)
-        if self.last_state is not None:
-            velocity_state = np.subtract(self.state, self.last_state)
-        else:
-            velocity_state = np.subtract(self.state, self.state)
         # action decomposition
         flag = np.argmax(action[ACTION_LOOKUP['FLAG']])
         assert flag.shape == ()
@@ -157,17 +150,16 @@ class BBallEnv(gym.Env):
 
         if flag == FLAG_LOOPUP['OFFENSE']:
             result = self._step_offense(
-                decision, ball_pass_dir, off_pl_dash, velocity_state)
+                decision, ball_pass_dir, off_pl_dash, self.states.vels)
         elif flag == FLAG_LOOPUP['DEFENSE']:
             result = self._step_defense(
-                def_pl_dash, velocity_state)
+                def_pl_dash, self.states.vels)
         else:
             raise KeyError(
                 'FLAG #{} have not been defined in FLAG_LOOPUP table'.format(flag))
 
         # update env information
         self.update_closest_map()
-        self.last_state = temp_state
         return result
 
     def _reset(self):
@@ -203,13 +195,14 @@ class BBallEnv(gym.Env):
         self.ball_transform = None
         self.done = False
 
-        self.state = np.array([ball_pos, off_players_pos, def_players_pos])
-        self.last_state = None
-        self.ball_state.reset(handler_idx=ball_handler_idx, is_passing=False)
+        positions = np.array([ball_pos, off_players_pos, def_players_pos])
+        vels = np.array([np.zeros_like(ball_pos), np.zeros_like(
+            off_players_pos), np.zeros_like(def_players_pos)])
+        self.states.reset(positions, vels, ball_handler_idx)
         self.off_def_closest_map = dict()
         self.update_closest_map()
 
-        return self.state
+        return self.states.positions
 
     def _render(self, mode='human', close=False):
         if close:
@@ -283,13 +276,13 @@ class BBallEnv(gym.Env):
 
             ### set translations ###
             # defensive players
-            for trans, pos in zip(self.def_pl_transforms, self.state[STATE_LOOKUP['DEFENSE']]):
+            for trans, pos in zip(self.def_pl_transforms, self.states.defense_positions):
                 trans.set_translation(pos[0], pos[1])
             # offensive players
-            for trans, pos in zip(self.off_pl_transforms, self.state[STATE_LOOKUP['OFFENSE']]):
+            for trans, pos in zip(self.off_pl_transforms, self.states.offense_positions):
                 trans.set_translation(pos[0], pos[1])
             # ball
-            ball_pos = self.state[STATE_LOOKUP['BALL']]
+            ball_pos = self.states.ball_position
             self.ball_transform.set_translation(ball_pos[0], ball_pos[1])
 
         if self.if_vis_trajectory:
@@ -307,7 +300,7 @@ class BBallEnv(gym.Env):
                 def_player = rendering.make_circle(radius=2.)
                 def_player.set_color(0, 0, 1)
                 def_trans = rendering.Transform()
-                pos = self.state[STATE_LOOKUP['DEFENSE']][i]
+                pos = self.states.defense_positions[i]
                 def_trans.set_translation(pos[0], pos[1])
                 def_player.add_attr(def_trans)
                 self.viewer.add_geom(def_player)
@@ -327,7 +320,7 @@ class BBallEnv(gym.Env):
                 off_player = rendering.make_circle(radius=2.)
                 off_player.set_color(1, 0, 0)
                 off_trans = rendering.Transform()
-                pos = self.state[STATE_LOOKUP['OFFENSE']][i]
+                pos = self.states.offense_positions[i]
                 off_trans.set_translation(pos[0], pos[1])
                 off_player.add_attr(off_trans)
                 self.viewer.add_geom(off_player)
@@ -351,7 +344,7 @@ class BBallEnv(gym.Env):
             ball = rendering.make_circle(radius=1.)
             ball.set_color(0, 1, 0)
             ball_trans = rendering.Transform()
-            ball_pos = self.state[STATE_LOOKUP['BALL']]
+            ball_pos = self.states.ball_position
             ball_trans.set_translation(ball_pos[0], ball_pos[1])
             ball.add_attr(ball_trans)
             self.viewer.add_geom(ball)
@@ -409,7 +402,7 @@ class BBallEnv(gym.Env):
                        high=np.array([[self.court_length, self.court_width] for _ in range(5)]))
         ))
 
-    def _step_offense(self, decision, ball_pass_dir, off_pl_dash, velocity_state):
+    def _step_offense(self, decision, ball_pass_dir, off_pl_dash, vels):
         """
         Returns
         -------
@@ -419,19 +412,19 @@ class BBallEnv(gym.Env):
         info (dict) : contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
         self._update_player_state(
-            off_pl_dash, velocity_state, STATE_LOOKUP['OFFENSE'])
+            off_pl_dash, vels, STATE_LOOKUP['OFFENSE'])
         # update ball state
         self._update_ball_state(decision, ball_pass_dir)
 
         if decision == DESICION_LOOKUP['SHOOT']:
             reward = self._calculate_reward()
-            return self.state, 0.0, self.done, dict()
+            return self.states.positions, 0.0, self.done, dict()
         elif decision == DESICION_LOOKUP['PASS']:
 
-            return self.state, 0.0, self.done, dict()
+            return self.states.positions, 0.0, self.done, dict()
         elif decision == DESICION_LOOKUP['NO_OP']:
 
-            return self.state, 0.0, self.done, dict()
+            return self.states.positions, 0.0, self.done, dict()
         else:
             raise KeyError(
                 'Decision #{} have not been defined in DESICION_LOOKUP table'.format(decision))
@@ -442,7 +435,7 @@ class BBallEnv(gym.Env):
         # --A defender gets possession of the ball.
         # --A max time limit for the episode is reached.
 
-    def _step_defense(self, def_pl_dash, velocity_state):
+    def _step_defense(self, def_pl_dash, vels):
         """
         Returns
         -------
@@ -452,23 +445,22 @@ class BBallEnv(gym.Env):
         info (dict) : contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
         self._update_player_state(
-            def_pl_dash, velocity_state, STATE_LOOKUP['DEFENSE'])
-        return self.state, 0.0, False, dict()
+            def_pl_dash, vels, STATE_LOOKUP['DEFENSE'])
+        return self.states.positions, 0.0, False, dict()
 
-    def _update_player_state(self, pl_dash, velocity_state, state_idx):
+    def _update_player_state(self, pl_dash, vels, state_idx):
         """ Update the player's movement following the physics limitation predefined
         Inputs
         ------
         pl_dash : float, shape=[5,2]
             the force of each player
         """
-        # 0. update the velocity_state by player's power (with max speed limit = self.pl_max_speed)
-        # 1. check if move toward opponent
-        # 2. check if move into the opponent's screen range (self.screen_radius)
-        # 3. if any collisions, calculate the discounted velocity, then update player
+        # 1. update the vels by player's power (with max speed limit = self.pl_max_speed)
+        # 2. check if any collisions might happen among one player to five opponents.
+        # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
         # 4. if none collisions, update with velocity
 
-        # 0. update the velocity_state by player's power (with max speed limit = self.pl_max_speed)
+        # 1. update the vels by player's power (with max speed limit = self.pl_max_speed)
         # update player state
         assert pl_dash.shape == (5, 2)
         # decomposing into power and direction
@@ -476,55 +468,73 @@ class BBallEnv(gym.Env):
             pl_dash[:, DASH_LOOKUP['POWER']], 0, self.pl_max_power)
         pl_dir = np.clip(
             pl_dash[:, DASH_LOOKUP['DIRECTION']], -np.pi, np.pi)
-        last_pl_velocity = velocity_state[state_idx]
-        pl_acc = np.stack([np.cos(pl_dir) * pl_power,
-                           np.sin(pl_dir) * pl_power], axis=1)
-        pl_collision_vel = np.stack([np.cos(pl_dir) * self.pl_collision_speed,
-                                     np.sin(pl_dir) * self.pl_collision_speed], axis=1)
-        assert pl_acc.shape == last_pl_velocity.shape
-        pl_velocity = np.add(velocity_state[state_idx], pl_acc)
-        pl_speed = length(pl_velocity, axis=1)
+        pl_dir_vec = np.stack([np.cos(pl_dir), np.sin(pl_dir)], axis=1)
+        pl_acc = np.stack(
+            [pl_dir_vec[:, 0] * pl_power, pl_dir_vec[:, 1] * pl_power], axis=1)
+        assert pl_acc.shape == vels[state_idx].shape
+        pl_vels = np.add(vels[state_idx], pl_acc)
+        pl_speed = length(pl_vels, axis=1)
         # can't not exceed the limits
         indices = np.argwhere(pl_speed > self.pl_max_speed)
-        pl_velocity[indices] = pl_velocity[indices] / \
+        pl_vels[indices] = pl_vels[indices] / \
             np.stack([pl_speed[indices], pl_speed[indices]],
                      axis=-1) * self.pl_max_speed
 
-        # 1. check if move toward opponent
-        # 2. check if move into the opponent's screen range (self.screen_radius)
+        # 2. check if any collisions might happen among one player to five opponents.
         if state_idx == STATE_LOOKUP['DEFENSE']:
             opp_idx = STATE_LOOKUP['OFFENSE']
         elif state_idx == STATE_LOOKUP['OFFENSE']:
             opp_idx = STATE_LOOKUP['DEFENSE']
-
-        opp_positions = self.state[opp_idx]
-        for pl_idx, (pl_pos, next_pl_pos) in enumerate(zip(self.state[state_idx], self.state[state_idx] + pl_velocity)):
-            zone_idx = self._find_zone_idx(
-                next_pl_pos, pl_pos, pl_velocity[pl_idx], opp_positions, self.screen_radius)
-            if zone_idx is not None:
-                next_pl_pos = pl_pos + pl_collision_vel[pl_idx]
+        opp_positions = self.states.positions[opp_idx]
+        for pl_idx, (pl_pos, next_pl_pos, pl_vel) in enumerate(zip(self.states.positions[state_idx], self.states.positions[state_idx] + pl_vels, pl_vels)):
+            zone_idx, mode = self._find_zone_idx(
+                next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius)
+        # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
+            # TODO IN-THEN-OUT
+            if zone_idx is not None and (mode == MODE_LOOKUP['IN'] or mode == MODE_LOOKUP['IN-THEN-OUT']):
                 # a. length between player and opponent
+                pl2zone_vec = opp_positions[zone_idx] - pl_pos
+                pl2zone_length = length(pl2zone_vec, axis=0)
                 # b. length between opponent and velocity vector = a dot dir
-                # c. legnth from player to circle = sqrt(aa-bb)-sqrt(rr-(aa-bb))
-                # d. final velocity = c * direction + sqrt(rr-(aa-bb)) * self.pl_collision_speed
-            self.state[state_idx][pl_idx] = next_pl_pos
+                opp2vel_length = np.dot(pl2zone_vec, pl_dir_vec[pl_idx])
+                # c. legnth from player to circle edge = sqrt(aa-bb)-sqrt(rr-(aa-bb))
+                temp = pl2zone_length**2 - opp2vel_length**2
+                temp2 = self.screen_radius**2 - temp
+                if temp < 1e-5:
+                    pl2edge_length = np.sqrt(temp) - np.sqrt(temp2)
+                else:
+                    pl2edge_length = abs(pl2zone_length - self.screen_radius)
+                    # d. final velocity = c * direction + sqrt(rr-(aa-bb)) * collision_speed * direction
+                collision_speed = self.pl_collision_speed if pl_speed[
+                    pl_idx] >= self.pl_collision_speed else pl_speed[pl_idx]
+                pl_collision_vel = pl2edge_length * \
+                    pl_dir_vec[pl_idx] + \
+                    np.sqrt(temp2) * collision_speed * pl_dir_vec[pl_idx]
+                next_pl_pos = pl_pos + pl_collision_vel
+        # 4. if none collisions, update with velocity
+            self.states.update_player(state_idx, pl_idx, next_pl_pos, pl_vel)
 
     def _find_zone_idx(self, next_pos, pos, vel, zone_positions, zone_radius):
         shortest_dists = np.empty(shape=(len(zone_positions),))
+        modes = np.empty(shape=(len(zone_positions),))
         next_pos2zone_vecs = zone_positions - next_pos
         pos2zone_vecs = zone_positions - pos
         for i, (next_vec, vec) in enumerate(zip(next_pos2zone_vecs, pos2zone_vecs)):
             next_dotvalue = np.dot(next_vec, vel)
             dotvalue = np.dot(vec, vel)
-            if next_dotvalue <= 0.0 and dotvalue <= 0.0:  # leave
+            if next_dotvalue <= 0.0 and dotvalue <= 0.0:  # out or leave
+                modes[i] = MODE_LOOKUP['LEAVE']
                 shortest_dists[i] = sys.float_info.max
-            elif next_dotvalue > 0.0 and dotvalue > 0.0:  # come
+            elif next_dotvalue > 0.0 and dotvalue > 0.0:  # in or come
                 temp_dist = length(next_vec, axis=0)
                 if temp_dist <= zone_radius:
+                    modes[i] = MODE_LOOKUP['IN']
                     shortest_dists[i] = temp_dist
                 else:
+                    modes[i] = MODE_LOOKUP['COME']
                     shortest_dists[i] = sys.float_info.max
             elif next_dotvalue <= 0.0 and dotvalue > 0.0:  # in then out
+                modes[i] = MODE_LOOKUP['IN-THEN-OUT']
                 temp = np.inner(next_vec, np.multiply(-1, vel)
                                 ) / length(vel, axis=0)
                 shortest_dists[i] = 0.0 if abs(length(
@@ -538,7 +548,7 @@ class BBallEnv(gym.Env):
                     np.argmin(length(pos2zone_vecs[candidates], axis=1))]
             else:
                 zone_idx = candidates[0]
-        return zone_idx
+        return zone_idx, modes[zone_idx]
 
     def _update_ball_state(self, decision, ball_pass_dir):
         """
@@ -547,10 +557,10 @@ class BBallEnv(gym.Env):
         decision : int
             offensive team's decision, including SHOOT, NOOP, and PASS.
         """
-        if self.ball_state.is_passing:
+        if self.states.is_passing:
             # # ball update with the same velocity
-            # self.state[STATE_LOOKUP['BALL']
-            #            ] = self.state[STATE_LOOKUP['BALL']] + self.ball_state.velocity
+            # self.states.is_passing[STATE_LOOKUP['BALL']
+            #            ] = self.states.is_passing[STATE_LOOKUP['BALL']] + self.states.ball_vel
             # # TODO if decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['PASS'] return negative reward
 
             # check if ball caught/stolen
@@ -561,100 +571,141 @@ class BBallEnv(gym.Env):
             # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
             # 5. if any candidates, choose the best catcher among them
             # 6. if none candidates, ball keep flying
-            ball_pos = self.state[STATE_LOOKUP['BALL']]
-            next_ball_pos = self.state[STATE_LOOKUP['BALL']
-                                       ] + self.ball_state.velocity
-            off2oldball_vecs = self.state[STATE_LOOKUP['OFFENSE']
-                                          ] - ball_pos
-            def2oldball_vecs = self.state[STATE_LOOKUP['DEFENSE']
-                                          ] - ball_pos
+            ball_pos = self.states.ball_position
+            next_ball_pos = self.states.ball_position + self.states.ball_vel
+            off2oldball_vecs = self.states.offense_positions - ball_pos
+            def2oldball_vecs = self.states.defense_positions - ball_pos
 
+            # 1. if any defenders is close enough to offender (depend on stolen_radius)
+            # 2. defender is closer to ball init position than offender
             candidates = []
             for key, value in self.off_def_closest_map.items():
                 if value['distance'] <= self.stolen_radius:
                     if length(def2oldball_vecs[value['idx']], axis=0) <= length(off2oldball_vecs[key], axis=0):
                         candidates.append(value['idx'])
 
+            # 3. if any in (2), check is any defender able to fetch ball (depend on defender's wingspan_radius), then go (5)
             def_zone_idx = None
             if len(candidates) != 0:
-                def_zone_idx = self._find_zone_idx(
-                    next_ball_pos, ball_pos, self.ball_state.velocity, self.state[STATE_LOOKUP['DEFFENSE']][candidates], self.wingspan_radius)
+                def_zone_idx, _ = self._find_zone_idx(
+                    next_ball_pos, ball_pos, self.states.ball_vel, self.states.defense_positions[candidates], self.wingspan_radius)
+            # 5. if any candidates, choose the best catcher among them
                 if def_zone_idx is not None:
                     # assign catcher pos to ball pos
-                    self.state[STATE_LOOKUP['BALL']
-                               ] = self.state[STATE_LOOKUP['DEFENSE']][def_zone_idx]
-                    self.ball_state.update(
-                        handler_idx=def_zone_idx, is_passing=False, velocity=[0, 0])
+                    self.states.update_ball(self.states.defense_positions[candidates][def_zone_idx],
+                                            None, False, [0, 0])
                     # TODO if if_def_catch_ball:
                     # game ends with negative reward to offense, positive reward to defense
                     logger.info('DEFENSE steals the ball QQ')
                     self.done = True
-            off_zone_idx = None            
+            # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
+            off_zone_idx = None
             if len(candidates) == 0 or (def_zone_idx is None):
-                off_zone_idx = self._find_zone_idx(
-                    next_ball_pos, ball_pos, self.ball_state.velocity, self.state[STATE_LOOKUP['OFFENSE']], self.wingspan_radius)
+                off_zone_idx, _ = self._find_zone_idx(
+                    next_ball_pos, ball_pos, self.states.ball_vel, self.states.offense_positions, self.wingspan_radius)
+            # 5. if any candidates, choose the best catcher among them
                 if off_zone_idx is not None:
                     # assign catcher pos to ball pos
-                    self.state[STATE_LOOKUP['BALL']
-                               ] = self.state[STATE_LOOKUP['OFFENSE']][off_zone_idx]
-                    self.ball_state.update(
-                        handler_idx=off_zone_idx, is_passing=False, velocity=[0, 0])
+                    self.states.update_ball(self.states.offense_positions[off_zone_idx],
+                                            off_zone_idx, False, [0, 0])
                     logger.info('Successfull Pass :D')
+            # 6. if none candidates, ball keep flying
             if def_zone_idx is None and off_zone_idx is None:
-                self.state[STATE_LOOKUP['BALL']
-                           ] = self.state[STATE_LOOKUP['BALL']] + self.ball_state.velocity
+                self.states.update_ball(self.states.ball_position + self.states.ball_vel,
+                                        None, True, self.states.ball_vel)
                 logger.info('Ball is Flying')
-
         elif decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['NO_OP']:
             # dribble, assign ball handler's position to ball
-            self.state[STATE_LOOKUP['BALL']
-                       ] = self.state[STATE_LOOKUP['OFFENSE']][self.ball_state.handler_idx]
-            pass
+            self.states.update_ball(self.states.offense_positions[self.states.ball_handler_idx],
+                                    self.states.ball_handler_idx, False, [0, 0])
         elif decision == DESICION_LOOKUP['PASS']:
-            assert self.ball_state.is_passing == False
+            assert self.states.is_passing == False
             ball_pass_dir = np.clip(
                 ball_pass_dir, -np.pi, np.pi)
-            new_vel = [self.ball_state.passing_speed * np.cos(ball_pass_dir),
-                       self.ball_state.passing_speed * np.sin(ball_pass_dir)]
-            self.ball_state.update(
-                handler_idx=None, is_passing=True, velocity=new_vel)
-            self.state[STATE_LOOKUP['BALL']
-                       ] = self.state[STATE_LOOKUP['BALL']] + self.ball_state.velocity
+            new_vel = [self.ball_passing_speed * np.cos(ball_pass_dir),
+                       self.ball_passing_speed * np.sin(ball_pass_dir)]
+            self.states.update_ball(self.states.ball_position + new_vel,
+                                    None, True, new_vel)
             logger.info('Ball is Flying')
-            
+
     def _calculate_reward(self):
         pass
 
     def update_closest_map(self):
-        for idx, off_pos in enumerate(self.state[STATE_LOOKUP['OFFENSE']]):
-            distances = distance(self.state[STATE_LOOKUP['DEFENSE']], off_pos)
+        for idx, off_pos in enumerate(self.states.offense_positions):
+            distances = distance(self.states.defense_positions, off_pos)
             temp_idx = np.argmin(distances)
             self.off_def_closest_map[idx] = {
                 'idx': temp_idx, 'distance': distances[temp_idx]}
 
-    class BallState(object):
-        def __init__(self):
-            self.is_passing = None
-            self.handler_idx = None
-            self.velocity = None
-            self.passing_speed = 30.0 / FPS
 
-        def reset(self, handler_idx, is_passing=False):
-            self.is_passing = is_passing
-            self.handler_idx = handler_idx
-            self.velocity = np.array([0, 0])
+class States(object):
+    """ modulize all states into class """
 
-        def update(self, handler_idx, is_passing, velocity):
-            self.is_passing = is_passing
-            self.handler_idx = handler_idx
-            self.velocity = np.array(velocity)
+    def __init__(self):
+        """
+        """
+        # ball and players [ball, offense, defense]
+        self.positions = None
+        self.vels = None
+        # self.__dirs = None
+        # ball state
+        self.is_passing = None
+        self.ball_handler_idx = None
 
+    def reset(self, positions, vels, ball_handler_idx):
+        self.positions = positions
+        self.vels = vels
+        # self.__dirs = None
+        # ball state
+        self.ball_handler_idx = ball_handler_idx
+        self.is_passing = False
+
+    def update_ball(self, pos, ball_handler_idx, is_passing, velocity):
+        self.ball_handler_idx = ball_handler_idx
+        self.is_passing = is_passing
+        self.positions[STATE_LOOKUP['BALL']] = pos
+        self.vels[STATE_LOOKUP['BALL']] = np.array(velocity)
+
+    def update_player(self, team_id, pl_idx, position, vel):
+        self.positions[team_id][pl_idx] = position
+        self.vels[team_id][pl_idx] = vel
+
+    @property
+    def ball_position(self):
+        return self.positions[STATE_LOOKUP['BALL']]
+
+    @property
+    def offense_positions(self):
+        return self.positions[STATE_LOOKUP['OFFENSE']]
+
+    @property
+    def defense_positions(self):
+        return self.positions[STATE_LOOKUP['DEFENSE']]
+
+    @property
+    def ball_vel(self):
+        return self.vels[STATE_LOOKUP['BALL']]
+
+    @property
+    def offense_vel(self):
+        return self.vels[STATE_LOOKUP['OFFENSE']]
+
+    @property
+    def defense_vel(self):
+        return self.vels[STATE_LOOKUP['DEFENSE']]
+
+
+MODE_LOOKUP = {
+    'LEAVE': 0,
+    'COME': 1,
+    'IN': 2,
+    'IN-THEN-OUT': 3
+}
 
 DASH_LOOKUP = {
     'POWER': 0,
     'DIRECTION': 1
-
-
 }
 
 STATE_LOOKUP = {

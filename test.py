@@ -184,12 +184,12 @@ def main():
 
     # DEMO script
     # ball_looping()
-    # moving_around()
+    moving_around()
     # maxspeed()
     # ball_stealing()
     # random_dancing()
     # rewards()
-    move_offense_right()
+    # move_offense_right()
 
     env.close()
 
