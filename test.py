@@ -154,7 +154,7 @@ def move_offense_right():
             np.array([1, 0]),
             np.array([0, 0, 1]),
             np.array(0),
-            np.array([[5, 0], [5, 0], [5, 0], [5, 0], [5, 0]]),
+            np.array([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
@@ -184,12 +184,12 @@ def main():
 
     # DEMO script
     # ball_looping()
-    moving_around()
+    # moving_around()
     # maxspeed()
     # ball_stealing()
-    # random_dancing()
-    # rewards()
     # move_offense_right()
+    random_dancing()
+    # rewards()
 
     env.close()
 
