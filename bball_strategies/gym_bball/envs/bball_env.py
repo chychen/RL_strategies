@@ -107,12 +107,13 @@ class BBallEnv(gym.Env):
         self.if_vis_visual_aid = False
         # for render()
         self.viewer = None
-        self.def_pl_transforms = None
-        self.off_pl_transforms = None
+        self.def_pl_transforms = []
+        self.off_pl_transforms = []
         self.ball_transform = None
         # court information
         self.court_length = 94
         self.court_width = 50
+        self.time_limit = 24 * FPS * 2
         self.left_basket_pos = [0 + 5.25, 25]
         self.right_basket_pos = [94 - 5.25, 25]
         # this is the distance between two players' center position
@@ -128,7 +129,6 @@ class BBallEnv(gym.Env):
         # Env information
         self.states = States()
         self.off_def_closest_map = None  # dict()
-        self.done = None  # boolean
 
         # must define properties
         self.action_space = self._set_action_space()
@@ -138,29 +138,60 @@ class BBallEnv(gym.Env):
         self._seed()
 
     def _step(self, action):
-        """ Following gym.Env.step
         """
-        # action decomposition
-        # flag = action[ACTION_LOOKUP['FLAG']]
+        Returns
+        -------
+        observation (object) : agent's observation of the current environment
+        reward (float) : amount of reward returned after previous action
+        done (boolean) : whether the episode has ended, in which case further step() calls will return undefined results
+        info (dict) : contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
+        """
         decision = action[ACTION_LOOKUP['DECISION']]
         ball_pass_dir = action[ACTION_LOOKUP['BALL']]
-        off_pl_dash = action[ACTION_LOOKUP['OFFENSE']]
-        def_pl_dash = action[ACTION_LOOKUP['DEFENSE']]
+        pl_dash = action[ACTION_LOOKUP['DASH']]
         if self.states.turn == FLAG_LOOPUP['OFFENSE']:
-            logger.info('OFFENSE')
-            result = self._step_offense(
-                decision, ball_pass_dir, off_pl_dash, self.states.vels)
+            logger.info('[TURN] OFFENSE')
+            self._update_player_state(
+                pl_dash, self.states.vels, STATE_LOOKUP['OFFENSE'])
+            # update ball state
+            self._update_ball_state(decision, ball_pass_dir)
         elif self.states.turn == FLAG_LOOPUP['DEFENSE']:
-            logger.info('DEFENSE')
-            result = self._step_defense(
-                def_pl_dash, self.states.vels)
-        else:
-            raise KeyError(
-                'FLAG #{} have not been defined in FLAG_LOOPUP table'.format(flag))
+            logger.info('[TURN] DEFENSE')
+            self._update_player_state(
+                pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
+
+        # check if meets termination condition
+        if decision == DESICION_LOOKUP['SHOOT']:
+            # self.states.game_over(REASON_LOOKUP['SHOOT'])
+            pass
+        # OOB
+        if self.states.ball_position[0] >= self.court_length or self.states.ball_position[0] < 0.0 or self.states.ball_position[1] >= self.court_width or self.states.ball_position[1] < 0.0:
+            # self.states.game_over(REASON_LOOKUP['OOB'])
+            pass
+        # OOT
+        if self.states.steps >= self.time_limit:
+            # self.states.game_over(REASON_LOOKUP['OOT'])
+            pass
+        # termination conditions
+        if self.states.done:
+            if self.states.reason == REASON_LOOKUP['SHOOT']:
+                logger.info('[GAME OVER], A shoot decision is made')
+                reward = self._calculate_reward()
+                pass
+            elif self.states.reason == REASON_LOOKUP['CAPTURED']:
+                logger.info('[GAME OVER], A defender gets possession of the ball')
+                pass
+            elif self.states.reason == REASON_LOOKUP['OOB']:
+                logger.info('[GAME OVER], The ball is out of bounds.')
+                pass
+            elif self.states.reason == REASON_LOOKUP['OOT']:
+                logger.info('[GAME OVER], Max time limit for the episode is reached')
+                pass
 
         # update env information
         self.update_closest_map()
-        return result
+
+        return self.states.positions, 0.0, self.states.done, dict()
 
     def _reset(self):
         """ random init positions in the right half court
@@ -189,12 +220,6 @@ class BBallEnv(gym.Env):
         u_vec = vec / np.stack([vec_length, vec_length], axis=1)
         def_players_pos = def_players_pos + u_vec * self.screen_radius * 2
         ball_pos = np.array(off_players_pos[ball_handler_idx, :], copy=True)
-        # reinit Env information
-        self.def_pl_transforms = []
-        self.off_pl_transforms = []
-        self.ball_transform = None
-        self.done = False
-
         positions = np.array([ball_pos, off_players_pos, def_players_pos])
         vels = np.array([np.zeros_like(ball_pos), np.zeros_like(
             off_players_pos), np.zeros_like(def_players_pos)])
@@ -230,7 +255,6 @@ class BBallEnv(gym.Env):
                     def_player.add_attr(def_trans)
                     self.viewer.add_geom(def_player)
                     if self.if_vis_visual_aid:
-                        logger.info('{}'.format(self.if_vis_visual_aid))
                         def_player_screen = rendering.make_circle(
                             radius=self.screen_radius, filled=False)
                         def_player_wingspan = rendering.make_circle(
@@ -250,7 +274,6 @@ class BBallEnv(gym.Env):
                     off_player.add_attr(off_trans)
                     self.viewer.add_geom(off_player)
                     if self.if_vis_visual_aid:
-                        logger.info('{}'.format(self.if_vis_visual_aid))
                         off_player_screen = rendering.make_circle(
                             radius=self.screen_radius, filled=False)
                         off_player_wingspan = rendering.make_circle(
@@ -401,52 +424,6 @@ class BBallEnv(gym.Env):
                        high=np.array([[self.court_length, self.court_width] for _ in range(5)]))
         ))
 
-    def _step_offense(self, decision, ball_pass_dir, off_pl_dash, vels):
-        """
-        Returns
-        -------
-        observation (object) : agent's observation of the current environment
-        reward (float) : amount of reward returned after previous action
-        done (boolean) : whether the episode has ended, in which case further step() calls will return undefined results
-        info (dict) : contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
-        """
-        self._update_player_state(
-            off_pl_dash, vels, STATE_LOOKUP['OFFENSE'])
-        # update ball state
-        self._update_ball_state(decision, ball_pass_dir)
-
-        if decision == DESICION_LOOKUP['SHOOT']:
-            reward = self._calculate_reward()
-            return self.states.positions, 0.0, self.done, dict()
-        elif decision == DESICION_LOOKUP['PASS']:
-
-            return self.states.positions, 0.0, self.done, dict()
-        elif decision == DESICION_LOOKUP['NO_OP']:
-
-            return self.states.positions, 0.0, self.done, dict()
-        else:
-            raise KeyError(
-                'Decision #{} have not been defined in DESICION_LOOKUP table'.format(decision))
-
-        # if episode ended
-        # --A shoot decision is made,
-        # --The ball is out of bounds.
-        # --A defender gets possession of the ball.
-        # --A max time limit for the episode is reached.
-
-    def _step_defense(self, def_pl_dash, vels):
-        """
-        Returns
-        -------
-        observation (object) : agent's observation of the current environment
-        reward (float) : amount of reward returned after previous action
-        done (boolean) : whether the episode has ended, in which case further step() calls will return undefined results
-        info (dict) : contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
-        """
-        self._update_player_state(
-            def_pl_dash, vels, STATE_LOOKUP['DEFENSE'])
-        return self.states.positions, 0.0, False, dict()
-
     def _update_player_state(self, pl_dash, vels, state_idx):
         """ Update the player's movement following the physics limitation predefined
         Inputs
@@ -480,6 +457,7 @@ class BBallEnv(gym.Env):
             np.stack([pl_speed[indices], pl_speed[indices]],
                      axis=-1) * self.pl_max_speed
         pl_speed = length(pl_vels, axis=1)
+        # current moving direction (unit vector)
         pl_vels_dir_vec = np.stack(
             [pl_vels[:, 0] / pl_speed, pl_vels[:, 1] / pl_speed], axis=1)
 
@@ -495,10 +473,9 @@ class BBallEnv(gym.Env):
         # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
             if zone_idx is not None:
                 logger.info(
-                    'mode {}, {}-{} colide into {}-{}'.format(mode, state_idx, pl_idx, opp_idx, zone_idx))
+                    '[COLLISION] mode {}, {}-{} colide into {}-{}'.format(mode, state_idx, pl_idx, opp_idx, zone_idx))
                 if mode == MODE_LOOKUP['IN'] or mode == MODE_LOOKUP['IN-THEN-OUT']:
                     # if 'IN' or 'IN-THEN-OUT', use collision_speed
-                    logger.info('mode: IN, IN-THEN-OUT')
                     collision_speed = self.pl_collision_speed
                     collision_speed = collision_speed if pl_speed[
                         pl_idx] >= collision_speed else pl_speed[pl_idx]
@@ -506,7 +483,6 @@ class BBallEnv(gym.Env):
                         pl_vels_dir_vec[pl_idx]
                 elif mode == MODE_LOOKUP['COME-THEN-IN']:
                     # if 'COME-THEN-IN', combine player speed when 'COME' and collision_speed when 'IN'
-                    logger.info('mode: COME-THEN-IN')
                     # a. length between player and opponent
                     pl2zone_vec = opp_positions[zone_idx] - pl_pos
                     pl2zone_length = length(pl2zone_vec, axis=0)
@@ -518,15 +494,6 @@ class BBallEnv(gym.Env):
                     temp = pl2zone_length**2 - pl2zone_ondir_length**2
                     # edge to end pos
                     temp2 = self.screen_radius**2 - temp
-                    # print(pl_pos)
-                    # print(next_pl_pos)
-                    # print(opp_positions[zone_idx])
-                    # print(pl2zone_vec)
-                    # print(pl_vels_dir_vec[pl_idx])
-                    # print(pl2zone_length)
-                    # print(pl2zone_ondir_length)
-                    # print(temp)
-                    # print(temp2)
                     if temp < 1e-5:
                         pl2edge_length = abs(
                             pl2zone_length - self.screen_radius)
@@ -538,7 +505,6 @@ class BBallEnv(gym.Env):
                     pl_collision_vel = pl2edge_length * pl_vels_dir_vec[pl_idx] + \
                         (1 - pl2edge_length / pl_speed[pl_idx]) * \
                         collision_speed * pl_vels_dir_vec[pl_idx]
-                    # + (pl_speed[pl_idx] - pl2zone_ondir_length) * pl_vels_dir_vec[pl_idx]
                 next_pl_pos = pl_pos + pl_collision_vel
                 pl_vel = 0.0  # if collision, velocity = 0
         # 4. if none collisions, update with velocity
@@ -634,8 +600,7 @@ class BBallEnv(gym.Env):
                                             None, False, [0, 0])
                     # TODO if if_def_catch_ball:
                     # game ends with negative reward to offense, positive reward to defense
-                    logger.info('DEFENSE steals the ball QQ')
-                    self.done = True
+                    self.states.game_over(REASON_LOOKUP['CAPTURED'])
             # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
             off_zone_idx = None
             if len(candidates) == 0 or (def_zone_idx is None):
@@ -646,12 +611,12 @@ class BBallEnv(gym.Env):
                     # assign catcher pos to ball pos
                     self.states.update_ball(self.states.offense_positions[off_zone_idx],
                                             off_zone_idx, False, [0, 0])
-                    logger.info('Successfull Pass :D')
+                    logger.info('[BALL] Successfull Pass :D')
             # 6. if none candidates, ball keep flying
             if def_zone_idx is None and off_zone_idx is None:
                 self.states.update_ball(self.states.ball_position + self.states.ball_vel,
                                         None, True, self.states.ball_vel)
-                logger.info('Ball is Flying')
+                logger.info('[BALL] Flying')
         elif decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['NO_OP']:
             # dribble, assign ball handler's position to ball
             self.states.update_ball(self.states.offense_positions[self.states.ball_handler_idx],
@@ -664,7 +629,7 @@ class BBallEnv(gym.Env):
                        self.ball_passing_speed * np.sin(ball_pass_dir)]
             self.states.update_ball(self.states.ball_position + new_vel,
                                     None, True, new_vel)
-            logger.info('Ball is Flying')
+            logger.info('[BALL] Flying')
 
     def _calculate_reward(self):
         pass
@@ -687,6 +652,9 @@ class States(object):
         self.turn = None
         self.positions = None
         self.vels = None
+        self.done = None
+        self.reason = None
+        self.steps = None
         # self.__dirs = None
         # ball state
         self.is_passing = None
@@ -696,6 +664,9 @@ class States(object):
         self.turn = FLAG_LOOPUP['OFFENSE']
         self.positions = positions
         self.vels = vels
+        self.done = False
+        self.reason = None
+        self.steps = 0
         # self.__dirs = None
         # ball state
         self.ball_handler_idx = ball_handler_idx
@@ -713,7 +684,11 @@ class States(object):
 
     def take_turn(self):
         self.turn = FLAG_LOOPUP['DEFENSE'] if self.turn == FLAG_LOOPUP['OFFENSE'] else FLAG_LOOPUP['OFFENSE']
-        
+        self.steps = self.steps + 1
+
+    def game_over(self, reason):
+        self.done = True
+        self.reason = reason
 
     @property
     def ball_position(self):
@@ -730,6 +705,15 @@ class States(object):
     @property
     def ball_vel(self):
         return self.vels[STATE_LOOKUP['BALL']]
+
+
+# Termination Conditions:
+REASON_LOOKUP = {
+    'SHOOT': 0,  # A shoot decision is made
+    'CAPTURED': 1,  # A defender gets possession of the ball
+    'OOB': 2,  # The ball is Out Of Bounds
+    'OOT': 3  # Out Of Time by a max time limitation
+}
 
 
 MODE_LOOKUP = {
@@ -753,12 +737,10 @@ STATE_LOOKUP = {
 }
 
 ACTION_LOOKUP = {
-    # Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
-    # 'FLAG': 0,
+    # Tuple(Discrete(3), Box(), Box(5, 2))
     'DECISION': 0,
     'BALL': 1,
-    'OFFENSE': 2,
-    'DEFENSE': 3
+    'DASH': 2
 }
 
 FLAG_LOOPUP = {

@@ -8,13 +8,13 @@ def no_op():
         # np.array([1, 0]),
         np.array(2),
         np.array(0),
-        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
     ))
     _, _, done, _ = env.step(action)
     env.render()
     if done:
         env.reset()
+        env.render()
 
 
 def ball_looping():
@@ -23,27 +23,28 @@ def ball_looping():
         action = tuple((
             np.array(1),
             np.array(np.pi / 4),
-            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
+            env.render()
 
+        no_op()
         no_op()
         no_op()
 
         action = tuple((
             np.array(1),
             np.array(-np.pi / 2),
-            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
+            env.render()
 
         no_op()
         no_op()
@@ -52,14 +53,15 @@ def ball_looping():
         action = tuple((
             np.array(1),
             np.array(np.pi * 3 / 4),
-            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
+            env.render()
 
+        no_op()
         no_op()
         no_op()
 
@@ -71,17 +73,17 @@ def moving_around():
             np.array(2),
             np.array(0),
             np.array(
-                [[2, np.pi], [2, np.pi], [2, np.pi], [2, np.pi], [2, np.pi]]),
-            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+                [[2, np.pi], [2, np.pi], [2, np.pi], [2, np.pi], [2, np.pi]])
         ))
         _, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
+            env.render()
 
-    no_op()
-    no_op()
-    no_op()
+        no_op()
+        no_op()
+        no_op()
 
     no_op()
     no_op()
@@ -93,13 +95,13 @@ def moving_around():
             np.array(2),
             np.array(0),
             np.array(
-                [[2, 0], [2, 0], [2, 0], [2, 0], [2, 0]]),
-            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+                [[2, 0], [2, 0], [2, 0], [2, 0], [2, 0]])
         ))
         _, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
+            env.render()
 
 
 def maxspeed():
@@ -107,14 +109,14 @@ def maxspeed():
         action = tuple((
             np.array(2),
             np.array(0),
-            np.array([[0, 0], [0, 0], [5, np.pi], [0, 0], [0, 0]]),
-            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+            np.array([[0, 0], [0, 0], [5, np.pi], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
-    no_op()
+            env.render()
+        no_op()
 
 
 def ball_stealing():
@@ -131,7 +133,6 @@ def ball_stealing():
     action = tuple((
         np.array(1),
         np.array(-np.pi / 2),
-        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
     ))
     _, _, done, _ = env.step(action)
@@ -143,26 +144,38 @@ def ball_stealing():
 
 
 def move_offense_right():
-    for _ in range(15):
+    for _ in range(25):
         action = tuple((
             np.array(2),
             np.array(0),
-            np.array([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]]),
+            np.array([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]])
+        ))
+        _, _, done, _ = env.step(action)
+        env.render()
+        if done:
+            env.reset()
+            env.render()
+        action = tuple((
+            np.array(2),
+            np.array(0),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
+            env.render()
 
 
 def random_dancing():
-    for _ in range(20):
+    for _ in range(240):
         action = env.action_space.sample()
         _, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
+            env.render()
+            
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
@@ -190,7 +203,6 @@ def main():
     # ball_stealing()
     # move_offense_right()
     random_dancing()
-    # terminal_conditions()
     # rewards()
 
     env.close()
