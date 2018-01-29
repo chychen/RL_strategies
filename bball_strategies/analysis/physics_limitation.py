@@ -98,9 +98,49 @@ from __future__ import absolute_import
 from __future__ import division
 
 import numpy as np
+import plotly.offline as py
+import plotly.graph_objs as go
 
 FEET_TO_METER = 0.3048
 METER_TP_FEET = 1.0 / 0.3048
+
+
+def analize_passing_speed(data):
+    ball_passing_speed = []
+    ball_positions = np.stack(
+        [data[:, :, 0:1, 0], data[:, :, 0:1, 1]], axis=-1)
+    players_positions = np.stack(
+        [data[:, :, 1:, 0], data[:, :, 1:, 1]], axis=-1)
+    print(ball_positions.shape)
+    print(players_positions.shape)
+    pl2ball_vec = players_positions - ball_positions
+    print(pl2ball_vec.shape)
+    pl2ball_length = np.sqrt(
+        pl2ball_vec[:, :, :, 0]**2 + pl2ball_vec[:, :, :, 1]**2)
+    print(pl2ball_length.shape)
+    k = True
+    for i in range(10):
+        k = np.logical_and(k, pl2ball_length[:, :, i] > 5)
+    print(np.array(k).shape)
+    indices = np.argwhere(k)
+    print(indices.shape)
+    ball_positions = ball_positions[indices[:, 0], indices[:, 1]]
+    print(ball_positions.shape)
+    speed_vec = ball_positions[1:] - ball_positions[:-1]
+    print(speed_vec.shape)
+    speed = np.sqrt(speed_vec[:, 0, 0]**2 + speed_vec[:, 0, 1]**2)* FPS
+    print(speed.shape)
+    trace = go.Histogram(
+        x=speed.reshape([-1])
+        # xbins=dict(
+        #     start=0.0,
+        #     end=50.0,
+        #     size=0.5
+        # )
+    )
+
+    data = [trace]
+    py.plot(data, filename='Histogram.html')
 
 
 def analyze(x, y):
@@ -125,8 +165,9 @@ def analyze(x, y):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--name', type=str, help='data name', default='FrameRate5')
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('--name', type=str,
+                        help='data name', default='FrameRate5')
     parser.add_argument('--fps', type=float, help='fps', default=5.0)
     args = parser.parse_args()
 #     data = np.load('../data/' + args.name + '.npy').reshape([1,-1,11,3])
@@ -139,24 +180,26 @@ def main():
     speed_y = (data[:, :-1, :, 1] - data[:, 1:, :, 1]) * FPS
     # speed_z = data[:, :-1, :, 2] - data[:, 1:, :, 2] * FPS
 
-    print('######## SPEED ########')
-    print('--BALL--')
-    analyze(speed_x[:, :, 0:1], speed_y[:, :, 0:1])
-    print('--OFFENSIVE PLAYERS--')
-    analyze(speed_x[:, :, 1:6], speed_y[:, :, 1:6])
-    print('--DEFENSIVE PLAYERS--')
-    analyze(speed_x[:, :, 6:11], speed_y[:, :, 6:11])
+    # print('######## SPEED ########')
+    # print('--BALL--')
+    # analyze(speed_x[:, :, 0:1], speed_y[:, :, 0:1])
+    # print('--OFFENSIVE PLAYERS--')
+    # analyze(speed_x[:, :, 1:6], speed_y[:, :, 1:6])
+    # print('--DEFENSIVE PLAYERS--')
+    # analyze(speed_x[:, :, 6:11], speed_y[:, :, 6:11])
 
-    acc_x = speed_x[:, :-1] - speed_x[:, 1:]
-    acc_y = speed_y[:, :-1] - speed_y[:, 1:]
+    # acc_x = speed_x[:, :-1] - speed_x[:, 1:]
+    # acc_y = speed_y[:, :-1] - speed_y[:, 1:]
 
-    print('##### ACCERLATION #####')
-    print('--BALL--')
-    analyze(acc_x[:, :, 0:1], acc_y[:, :, 0:1])
-    print('--OFFENSIVE PLAYERS--')
-    analyze(acc_x[:, :, 1:6], acc_y[:, :, 1:6])
-    print('--DEFENSIVE PLAYERS--')
-    analyze(acc_x[:, :, 6:11], acc_y[:, :, 6:11])
+    # print('##### ACCERLATION #####')
+    # print('--BALL--')
+    # analyze(acc_x[:, :, 0:1], acc_y[:, :, 0:1])
+    # print('--OFFENSIVE PLAYERS--')
+    # analyze(acc_x[:, :, 1:6], acc_y[:, :, 1:6])
+    # print('--DEFENSIVE PLAYERS--')
+    # analyze(acc_x[:, :, 6:11], acc_y[:, :, 6:11])
+
+    analize_passing_speed(data)
 
 
 if __name__ == '__main__':

@@ -97,7 +97,7 @@ class BBallEnv(gym.Env):
     """
     metadata = {
         'render.modes': ['human', 'rgb_array'],
-        'video.frames_per_second': FPS / 2.0
+        'video.frames_per_second': FPS * 2.0
     }
 
     def __init__(self):

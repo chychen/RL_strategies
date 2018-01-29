@@ -1,31 +1,50 @@
-import numpy
-import cProfile
+import numpy as np
 
-def cross_diff(A, B):
-    return A[:,None] - B[None,:]
+a = np.zeros(shape=[3, 4, 5])
+a[2, 3, 4] = 1
+a[1, 2, :] = 1
+print(a)
 
-def crossdiff2 (a,b):
-    ap = numpy.tile (a, (numpy.shape(b)[0],1))
-    bp = numpy.tile (b, (numpy.shape(a)[0],1))
+b = True
+for i in range(5):
+    b = np.logical_and(b, a[:, :, i] == 1)
+print(b)
+print(b.shape)
 
-    return ap - bp.transpose()
+c = np.argwhere(b == 1)
+print(c)
+print('c.shape', c.shape)
+print(b[c[:, 0], c[:, 1]])
+print(a[c[:, 0], c[:, 1]])
 
-def crossdiff(a,b):
-    c = []
-    for a1 in range(len(a)):
-        for b1 in range(len(b)):
-            c.append (a[a1]-b[b1])
-    x = numpy.array(c)
-    x.reshape(len(a),len(b))
-    return x
+# import numpy
+# import cProfile
 
-a = numpy.array(range(10000))
-b = numpy.array(range(10000))
+# def cross_diff(A, B):
+#     return A[:,None] - B[None,:]
 
-cProfile.run('crossdiff (a,b)')
-cProfile.run('crossdiff2 (a,b)')
-cProfile.run('cross_diff (a,b)')
-cProfile.run('numpy.subtract.outer (a,b)')
+# def crossdiff2 (a,b):
+#     ap = numpy.tile (a, (numpy.shape(b)[0],1))
+#     bp = numpy.tile (b, (numpy.shape(a)[0],1))
+
+#     return ap - bp.transpose()
+
+# def crossdiff(a,b):
+#     c = []
+#     for a1 in range(len(a)):
+#         for b1 in range(len(b)):
+#             c.append (a[a1]-b[b1])
+#     x = numpy.array(c)
+#     x.reshape(len(a),len(b))
+#     return x
+
+# a = numpy.array(range(10000))
+# b = numpy.array(range(10000))
+
+# cProfile.run('crossdiff (a,b)')
+# cProfile.run('crossdiff2 (a,b)')
+# cProfile.run('cross_diff (a,b)')
+# cProfile.run('numpy.subtract.outer (a,b)')
 
 """
 100010009 function calls in 69.869 seconds
