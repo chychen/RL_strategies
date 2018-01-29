@@ -141,17 +141,17 @@ class BBallEnv(gym.Env):
         """ Following gym.Env.step
         """
         # action decomposition
-        flag = np.argmax(action[ACTION_LOOKUP['FLAG']])
-        assert flag.shape == ()
-        decision = np.argmax(action[ACTION_LOOKUP['DECISION']])
+        # flag = action[ACTION_LOOKUP['FLAG']]
+        decision = action[ACTION_LOOKUP['DECISION']]
         ball_pass_dir = action[ACTION_LOOKUP['BALL']]
         off_pl_dash = action[ACTION_LOOKUP['OFFENSE']]
         def_pl_dash = action[ACTION_LOOKUP['DEFENSE']]
-
-        if flag == FLAG_LOOPUP['OFFENSE']:
+        if self.states.turn == FLAG_LOOPUP['OFFENSE']:
+            logger.info('OFFENSE')
             result = self._step_offense(
                 decision, ball_pass_dir, off_pl_dash, self.states.vels)
-        elif flag == FLAG_LOOPUP['DEFENSE']:
+        elif self.states.turn == FLAG_LOOPUP['DEFENSE']:
+            logger.info('DEFENSE')
             result = self._step_defense(
                 def_pl_dash, self.states.vels)
         else:
@@ -366,7 +366,6 @@ class BBallEnv(gym.Env):
         Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
         """
         return spaces.Tuple((
-            spaces.Discrete(2),  # offense or defense
             spaces.Discrete(3),  # offensive decision
             # ball theta
             spaces.Box(
@@ -466,13 +465,14 @@ class BBallEnv(gym.Env):
         # decomposing into power and direction
         pl_power = np.clip(
             pl_dash[:, DASH_LOOKUP['POWER']], 0, self.pl_max_power)
-        pl_dir = np.clip(
+        pl_acc_dir = np.clip(
             pl_dash[:, DASH_LOOKUP['DIRECTION']], -np.pi, np.pi)
-        pl_dir_vec = np.stack([np.cos(pl_dir), np.sin(pl_dir)], axis=1)
-        pl_acc = np.stack(
-            [pl_dir_vec[:, 0] * pl_power, pl_dir_vec[:, 1] * pl_power], axis=1)
-        assert pl_acc.shape == vels[state_idx].shape
-        pl_vels = np.add(vels[state_idx], pl_acc)
+        pl_acc_dir_vec = np.stack(
+            [np.cos(pl_acc_dir), np.sin(pl_acc_dir)], axis=1)
+        pl_acc_vec = np.stack(
+            [pl_acc_dir_vec[:, 0] * pl_power, pl_acc_dir_vec[:, 1] * pl_power], axis=1)
+        assert pl_acc_vec.shape == vels[state_idx].shape
+        pl_vels = np.add(vels[state_idx], pl_acc_vec)
         pl_speed = length(pl_vels, axis=1)
         # can't not exceed the limits
         indices = np.argwhere(pl_speed > self.pl_max_speed)
@@ -480,6 +480,8 @@ class BBallEnv(gym.Env):
             np.stack([pl_speed[indices], pl_speed[indices]],
                      axis=-1) * self.pl_max_speed
         pl_speed = length(pl_vels, axis=1)
+        pl_vels_dir_vec = np.stack(
+            [pl_vels[:, 0] / pl_speed, pl_vels[:, 1] / pl_speed], axis=1)
 
         # 2. check if any collisions might happen among one player to five opponents.
         if state_idx == STATE_LOOKUP['DEFENSE']:
@@ -491,44 +493,57 @@ class BBallEnv(gym.Env):
             zone_idx, mode = self._find_zone_idx(
                 next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius)
         # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
-            # TODO IN-THEN-OUT
             if zone_idx is not None:
                 logger.info(
-                    '{}-{} colide into {}-{}'.format(state_idx, pl_idx, opp_idx, zone_idx))
+                    'mode {}, {}-{} colide into {}-{}'.format(mode, state_idx, pl_idx, opp_idx, zone_idx))
                 if mode == MODE_LOOKUP['IN'] or mode == MODE_LOOKUP['IN-THEN-OUT']:
+                    # if 'IN' or 'IN-THEN-OUT', use collision_speed
                     logger.info('mode: IN, IN-THEN-OUT')
                     collision_speed = self.pl_collision_speed
                     collision_speed = collision_speed if pl_speed[
                         pl_idx] >= collision_speed else pl_speed[pl_idx]
-                    pl_collision_vel = collision_speed * pl_dir_vec[pl_idx]
+                    pl_collision_vel = collision_speed * \
+                        pl_vels_dir_vec[pl_idx]
                 elif mode == MODE_LOOKUP['COME-THEN-IN']:
+                    # if 'COME-THEN-IN', combine player speed when 'COME' and collision_speed when 'IN'
                     logger.info('mode: COME-THEN-IN')
                     # a. length between player and opponent
                     pl2zone_vec = opp_positions[zone_idx] - pl_pos
                     pl2zone_length = length(pl2zone_vec, axis=0)
                     # b. length between player and opponent on velocity direction = a dot dir
                     pl2zone_ondir_length = np.dot(
-                        pl2zone_vec, pl_dir_vec[pl_idx])
+                        pl2zone_vec, pl_vels_dir_vec[pl_idx])
                     # c. legnth from player to circle edge = b - sqrt(rr-(aa-bb))
+                    # zone to end pos
                     temp = pl2zone_length**2 - pl2zone_ondir_length**2
+                    # edge to end pos
                     temp2 = self.screen_radius**2 - temp
+                    # print(pl_pos)
+                    # print(next_pl_pos)
+                    # print(opp_positions[zone_idx])
+                    # print(pl2zone_vec)
+                    # print(pl_vels_dir_vec[pl_idx])
+                    # print(pl2zone_length)
+                    # print(pl2zone_ondir_length)
+                    # print(temp)
+                    # print(temp2)
                     if temp < 1e-5:
                         pl2edge_length = abs(
                             pl2zone_length - self.screen_radius)
                     else:
                         pl2edge_length = pl2zone_ondir_length - np.sqrt(temp2)
                     # d. final velocity = c * direction + sqrt(rr-(aa-bb)) * collision_speed * direction
-                    collision_speed = self.pl_collision_speed
-                    # * (1.0 - pl2edge_length / pl_speed[pl_idx])
-                    collision_speed = collision_speed if pl_speed[
-                        pl_idx] >= collision_speed else pl_speed[pl_idx]
-                    pl_collision_vel = pl2edge_length * pl_dir_vec[pl_idx] + \
-                        (1 - pl2edge_length / pl_speed[pl_idx]) * collision_speed * pl_dir_vec[pl_idx]
-                    # + (pl_speed[pl_idx] - pl2zone_ondir_length) * pl_dir_vec[pl_idx]
+                    collision_speed = self.pl_collision_speed if pl_speed[
+                        pl_idx] >= self.pl_collision_speed else pl_speed[pl_idx]
+                    pl_collision_vel = pl2edge_length * pl_vels_dir_vec[pl_idx] + \
+                        (1 - pl2edge_length / pl_speed[pl_idx]) * \
+                        collision_speed * pl_vels_dir_vec[pl_idx]
+                    # + (pl_speed[pl_idx] - pl2zone_ondir_length) * pl_vels_dir_vec[pl_idx]
                 next_pl_pos = pl_pos + pl_collision_vel
                 pl_vel = 0.0  # if collision, velocity = 0
         # 4. if none collisions, update with velocity
             self.states.update_player(state_idx, pl_idx, next_pl_pos, pl_vel)
+        self.states.take_turn()
 
     def _find_zone_idx(self, next_pos, pos, vel, zone_positions, zone_radius):
         shortest_dists = np.empty(shape=(len(zone_positions),))
@@ -669,6 +684,7 @@ class States(object):
         """
         """
         # ball and players [ball, offense, defense]
+        self.turn = None
         self.positions = None
         self.vels = None
         # self.__dirs = None
@@ -677,6 +693,7 @@ class States(object):
         self.ball_handler_idx = None
 
     def reset(self, positions, vels, ball_handler_idx):
+        self.turn = FLAG_LOOPUP['OFFENSE']
         self.positions = positions
         self.vels = vels
         # self.__dirs = None
@@ -694,6 +711,10 @@ class States(object):
         self.positions[team_id][pl_idx] = position
         self.vels[team_id][pl_idx] = vel
 
+    def take_turn(self):
+        self.turn = FLAG_LOOPUP['DEFENSE'] if self.turn == FLAG_LOOPUP['OFFENSE'] else FLAG_LOOPUP['OFFENSE']
+        
+
     @property
     def ball_position(self):
         return self.positions[STATE_LOOKUP['BALL']]
@@ -709,14 +730,6 @@ class States(object):
     @property
     def ball_vel(self):
         return self.vels[STATE_LOOKUP['BALL']]
-
-    @property
-    def offense_vel(self):
-        return self.vels[STATE_LOOKUP['OFFENSE']]
-
-    @property
-    def defense_vel(self):
-        return self.vels[STATE_LOOKUP['DEFENSE']]
 
 
 MODE_LOOKUP = {
@@ -741,11 +754,11 @@ STATE_LOOKUP = {
 
 ACTION_LOOKUP = {
     # Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
-    'FLAG': 0,
-    'DECISION': 1,
-    'BALL': 2,
-    'OFFENSE': 3,
-    'DEFENSE': 4
+    # 'FLAG': 0,
+    'DECISION': 0,
+    'BALL': 1,
+    'OFFENSE': 2,
+    'DEFENSE': 3
 }
 
 FLAG_LOOPUP = {
