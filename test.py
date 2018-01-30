@@ -175,34 +175,36 @@ def random_dancing():
         if done:
             env.reset()
             env.render()
-            
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
-    def __init__(self, env, if_init_by_default=False, if_vis_trajectory=False, if_vis_visual_aid=False):
+    def __init__(self, env, if_init_by_default=False, if_vis_trajectory=False, if_vis_visual_aid=False, if_init_by_dataset=False):
         super(MonitorWrapper, self).__init__(env=env, directory='./test/',
                                              video_callable=lambda count: count % 1 == 0, force=True)
         env.if_init_by_default = if_init_by_default
         env.if_vis_trajectory = if_vis_trajectory
         env.if_vis_visual_aid = if_vis_visual_aid
+        env.if_init_by_dataset = if_init_by_dataset
 
 
 def main():
     global env
     env = gym.make('bball-v0')
-    env = MonitorWrapper(env, if_init_by_default=True,
+    env = MonitorWrapper(env,
+                         if_init_by_default=False,
+                         if_init_by_dataset=True,
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True)
     env.reset()
     env.render()
-
+    input()
     # DEMO script
     # ball_looping()
     # moving_around()
     # maxspeed()
     # ball_stealing()
     # move_offense_right()
-    random_dancing()
+    # random_dancing()
     # rewards()
 
     env.close()

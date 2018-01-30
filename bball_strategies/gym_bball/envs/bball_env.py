@@ -103,6 +103,7 @@ class BBallEnv(gym.Env):
     def __init__(self):
         # config might be setup by Wrapper
         self.if_init_by_default = False
+        self.if_init_by_dataset = False
         self.if_vis_trajectory = False
         self.if_vis_visual_aid = False
         # for render()
@@ -179,13 +180,15 @@ class BBallEnv(gym.Env):
                 reward = self._calculate_reward()
                 pass
             elif self.states.reason == REASON_LOOKUP['CAPTURED']:
-                logger.info('[GAME OVER], A defender gets possession of the ball')
+                logger.info(
+                    '[GAME OVER], A defender gets possession of the ball')
                 pass
             elif self.states.reason == REASON_LOOKUP['OOB']:
                 logger.info('[GAME OVER], The ball is out of bounds.')
                 pass
             elif self.states.reason == REASON_LOOKUP['OOT']:
-                logger.info('[GAME OVER], Max time limit for the episode is reached')
+                logger.info(
+                    '[GAME OVER], Max time limit for the episode is reached')
                 pass
 
         # update env information
@@ -198,32 +201,48 @@ class BBallEnv(gym.Env):
         1. init offensive team randomlu
         2. add defensive team next to each offensive player in the basket side.
         """
-        if self.if_init_by_default:
-            off_players_pos = np.array([
-                [80, 40],
-                [70, 35],
-                [60, 25],
-                [70, 15],
-                [80, 10]
-            ], dtype=np.float)
-            ball_handler_idx = 2
+        if self.if_init_by_dataset:
+            data = np.load('bball_strategies/data/FrameRate5.npy')
+            ep_idx = np.floor(self.np_random_generator.uniform(
+                low=0.0, high=data.shape[0])).astype(np.int)
+            ball_pos = data[ep_idx, 0, 0, 0:2]
+            off_positions = data[ep_idx, 0, 1:6, 0:2]
+            def_positions = data[ep_idx, 0, 6:11, 0:2]
+            off2ball_vec = off_positions - ball_pos
+            ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
+            positions = np.array(
+                [off_positions[ball_handler_idx], off_positions, def_positions])
+            vels = np.array([np.zeros_like(ball_pos), np.zeros_like(
+                off_positions), np.zeros_like(def_positions)])
+            self.states.reset(positions, vels, ball_handler_idx)
         else:
-            off_players_pos = self.np_random_generator.uniform(
-                low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
-            ball_handler_idx = np.floor(self.np_random_generator.uniform(
-                low=0.0, high=5.0)).astype(np.int)
+            if self.if_init_by_default:
+                off_positions = np.array([
+                    [80, 40],
+                    [70, 35],
+                    [60, 25],
+                    [70, 15],
+                    [80, 10]
+                ], dtype=np.float)
+                ball_handler_idx = 2
+            else:
+                off_positions = self.np_random_generator.uniform(
+                    low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
+                ball_handler_idx = np.floor(self.np_random_generator.uniform(
+                    low=0.0, high=5.0)).astype(np.int)
 
-        def_players_pos = np.array(off_players_pos, copy=True)
-        vec = self.right_basket_pos - off_players_pos
-        vec_length = length(vec, axis=1)
-        # vec_length = np.sqrt(np.sum(vec * vec, axis=1))
-        u_vec = vec / np.stack([vec_length, vec_length], axis=1)
-        def_players_pos = def_players_pos + u_vec * self.screen_radius * 2
-        ball_pos = np.array(off_players_pos[ball_handler_idx, :], copy=True)
-        positions = np.array([ball_pos, off_players_pos, def_players_pos])
-        vels = np.array([np.zeros_like(ball_pos), np.zeros_like(
-            off_players_pos), np.zeros_like(def_players_pos)])
-        self.states.reset(positions, vels, ball_handler_idx)
+            def_positions = np.array(off_positions, copy=True)
+            vec = self.right_basket_pos - off_positions
+            vec_length = length(vec, axis=1)
+            # vec_length = np.sqrt(np.sum(vec * vec, axis=1))
+            u_vec = vec / np.stack([vec_length, vec_length], axis=1)
+            def_positions = def_positions + u_vec * self.screen_radius * 2
+            ball_pos = np.array(off_positions[ball_handler_idx, :], copy=True)
+            positions = np.array([ball_pos, off_positions, def_positions])
+            vels = np.array([np.zeros_like(ball_pos), np.zeros_like(
+                off_positions), np.zeros_like(def_positions)])
+            self.states.reset(positions, vels, ball_handler_idx)
+        
         self.off_def_closest_map = dict()
         self.update_closest_map()
 
