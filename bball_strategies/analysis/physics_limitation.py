@@ -106,32 +106,58 @@ METER_TP_FEET = 1.0 / 0.3048
 
 
 def analize_passing_speed(data):
-    ball_passing_speed = []
-    ball_positions = np.stack(
-        [data[:, :, 0:1, 0], data[:, :, 0:1, 1]], axis=-1)
-    players_positions = np.stack(
-        [data[:, :, 1:, 0], data[:, :, 1:, 1]], axis=-1)
-    print(ball_positions.shape)
-    print(players_positions.shape)
-    pl2ball_vec = players_positions - ball_positions
-    print(pl2ball_vec.shape)
-    pl2ball_length = np.sqrt(
-        pl2ball_vec[:, :, :, 0]**2 + pl2ball_vec[:, :, :, 1]**2)
-    print(pl2ball_length.shape)
-    k = True
-    for i in range(10):
-        k = np.logical_and(k, pl2ball_length[:, :, i] > 5)
-    print(np.array(k).shape)
-    indices = np.argwhere(k)
-    print(indices.shape)
-    ball_positions = ball_positions[indices[:, 0], indices[:, 1]]
-    print(ball_positions.shape)
-    speed_vec = ball_positions[1:] - ball_positions[:-1]
-    print(speed_vec.shape)
-    speed = np.sqrt(speed_vec[:, 0, 0]**2 + speed_vec[:, 0, 1]**2)* FPS
-    print(speed.shape)
-    trace = go.Histogram(
-        x=speed.reshape([-1])
+    # ball_passing_speed = []
+    # ball_positions = np.stack(
+    #     [data[:, :, 0:1, 0], data[:, :, 0:1, 1]], axis=-1)
+    # players_positions = np.stack(
+    #     [data[:, :, 1:, 0], data[:, :, 1:, 1]], axis=-1)
+    # print(ball_positions.shape)
+    # print(players_positions.shape)
+    # pl2ball_vec = players_positions - ball_positions
+    # print(pl2ball_vec.shape)
+    # pl2ball_length = np.sqrt(
+    #     pl2ball_vec[:, :, :, 0]**2 + pl2ball_vec[:, :, :, 1]**2)
+    # print(pl2ball_length.shape)
+    # k = True
+    # for i in range(10):
+    #     k = np.logical_and(k, pl2ball_length[:, :, i] > 0)
+    # print(np.array(k).shape)
+    # indices = np.argwhere(k)
+    # indicesindices = np.argwhere((indices[1:, 1] - indices[:-1, 1]) == 1)
+    # print(indicesindices.shape)
+    # indices = indices[indicesindices[:, 0]]
+    # print(indices.shape)
+    # ball_positions = ball_positions[indices[:, 0], indices[:, 1]]
+    # print(ball_positions.shape)
+    # speed_vec = ball_positions[1:] - ball_positions[:-1]
+    # print(speed_vec.shape)
+    # speed = np.sqrt(speed_vec[:, 0, 0]**2 + speed_vec[:, 0, 1]**2) * FPS
+    # print(speed.shape)
+    
+    # ball
+    speed_x = (data[:, 1:, 0, 0] - data[:, :-1, 0, 0]) * FPS
+    speed_y = (data[:, 1:, 0, 1] - data[:, :-1, 0, 1]) * FPS
+    speed = np.sqrt(speed_x**2 + speed_y**2)
+
+    ball_speed = go.Histogram(
+        name='ball_speed',
+        x=speed.reshape([-1]),
+        opacity=0.75
+        # xbins=dict(
+        #     start=0.0,
+        #     end=50.0,
+        #     size=0.5
+        # )
+    )
+    # offense
+    speed_x = (data[:, 1:, 1:6, 0] - data[:, :-1, 1:6, 0]) * FPS
+    speed_y = (data[:, 1:, 1:6, 1] - data[:, :-1, 1:6, 1]) * FPS
+    speed = np.sqrt(speed_x**2 + speed_y**2)
+
+    offense_speed = go.Histogram(
+        name='offense_speed',
+        x=speed.reshape([-1]),
+        opacity=0.75
         # xbins=dict(
         #     start=0.0,
         #     end=50.0,
@@ -139,8 +165,10 @@ def analize_passing_speed(data):
         # )
     )
 
-    data = [trace]
-    py.plot(data, filename='Histogram.html')
+    data = [ball_speed, offense_speed]
+    layout = go.Layout(barmode='overlay')
+    fig = go.Figure(data=data, layout=layout)
+    py.plot(fig, filename='Histogram.html')
 
 
 def analyze(x, y):

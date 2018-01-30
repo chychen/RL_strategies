@@ -1,7 +1,9 @@
 # data
 *.npy
 # record
-.txt
+*.txt
+*.html
+*.htm
 test/
 DEMO/
 # vscode
