@@ -185,21 +185,63 @@ def random_dancing():
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
-    def __init__(self, env, if_init_by_default=False, if_vis_trajectory=False, if_vis_visual_aid=False, if_init_by_dataset=False):
+    # init_mode 0 : init by default
+    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None):
         super(MonitorWrapper, self).__init__(env=env, directory='./test/',
                                              video_callable=lambda count: count % 1 == 0, force=True)
-        env.if_init_by_default = if_init_by_default
+        env.init_mode = init_mode
         env.if_vis_trajectory = if_vis_trajectory
         env.if_vis_visual_aid = if_vis_visual_aid
-        env.if_init_by_dataset = if_init_by_dataset
+        env.init_positions = init_positions
+        env.init_ball_handler_idx = init_ball_handler_idx
+
+
+def rewards():
+    global env
+    env = gym.make('bball-v0')
+    init_positions = [
+        np.array([70,40]),
+        np.array([
+            [70, 40],
+            [71, 38],
+            [0,0],
+            [0,0],
+            [0,0]
+        ], dtype=np.float),
+        np.array([
+            [76, 32],
+            [70, 30],
+            [60, 40],
+            [0,0],
+            [0,0]
+        ], dtype=np.float)
+    ]
+    init_ball_handler_idx = 0
+    env = MonitorWrapper(env,
+                         init_mode=2,
+                         init_positions=init_positions,
+                         init_ball_handler_idx=init_ball_handler_idx,
+                         if_vis_trajectory=False,
+                         if_vis_visual_aid=True)
+    env.reset()
+    env.render()
+    action = tuple(( # shoot decision
+        np.array(0),
+        np.array(0),
+        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
+    ))
+    _, reward, done, _ = env.step(action)
+    env.render()
+    if done:
+        env.reset()
+        env.render()
+    input()
 
 
 def main():
     global env
     env = gym.make('bball-v0')
     env = MonitorWrapper(env,
-                         if_init_by_default=True,
-                         if_init_by_dataset=False,
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True)
     env.reset()
@@ -217,7 +259,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    rewards()
+
 
 # gather：根據一個list來取用目標
 # python 使用+=很可能會有不明錯誤！！！儘量避免
