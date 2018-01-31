@@ -34,6 +34,8 @@ def ball_looping():
         no_op()
         no_op()
         no_op()
+        no_op()
+        no_op()
 
         action = tuple((
             np.array(1),
@@ -49,6 +51,8 @@ def ball_looping():
         no_op()
         no_op()
         no_op()
+        no_op()
+        no_op()
 
         action = tuple((
             np.array(1),
@@ -61,6 +65,8 @@ def ball_looping():
             env.reset()
             env.render()
 
+        no_op()
+        no_op()
         no_op()
         no_op()
         no_op()
@@ -197,14 +203,14 @@ def main():
                          if_vis_visual_aid=True)
     env.reset()
     env.render()
-    input()
+
     # DEMO script
     # ball_looping()
     # moving_around()
     # maxspeed()
     # ball_stealing()
     # move_offense_right()
-    # random_dancing()
+    random_dancing()
     # rewards()
 
     env.close()

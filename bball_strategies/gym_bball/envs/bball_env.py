@@ -122,14 +122,13 @@ class BBallEnv(gym.Env):
         self.wingspan_radius = 3.5
         self.stolen_radius = 5.0
         # physics limitations TODO per frame
-        self.ball_passing_speed = 30.0 / FPS
+        self.ball_passing_speed = 35.0 / FPS
         self.pl_max_speed = 38.9379818754 / FPS
         # cost at least one second to cross over the opponent
         self.pl_collision_speed = self.screen_radius / FPS
         self.pl_max_power = 24.5810950984 / FPS
         # Env information
         self.states = States()
-        self.off_def_closest_map = None  # dict()
 
         # must define properties
         self.action_space = self._set_action_space()
@@ -192,7 +191,7 @@ class BBallEnv(gym.Env):
                 pass
 
         # update env information
-        self.update_closest_map()
+        self.states.take_turn()
 
         return self.states.positions, 0.0, self.states.done, dict()
 
@@ -243,8 +242,6 @@ class BBallEnv(gym.Env):
                 off_positions), np.zeros_like(def_positions)])
             self.states.reset(positions, vels, ball_handler_idx)
         
-        self.off_def_closest_map = dict()
-        self.update_closest_map()
 
         return self.states.positions
 
@@ -528,7 +525,6 @@ class BBallEnv(gym.Env):
                 pl_vel = 0.0  # if collision, velocity = 0
         # 4. if none collisions, update with velocity
             self.states.update_player(state_idx, pl_idx, next_pl_pos, pl_vel)
-        self.states.take_turn()
 
     def _find_zone_idx(self, next_pos, pos, vel, zone_positions, zone_radius):
         shortest_dists = np.empty(shape=(len(zone_positions),))
@@ -602,7 +598,7 @@ class BBallEnv(gym.Env):
             # 1. if any defenders is close enough to offender (depend on stolen_radius)
             # 2. defender is closer to ball init position than offender
             candidates = []
-            for key, value in self.off_def_closest_map.items():
+            for key, value in self.states.off_def_closest_map.items():
                 if value['distance'] <= self.stolen_radius:
                     if length(def2oldball_vecs[value['idx']], axis=0) <= length(off2oldball_vecs[key], axis=0):
                         candidates.append(value['idx'])
@@ -653,13 +649,6 @@ class BBallEnv(gym.Env):
     def _calculate_reward(self):
         pass
 
-    def update_closest_map(self):
-        for idx, off_pos in enumerate(self.states.offense_positions):
-            distances = distance(self.states.defense_positions, off_pos)
-            temp_idx = np.argmin(distances)
-            self.off_def_closest_map[idx] = {
-                'idx': temp_idx, 'distance': distances[temp_idx]}
-
 
 class States(object):
     """ modulize all states into class """
@@ -678,6 +667,7 @@ class States(object):
         # ball state
         self.is_passing = None
         self.ball_handler_idx = None
+        self.off_def_closest_map = None
 
     def reset(self, positions, vels, ball_handler_idx):
         self.turn = FLAG_LOOPUP['OFFENSE']
@@ -690,6 +680,8 @@ class States(object):
         # ball state
         self.ball_handler_idx = ball_handler_idx
         self.is_passing = False
+        self.off_def_closest_map = dict()
+        self.update_closest_map()
 
     def update_ball(self, pos, ball_handler_idx, is_passing, velocity):
         self.ball_handler_idx = ball_handler_idx
@@ -704,10 +696,18 @@ class States(object):
     def take_turn(self):
         self.turn = FLAG_LOOPUP['DEFENSE'] if self.turn == FLAG_LOOPUP['OFFENSE'] else FLAG_LOOPUP['OFFENSE']
         self.steps = self.steps + 1
+        self.update_closest_map()
 
     def game_over(self, reason):
         self.done = True
         self.reason = reason
+
+    def update_closest_map(self):
+        for idx, off_pos in enumerate(self.offense_positions):
+            distances = distance(self.defense_positions, off_pos)
+            temp_idx = np.argmin(distances)
+            self.off_def_closest_map[idx] = {
+                'idx': temp_idx, 'distance': distances[temp_idx]}
 
     @property
     def ball_position(self):
