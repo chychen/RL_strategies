@@ -174,7 +174,7 @@ def move_offense_right():
 
 
 def random_dancing():
-    for _ in range(240):
+    for _ in range(24):
         action = env.action_space.sample()
         _, _, done, _ = env.step(action)
         env.render()

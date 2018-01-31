@@ -150,45 +150,50 @@ class BBallEnv(gym.Env):
         ball_pass_dir = action[ACTION_LOOKUP['BALL']]
         pl_dash = action[ACTION_LOOKUP['DASH']]
         if self.states.turn == FLAG_LOOPUP['OFFENSE']:
-            logger.info('[TURN] OFFENSE')
+            # logger.info('[TURN] OFFENSE')
             self._update_player_state(
                 pl_dash, self.states.vels, STATE_LOOKUP['OFFENSE'])
             # update ball state
             self._update_ball_state(decision, ball_pass_dir)
         elif self.states.turn == FLAG_LOOPUP['DEFENSE']:
-            logger.info('[TURN] DEFENSE')
+            # logger.info('[TURN] DEFENSE')
             self._update_player_state(
                 pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
 
         # check if meets termination condition
         if decision == DESICION_LOOKUP['SHOOT']:
-            # self.states.game_over(REASON_LOOKUP['SHOOT'])
+            # self.states.update_status(done=True, status=STATUS_LOOKUP['SHOOT'])
             pass
         # OOB
         if self.states.ball_position[0] >= self.court_length or self.states.ball_position[0] < 0.0 or self.states.ball_position[1] >= self.court_width or self.states.ball_position[1] < 0.0:
-            # self.states.game_over(REASON_LOOKUP['OOB'])
+            # self.states.update_status(done=True, status=STATUS_LOOKUP['OOB'])
             pass
         # OOT
         if self.states.steps >= self.time_limit:
-            # self.states.game_over(REASON_LOOKUP['OOT'])
+            # self.states.update_status(done=True, status=STATUS_LOOKUP['OOT'])
             pass
         # termination conditions
         if self.states.done:
-            if self.states.reason == REASON_LOOKUP['SHOOT']:
+            if self.states.status == STATUS_LOOKUP['SHOOT']:
                 logger.info('[GAME OVER], A shoot decision is made')
                 reward = self._calculate_reward()
                 pass
-            elif self.states.reason == REASON_LOOKUP['CAPTURED']:
+            elif self.states.status == STATUS_LOOKUP['CAPTURED']:
                 logger.info(
                     '[GAME OVER], A defender gets possession of the ball')
                 pass
-            elif self.states.reason == REASON_LOOKUP['OOB']:
+            elif self.states.status == STATUS_LOOKUP['OOB']:
                 logger.info('[GAME OVER], The ball is out of bounds.')
                 pass
-            elif self.states.reason == REASON_LOOKUP['OOT']:
+            elif self.states.status == STATUS_LOOKUP['OOT']:
                 logger.info(
                     '[GAME OVER], Max time limit for the episode is reached')
                 pass
+        else:
+            if self.states.status == STATUS_LOOKUP['PASS']:
+                logger.info('[GAME STATUS] Successfully Pass :D')
+                pass
+
 
         # update env information
         self.states.take_turn()
@@ -615,7 +620,7 @@ class BBallEnv(gym.Env):
                                             None, False, [0, 0])
                     # TODO if if_def_catch_ball:
                     # game ends with negative reward to offense, positive reward to defense
-                    self.states.game_over(REASON_LOOKUP['CAPTURED'])
+                    self.states.update_status(done=True, status=STATUS_LOOKUP['CAPTURED'])
             # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
             off_zone_idx = None
             if len(candidates) == 0 or (def_zone_idx is None):
@@ -626,7 +631,7 @@ class BBallEnv(gym.Env):
                     # assign catcher pos to ball pos
                     self.states.update_ball(self.states.offense_positions[off_zone_idx],
                                             off_zone_idx, False, [0, 0])
-                    logger.info('[BALL] Successfull Pass :D')
+                    self.states.update_status(done=False, status=STATUS_LOOKUP['PASS'])
             # 6. if none candidates, ball keep flying
             if def_zone_idx is None and off_zone_idx is None:
                 self.states.update_ball(self.states.ball_position + self.states.ball_vel,
@@ -661,7 +666,7 @@ class States(object):
         self.positions = None
         self.vels = None
         self.done = None
-        self.reason = None
+        self.status = None
         self.steps = None
         # self.__dirs = None
         # ball state
@@ -674,7 +679,7 @@ class States(object):
         self.positions = positions
         self.vels = vels
         self.done = False
-        self.reason = None
+        self.status = None
         self.steps = 0
         # self.__dirs = None
         # ball state
@@ -698,9 +703,9 @@ class States(object):
         self.steps = self.steps + 1
         self.update_closest_map()
 
-    def game_over(self, reason):
-        self.done = True
-        self.reason = reason
+    def update_status(self, done, status):
+        self.done = done
+        self.status = status
 
     def update_closest_map(self):
         for idx, off_pos in enumerate(self.offense_positions):
@@ -727,11 +732,12 @@ class States(object):
 
 
 # Termination Conditions:
-REASON_LOOKUP = {
+STATUS_LOOKUP = {
     'SHOOT': 0,  # A shoot decision is made
     'CAPTURED': 1,  # A defender gets possession of the ball
     'OOB': 2,  # The ball is Out Of Bounds
-    'OOT': 3  # Out Of Time by a max time limitation
+    'OOT': 3,  # Out Of Time by a max time limitation
+    'PASS': 4  # Succefully Pass Ball
 }
 
 
