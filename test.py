@@ -176,11 +176,12 @@ def move_offense_right():
 def random_dancing():
     for _ in range(24):
         action = env.action_space.sample()
-        _, _, done, _ = env.step(action)
+        _, reward, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
             env.render()
+        print('###################### REWARD ######################', reward)
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
@@ -197,8 +198,8 @@ def main():
     global env
     env = gym.make('bball-v0')
     env = MonitorWrapper(env,
-                         if_init_by_default=False,
-                         if_init_by_dataset=True,
+                         if_init_by_default=True,
+                         if_init_by_dataset=False,
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True)
     env.reset()
@@ -211,7 +212,6 @@ def main():
     # ball_stealing()
     # move_offense_right()
     random_dancing()
-    # rewards()
 
     env.close()
 
