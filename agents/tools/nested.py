@@ -26,7 +26,8 @@ _builtin_map = map
 _builtin_filter = filter
 
 
-def zip_(*structures, flatten=False):
+def zip_(*structures, **kwargs):
+  # pylint: disable=differing-param-doc,missing-param-doc
   """Combine corresponding elements in multiple nested structure to tuples.
 
   The nested structures can consist of any combination of lists, tuples, and
@@ -40,13 +41,17 @@ def zip_(*structures, flatten=False):
   Returns:
     Nested structure.
   """
+  # Named keyword arguments are not allowed after *args in Python 2.
+  flatten = kwargs.pop('flatten', False)
+  assert not kwargs, 'zip() got unexpected keyword arguments.'
   return map(
       lambda *x: x if len(x) > 1 else x[0],
       *structures,
       flatten=flatten)
 
 
-def map_(function, *structures, flatten=False):
+def map_(function, *structures, **kwargs):
+  # pylint: disable=differing-param-doc,missing-param-doc
   """Apply a function to every element in a nested structure.
 
   If multiple structures are provided as input, their structure must match and
@@ -63,6 +68,10 @@ def map_(function, *structures, flatten=False):
   Returns:
     Nested structure.
   """
+  # Named keyword arguments are not allowed after *args in Python 2.
+  flatten = kwargs.pop('flatten', False)
+  assert not kwargs, 'zip() got unexpected keyword arguments.'
+
   def impl(function, *structures):
     if len(structures) == 0:  # pylint: disable=len-as-condition
       return structures
@@ -84,6 +93,7 @@ def map_(function, *structures, flatten=False):
   if flatten:
     result = flatten_(result)
   return result
+
 
 def flatten_(structure):
   """Combine all leaves of a nested structure into a tuple.
@@ -112,7 +122,8 @@ def flatten_(structure):
   return (structure,)
 
 
-def filter_(predicate, *structures, flatten=False):
+def filter_(predicate, *structures, **kwargs):
+  # pylint: disable=differing-param-doc,missing-param-doc
   """Select elements of a nested structure based on a predicate function.
 
   If multiple structures are provided as input, their structure must match and
@@ -129,6 +140,10 @@ def filter_(predicate, *structures, flatten=False):
   Returns:
     Nested structure.
   """
+  # Named keyword arguments are not allowed after *args in Python 2.
+  flatten = kwargs.pop('flatten', False)
+  assert not kwargs, 'zip() got unexpected keyword arguments.'
+
   def impl(predicate, *structures):
     if len(structures) == 0:  # pylint: disable=len-as-condition
       return structures

@@ -40,6 +40,9 @@ def _create_environment(config, outdir):
     config: Object providing configurations via attributes.
     outdir: Directory to store videos in.
 
+  Raises:
+    NotImplementedError: For action spaces other than Box and Discrete.
+
   Returns:
     Wrapped OpenAI Gym environment.
   """
@@ -55,8 +58,14 @@ def _create_environment(config, outdir):
     env = tools.wrappers.LimitDuration(env, config.max_length)
   env = gym.wrappers.Monitor(
       env, outdir, lambda unused_episode_number: True)
-  env = tools.wrappers.RangeNormalize(env)
-  env = tools.wrappers.ClipAction(env)
+  if isinstance(env.action_space, gym.spaces.Box):
+    env = tools.wrappers.RangeNormalize(env)
+    env = tools.wrappers.ClipAction(env)
+  elif isinstance(env.action_space, gym.spaces.Discrete):
+    env = tools.wrappers.RangeNormalize(env, action=False)
+  else:
+    message = "Unsupported action space '{}'".format(type(env.actions_space))
+    raise NotImplementedError(message)
   env = tools.wrappers.ConvertTo32Bit(env)
   return env
 

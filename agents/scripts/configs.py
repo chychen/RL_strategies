@@ -33,13 +33,15 @@ def default():
   num_agents = 30
   eval_episodes = 30
   use_gpu = False
+  # Environment
+  normalize_ranges = True
   # Network
   network = networks.feed_forward_gaussian
   weight_summaries = dict(
       all=r'.*', policy=r'.*/policy/.*', value=r'.*/value/.*')
   policy_layers = 200, 100
   value_layers = 200, 100
-  init_mean_factor = 0.1
+  init_output_factor = 0.1
   init_std = 0.35
   # Optimization
   update_every = 30
@@ -61,7 +63,23 @@ def pendulum():
   # Environment
   env = 'Pendulum-v0'
   max_length = 200
-  steps = 2e6  # 2M
+  steps = 1e6  # 1M
+  # Optimization
+  batch_size = 20
+  chunk_length = 50
+  return locals()
+
+
+def cartpole():
+  """Configuration for the cart pole classic control task."""
+  locals().update(default())
+  # Environment
+  env = 'CartPole-v1'
+  max_length = 500
+  steps = 2e5  # 200k
+  normalize_ranges = False  # The env reports wrong ranges.
+  # Network
+  network = networks.feed_forward_categorical
   return locals()
 
 
@@ -128,3 +146,14 @@ def humanoid():
   steps = 5e7  # 50M
   update_every = 60
   return locals()
+
+
+def bullet_ant():
+  """Configuration for PyBullet's ant task."""
+  locals().update(default())
+  # Environment
+  import pybullet_envs  # noqa pylint: disable=unused-import
+  env = 'AntBulletEnv-v0'
+  max_length = 1000
+  steps = 3e7  # 30M
+  update_every = 60

@@ -21,16 +21,18 @@ from __future__ import print_function
 import functools
 import operator
 
-import agents
+import gym
 import numpy as np
 import tensorflow as tf
+
+import agents
 
 tfd = tf.contrib.distributions
 
 
 # TensorFlow's default implementation of the KL divergence between two
-# tf.contrib.distributions.MultivariateNormalDiag instances sometimes results in
-# NaN values in the gradients (not in the forward pass). Until the default
+# tf.contrib.distributions.MultivariateNormalDiag instances sometimes results
+# in NaN values in the gradients (not in the forward pass). Until the default
 # implementation is fixed, we use our own KL implementation.
 class CustomKLDiagNormal(tfd.MultivariateNormalDiag):
   """Multivariate Normal with diagonal covariance and our custom KL code."""
@@ -63,7 +65,7 @@ def _custom_diag_normal_kl(lhs, rhs, name=None):  # pylint: disable=unused-argum
 
 
 def feed_forward_gaussian(
-    config, action_size, observations, unused_length, state=None):
+    config, action_space, observations, unused_length, state=None):
   """Independent feed forward networks for policy and value.
 
   The policy network outputs the mean action and the standard deviation is
@@ -71,16 +73,24 @@ def feed_forward_gaussian(
 
   Args:
     config: Configuration object.
-    action_size: Length of the action vector.
+    action_space: Action space of the environment.
     observations: Sequences of observations.
     unused_length: Batch of sequence lengths.
     state: Unused batch of initial states.
 
+  Raises:
+    ValueError: Unexpected action space.
+
   Returns:
     Attribute dictionary containing the policy, value, and unused state.
   """
-  mean_weights_initializer = tf.contrib.layers.variance_scaling_initializer(
-      factor=config.init_mean_factor)
+  if not isinstance(action_space, gym.spaces.Box):
+    raise ValueError('Network expects continuous actions.')
+  if not len(action_space.shape) == 1:
+    raise ValueError('Network only supports 1D action vectors.')
+  action_size = action_space.shape[0]
+  init_output_weights = tf.contrib.layers.variance_scaling_initializer(
+      factor=config.init_output_factor)
   before_softplus_std_initializer = tf.constant_initializer(
       np.log(np.exp(config.init_std) - 1))
   flat_observations = tf.reshape(observations, [
@@ -92,7 +102,7 @@ def feed_forward_gaussian(
       x = tf.contrib.layers.fully_connected(x, size, tf.nn.relu)
     mean = tf.contrib.layers.fully_connected(
         x, action_size, tf.tanh,
-        weights_initializer=mean_weights_initializer)
+        weights_initializer=init_output_weights)
     std = tf.nn.softplus(tf.get_variable(
         'before_softplus_std', mean.shape[2:], tf.float32,
         before_softplus_std_initializer))
@@ -111,8 +121,50 @@ def feed_forward_gaussian(
   return agents.tools.AttrDict(policy=policy, value=value, state=state)
 
 
+def feed_forward_categorical(
+    config, action_space, observations, unused_length, state=None):
+  """Independent feed forward networks for policy and value.
+
+  The policy network outputs the mean action and the log standard deviation
+  is learned as independent parameter vector.
+
+  Args:
+    config: Configuration object.
+    action_space: Action space of the environment.
+    observations: Sequences of observations.
+    unused_length: Batch of sequence lengths.
+    state: Unused batch of initial recurrent states.
+
+  Raises:
+    ValueError: Unexpected action space.
+
+  Returns:
+    Attribute dictionary containing the policy, value, and unused state.
+  """
+  init_output_weights = tf.contrib.layers.variance_scaling_initializer(
+      factor=config.init_output_factor)
+  if not isinstance(action_space, gym.spaces.Discrete):
+    raise ValueError('Network expects discrete actions.')
+  flat_observations = tf.reshape(observations, [
+      tf.shape(observations)[0], tf.shape(observations)[1],
+      functools.reduce(operator.mul, observations.shape.as_list()[2:], 1)])
+  with tf.variable_scope('policy'):
+    x = flat_observations
+    for size in config.policy_layers:
+      x = tf.contrib.layers.fully_connected(x, size, tf.nn.relu)
+    logits = tf.contrib.layers.fully_connected(
+        x, action_space.n, None, weights_initializer=init_output_weights)
+  with tf.variable_scope('value'):
+    x = flat_observations
+    for size in config.value_layers:
+      x = tf.contrib.layers.fully_connected(x, size, tf.nn.relu)
+    value = tf.contrib.layers.fully_connected(x, 1, None)[..., 0]
+  policy = tfd.Categorical(logits)
+  return agents.tools.AttrDict(policy=policy, value=value, state=state)
+
+
 def recurrent_gaussian(
-    config, action_size, observations, length, state=None):
+    config, action_space, observations, length, state=None):
   """Independent recurrent policy and feed forward value networks.
 
   The policy network outputs the mean action and the standard deviation is
@@ -121,16 +173,24 @@ def recurrent_gaussian(
 
   Args:
     config: Configuration object.
-    action_size: Length of the action vector.
+    action_space: Action space of the environment.
     observations: Sequences of observations.
     length: Batch of sequence lengths.
     state: Batch of initial recurrent states.
 
+  Raises:
+    ValueError: Unexpected action space.
+
   Returns:
     Attribute dictionary containing the policy, value, and state.
   """
-  mean_weights_initializer = tf.contrib.layers.variance_scaling_initializer(
-      factor=config.init_mean_factor)
+  if not isinstance(action_space, gym.spaces.Box):
+    raise ValueError('Network expects continuous actions.')
+  if not len(action_space.shape) == 1:
+    raise ValueError('Network only supports 1D action vectors.')
+  action_size = action_space.shape[0]
+  init_output_weights = tf.contrib.layers.variance_scaling_initializer(
+      factor=config.init_output_factor)
   before_softplus_std_initializer = tf.constant_initializer(
       np.log(np.exp(config.init_std) - 1))
   cell = tf.contrib.rnn.GRUBlockCell(config.policy_layers[-1])
@@ -144,7 +204,7 @@ def recurrent_gaussian(
     x, state = tf.nn.dynamic_rnn(cell, x, length, state, tf.float32)
     mean = tf.contrib.layers.fully_connected(
         x, action_size, tf.tanh,
-        weights_initializer=mean_weights_initializer)
+        weights_initializer=init_output_weights)
     std = tf.nn.softplus(tf.get_variable(
         'before_softplus_std', mean.shape[2:], tf.float32,
         before_softplus_std_initializer))

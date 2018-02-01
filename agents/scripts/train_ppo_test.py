@@ -30,34 +30,30 @@ from agents.scripts import networks
 from agents.scripts import train
 
 
-FLAGS = tf.app.flags.FLAGS
-
-
 class PPOTest(tf.test.TestCase):
 
-  def test_no_crash_cheetah(self):
+  def test_pendulum_no_crash(self):
     nets = networks.feed_forward_gaussian, networks.recurrent_gaussian
     for network in nets:
       config = self._define_config()
       with config.unlocked:
-        config.env = 'HalfCheetah-v1'
+        config.env = 'Pendulum-v0'
         config.max_length = 200
         config.steps = 1000
         config.network = network
       for score in train.train(config, env_processes=True):
         float(score)
 
-  def test_no_crash_ant(self):
-    nets = networks.feed_forward_gaussian, networks.recurrent_gaussian
-    for network in nets:
-      config = self._define_config()
-      with config.unlocked:
-        config.env = 'Ant-v1'
-        config.max_length = 200
-        config.steps = 1000
-        config.network = network
-      for score in train.train(config, env_processes=True):
-        float(score)
+  def test_no_crash_cartpole(self):
+    config = self._define_config()
+    with config.unlocked:
+      config.env = 'CartPole-v1'
+      config.max_length = 200
+      config.steps = 1000
+      config.normalize_ranges = False  # The env reports wrong ranges.
+      config.network = networks.feed_forward_categorical
+    for score in train.train(config, env_processes=True):
+      float(score)
 
   def test_no_crash_observation_shape(self):
     nets = networks.feed_forward_gaussian, networks.recurrent_gaussian
@@ -86,6 +82,20 @@ class PPOTest(tf.test.TestCase):
     for score in train.train(config, env_processes=False):
       float(score)
 
+  def test_no_crash_chunking(self):
+    config = self._define_config()
+    with config.unlocked:
+      config.env = functools.partial(
+          tools.MockEnvironment, observ_shape=(2, 3), action_shape=(3,),
+          min_duration=5, max_duration=25)
+      config.max_length = 25
+      config.steps = 200
+      config.network = networks.recurrent_gaussian
+      config.chunk_length = 10
+      config.batch_size = 5
+    for score in train.train(config, env_processes=False):
+      float(score)
+
   def _define_config(self):
     # Start from the example configuration.
     locals().update(configs.default())
@@ -106,5 +116,4 @@ class PPOTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
-  FLAGS.config = 'unused'
   tf.test.main()

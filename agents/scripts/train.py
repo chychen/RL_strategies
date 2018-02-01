@@ -40,6 +40,9 @@ def _create_environment(config):
   Args:
     config: Object providing configurations via attributes.
 
+  Raises:
+    NotImplementedError: For action spaces other than Box and Discrete.
+
   Returns:
     Wrapped OpenAI Gym environment.
   """
@@ -49,8 +52,16 @@ def _create_environment(config):
     env = config.env()
   if config.max_length:
     env = tools.wrappers.LimitDuration(env, config.max_length)
-  env = tools.wrappers.RangeNormalize(env)
-  env = tools.wrappers.ClipAction(env)
+  if isinstance(env.action_space, gym.spaces.Box):
+    if config.normalize_ranges:
+      env = tools.wrappers.RangeNormalize(env)
+    env = tools.wrappers.ClipAction(env)
+  elif isinstance(env.action_space, gym.spaces.Discrete):
+    if config.normalize_ranges:
+      env = tools.wrappers.RangeNormalize(env, action=False)
+  else:
+    message = "Unsupported action space '{}'".format(type(env.actions_space))
+    raise NotImplementedError(message)
   env = tools.wrappers.ConvertTo32Bit(env)
   return env
 
