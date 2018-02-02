@@ -1,21 +1,71 @@
-import numpy as np
+import tensorflow as tf
+import numpy as np 
 
-a = np.zeros(shape=[3, 4, 5])
-a[2, 3, 4] = 1
-a[1, 2, :] = 1
-print(a)
+# dist = tf.contrib.distributions.Categorical(logits=np.log([0.1, 0.3, 0.4]))
+dist = tf.contrib.distributions.Categorical(logits=[-1.0, -2.0, -3.0])
+# dist = tf.contrib.distributions.Categorical(probs=[0.1, 0.3, 0.4])
+n = 1e4
+empirical_prob = tf.cast(
+    tf.histogram_fixed_width(
+         tf.cast(dist.sample(int(n)), dtype=tf.float32),
+        [0., 2],
+        nbins=3),
+    dtype=tf.float32) / n
+with tf.Session() as sess:
+    print(sess.run(empirical_prob))
 
-b = True
-for i in range(5):
-    b = np.logical_and(b, a[:, :, i] == 1)
-print(b)
-print(b.shape)
+##############################################
 
-c = np.argwhere(b == 1)
-print(c)
-print('c.shape', c.shape)
-print(b[c[:, 0], c[:, 1]])
-print(a[c[:, 0], c[:, 1]])
+# def partial(func, *args, **keywords):
+#     """New function with partial application of the given arguments
+#     and keywords.
+#     """
+#     if hasattr(func, 'func'):
+#         args = func.args + args
+#         tmpkw = func.keywords.copy()
+#         tmpkw.update(keywords)
+#         keywords = tmpkw
+#         del tmpkw
+#         func = func.func
+
+#     def newfunc(*fargs, **fkeywords):
+#         newkeywords = keywords.copy()
+#         newkeywords.update(fkeywords)
+#         return func(*(args + fargs), **newkeywords)
+#     newfunc.func = func
+#     newfunc.args = args
+#     newfunc.keywords = keywords
+#     return newfunc
+
+# def aa(tt,bb,cc):
+#     print(tt,bb)
+
+# t = partial(aa, 'a', 'b')
+# tt = aa('1','2','c')
+
+# print(t)
+# print(t('c'))
+# print(tt)
+
+##############################################
+# import numpy as np
+
+# a = np.zeros(shape=[3, 4, 5])
+# a[2, 3, 4] = 1
+# a[1, 2, :] = 1
+# print(a)
+
+# b = True
+# for i in range(5):
+#     b = np.logical_and(b, a[:, :, i] == 1)
+# print(b)
+# print(b.shape)
+
+# c = np.argwhere(b == 1)
+# print(c)
+# print('c.shape', c.shape)
+# print(b[c[:, 0], c[:, 1]])
+# print(a[c[:, 0], c[:, 1]])
 
 # import numpy
 # import cProfile

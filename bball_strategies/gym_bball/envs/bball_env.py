@@ -57,6 +57,7 @@ from os import path
 import copy
 import sys
 from gym.envs.classic_control import rendering
+from bball_strategies.gym_bball.envs.tuple_space import Tuple as mTuple
 """
 # TODO
 # 把一些環境資訊物件化
@@ -212,7 +213,38 @@ class BBallEnv(gym.Env):
         # update env information
         self.states.take_turn()
 
-        return self.states.positions, reward, self.states.done, dict()
+        return self._get_obs(), reward, self.states.done, dict()
+
+    def _get_obs(self):
+        """
+        ### return observation shape
+        5 : 5 frames
+        14 : ball(1) + offense(5) + defense(5) + basket(1) + ball_boundry(2)
+        2 : x and y positions
+        """
+        obs = np.empty(shape=(5, 14, 2))
+        for i in range(4):
+            obs[i] = np.concatenate([np.expand_dims(
+                self.states.past_positions[i, STATE_LOOKUP['BALL']], axis=0),
+                self.states.past_positions[i, STATE_LOOKUP['OFFENSE']],
+                self.states.past_positions[i, STATE_LOOKUP['DEFENSE']],
+                np.expand_dims(self.right_basket_pos, axis=0),
+                np.expand_dims(
+                [self.court_length / 2, 0], axis=0),
+                np.expand_dims(
+                [self.court_length, self.court_width], axis=0)
+            ], axis=0)
+        obs[-1] = np.concatenate([np.expand_dims(
+            self.states.positions[STATE_LOOKUP['BALL']], axis=0),
+            self.states.positions[STATE_LOOKUP['OFFENSE']],
+            self.states.positions[STATE_LOOKUP['DEFENSE']],
+            np.expand_dims(self.right_basket_pos, axis=0),
+            np.expand_dims(
+                [self.court_length / 2, 0], axis=0),
+            np.expand_dims(
+                [self.court_length, self.court_width], axis=0)
+        ], axis=0)
+        return obs
 
     def _reset(self):
         """ random init positions in the right half court
@@ -422,9 +454,9 @@ class BBallEnv(gym.Env):
         """
         Return
         ------
-        Tuple(Discrete(2), Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
         """
-        return spaces.Tuple((
+        return mTuple((
             spaces.Discrete(3),  # offensive decision
             # ball theta
             spaces.Box(
@@ -443,22 +475,25 @@ class BBallEnv(gym.Env):
         ))
 
     def _set_observation_space(self):
-        """ positions only valid in right-half court
-        Return
-        ------
-        Tuple(Box(2,), Box(5, 2), Box(5, 2))
         """
-        return spaces.Tuple((
-            # ball position
-            spaces.Box(low=np.array([self.court_length // 2, 0]),
-                       high=np.array([self.court_length, self.court_width])),
-            # offense player positions
-            spaces.Box(low=np.array([[self.court_length // 2, 0] for _ in range(5)]),
-                       high=np.array([[self.court_length, self.court_width] for _ in range(5)])),
-            # defense player positions
-            spaces.Box(low=np.array([[self.court_length // 2, 0] for _ in range(5)]),
-                       high=np.array([[self.court_length, self.court_width] for _ in range(5)]))
-        ))
+        ### shape
+        5 : 5 frames
+        14 : ball(1) + offense(5) + defense(5) + basket(1) + ball_boundry(2)
+        2 : x and y positions
+        """
+        return spaces.Box(low=-np.inf, high=np.inf, shape=(5, 14, 2))
+        ## Tuple(Box(2,), Box(5, 2), Box(5, 2))
+        # return mTuple((
+        #     # ball position
+        #     spaces.Box(low=np.array([self.court_length // 2, 0]),
+        #                high=np.array([self.court_length, self.court_width])),
+        #     # offense player positions
+        #     spaces.Box(low=np.array([[0, 0] for _ in range(5)]),
+        #                high=np.array([[self.court_length, self.court_width] for _ in range(5)])),
+        #     # defense player positions
+        #     spaces.Box(low=np.array([[0, 0] for _ in range(5)]),
+        #                high=np.array([[self.court_length, self.court_width] for _ in range(5)]))
+        # ))
 
     def _update_player_state(self, pl_dash, vels, state_idx):
         """ Update the player's movement following the physics limitation predefined
@@ -723,6 +758,7 @@ class States(object):
         # ball and players [ball, offense, defense]
         self.turn = None
         self.positions = None
+        self.past_positions = None
         self.vels = None
         self.done = None
         self.status = None
@@ -733,9 +769,11 @@ class States(object):
         self.ball_handler_idx = None
         self.off_def_closest_map = None
 
-    def reset(self, positions, ball_handler_idx):
+    def reset(self, positions, ball_handler_idx, past_buffer_amount=4):
         self.turn = FLAG_LOOPUP['OFFENSE']
         self.positions = positions
+        self.past_positions = np.tile(np.array([np.zeros_like(positions[0]), np.zeros_like(
+            positions[1]), np.zeros_like(positions[2])]), [past_buffer_amount, 1])
         self.vels = np.array([np.zeros_like(positions[0]), np.zeros_like(
             positions[1]), np.zeros_like(positions[2])])
         self.done = False
@@ -763,6 +801,8 @@ class States(object):
         self.steps = self.steps + 1
         self.update_closest_map()
         self.status = None
+        self.past_positions = np.concatenate(
+            [self.past_positions[1:], np.expand_dims(self.positions, axis=0)], axis=0)
 
     def update_status(self, done, status):
         self.done = done

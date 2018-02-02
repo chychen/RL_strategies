@@ -4,6 +4,7 @@
 *.txt
 *.html
 *.htm
+*.yaml
 test/
 DEMO/
 # vscode
