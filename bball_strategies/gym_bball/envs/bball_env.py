@@ -131,7 +131,7 @@ class BBallEnv(gym.Env):
         self.pl_collision_speed = self.screen_radius / FPS
         self.pl_max_power = 24.5810950984 / FPS
         # reward
-        self.len2pi_weight = np.pi / 4  # 1 feet <-> 45 degrees
+        self.len2pi_weight = np.pi / 8  # 1 feet <-> 45 degrees
         self.max_reward = 100.0
 
         # Env information
@@ -731,8 +731,15 @@ class BBallEnv(gym.Env):
         ball2basket_len = length(ball2basket_vec, axis=0)
         ball_dot_defs = np.inner(ball2cloesetdef_vecs, ball2basket_vec)
         def2ball_lens[np.argwhere(ball_dot_defs <= 0)] = self.max_reward
-        angle_values = np.arccos(
-            ball_dot_defs / (length(ball2cloesetdef_vecs, axis=1) * length(ball2basket_vec, axis=0)))
+        # avoid divide zero
+        angle_values = np.empty(shape=(5,))
+        len_temp = length(ball2cloesetdef_vecs, axis=1) * \
+            length(ball2basket_vec, axis=0)
+        for i in range(5):
+            if len_temp[i] == 0.0:
+                angle_values[i] = 0.0
+            else:
+                angle_values[i] = np.arccos(ball_dot_defs[i] / len_temp[i])
         penalty = (self.three_point_distance -
                    ball2basket_len) if ball2basket_len > self.three_point_distance else 0.0
         rewards = self.len2pi_weight * def2ball_lens + \
