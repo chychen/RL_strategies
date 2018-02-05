@@ -6,21 +6,22 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from agents import algorithms
+# from agents import algorithms
+from bball_strategies import algorithms
 from bball_strategies.scripts import networks
 
 
 def default():
   """Default configuration for PPO."""
   # General
-  algorithm = algorithms.PPO
+  algorithm = algorithms.TWO_TRUNK_PPO
   num_agents = 30
   eval_episodes = 30
-  use_gpu = False
+  use_gpu = True
   # Environment
 #   normalize_ranges = True
   # Network
-  network = networks.two_crown_gaussian
+  network = networks.two_trunk_gaussian
   weight_summaries = dict(
       all=r'.*', policy=r'.*/policy/.*', value=r'.*/value/.*')
 #   policy_layers = 200, 100
@@ -28,7 +29,7 @@ def default():
   init_output_factor = 0.1
   init_std = 0.35
   # Optimization
-  update_every = 30
+  update_every = 100
   update_epochs = 25
   optimizer = tf.train.AdamOptimizer
   learning_rate = 1e-4
@@ -38,6 +39,8 @@ def default():
   kl_cutoff_factor = 2
   kl_cutoff_coef = 1000
   kl_init_penalty = 1
+#   gae_lambda = None
+#   entropy_regularization = None
   # Environment
   env = 'bball-v0'
 #   max_length = 200
