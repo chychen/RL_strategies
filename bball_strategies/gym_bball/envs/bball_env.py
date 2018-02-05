@@ -146,6 +146,9 @@ class BBallEnv(gym.Env):
 
     def _step(self, action):
         """
+        rewards value is only designed for offense agent.
+        the negative rewards of offense could be reckoned as the rewards of defense. 
+
         Returns
         -------
         observation (object) : agent's observation of the current environment
@@ -206,9 +209,6 @@ class BBallEnv(gym.Env):
                 logger.debug('[GAME STATUS] Successfully Pass :D')
                 reward = 1.0
                 pass
-
-        if self.states.turn == FLAG_LOOPUP['DEFENSE']:
-            reward = -1.0 * reward
 
         # update env information
         self.states.take_turn()
