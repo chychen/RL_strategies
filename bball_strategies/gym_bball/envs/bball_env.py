@@ -57,7 +57,7 @@ from os import path
 import copy
 import sys
 from gym.envs.classic_control import rendering
-from bball_strategies.gym_bball.envs.tuple_space import Tuple as mTuple
+from bball_strategies.gym_bball import tools
 """
 # TODO
 # 把一些環境資訊物件化
@@ -213,7 +213,7 @@ class BBallEnv(gym.Env):
         # update env information
         self.states.take_turn()
 
-        return self._get_obs(), reward, self.states.done, dict()
+        return self._get_obs(), reward, self.states.done, dict(turn=self.states.turn)
 
     def _get_obs(self):
         """
@@ -456,7 +456,7 @@ class BBallEnv(gym.Env):
         ------
         Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
         """
-        return mTuple((
+        return tools.ActTuple((
             spaces.Discrete(3),  # offensive decision
             # ball theta
             spaces.Box(
@@ -476,14 +476,13 @@ class BBallEnv(gym.Env):
 
     def _set_observation_space(self):
         """
-        ### shape
+        ## shape
         5 : 5 frames
         14 : ball(1) + offense(5) + defense(5) + basket(1) + ball_boundry(2)
         2 : x and y positions
         """
-        return spaces.Box(low=-np.inf, high=np.inf, shape=(5, 14, 2))
-        ## Tuple(Box(2,), Box(5, 2), Box(5, 2))
-        # return mTuple((
+        # # Tuple(Box(2,), Box(5, 2), Box(5, 2))
+        # return tools.ObsTuple((
         #     # ball position
         #     spaces.Box(low=np.array([self.court_length // 2, 0]),
         #                high=np.array([self.court_length, self.court_width])),
@@ -494,6 +493,7 @@ class BBallEnv(gym.Env):
         #     spaces.Box(low=np.array([[0, 0] for _ in range(5)]),
         #                high=np.array([[self.court_length, self.court_width] for _ in range(5)]))
         # ))
+        return spaces.Box(low=-np.inf, high=np.inf, shape=(5, 14, 2))
 
     def _update_player_state(self, pl_dash, vels, state_idx):
         """ Update the player's movement following the physics limitation predefined

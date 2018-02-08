@@ -21,7 +21,7 @@ from __future__ import print_function
 import gym
 import tensorflow as tf
 # Extended
-from bball_strategies.gym_bball.envs.tuple_space import Tuple as mTuple
+from bball_strategies.gym_bball import tools
 
 
 class InGraphBatchEnv(object):
@@ -56,6 +56,10 @@ class InGraphBatchEnv(object):
             self._done = tf.Variable(
                 tf.cast(tf.ones((len(self._batch_env),)), tf.bool),
                 name='done', trainable=False)
+            # Extended
+            self._turn_info = tf.Variable(
+                tf.cast(tf.ones((len(self._batch_env),)), tf.int8),
+                name='turn_info', trainable=False)
 
     def __getattr__(self, name):
         """Forward unimplemented attributes to one of the original environments.
@@ -91,16 +95,21 @@ class InGraphBatchEnv(object):
             if action.dtype in (tf.float16, tf.float32, tf.float64):
                 action = tf.check_numerics(action, 'action')
             observ_dtype = self._parse_dtype(self._batch_env.observation_space)
-            observ, reward, done = tf.py_func(
-                lambda a: self._batch_env.step(a)[:3], [action],
-                [observ_dtype, tf.float32, tf.bool], name='step')
+            # Extended
+            observ, reward, done, turn_info = tf.py_func(
+                lambda a: self._batch_env.step(a), [action],
+                [observ_dtype, tf.float32, tf.bool, tf.int8], name='step')
+            # observ, reward, done = tf.py_func(
+            #     lambda a: self._batch_env.step(a)[:3], [action],
+            #     [observ_dtype, tf.float32, tf.bool], name='step')
             observ = tf.check_numerics(observ, 'observ')
             reward = tf.check_numerics(reward, 'reward')
             return tf.group(
                 self._observ.assign(observ),
                 self._action.assign(action),
                 self._reward.assign(reward),
-                self._done.assign(done))
+                self._done.assign(done),
+                self._turn_info.assign(turn_info))
 
     def reset(self, indices=None):
         """Reset the batch of environments.
@@ -145,6 +154,12 @@ class InGraphBatchEnv(object):
         """Access the variable indicating whether the episode is done."""
         return self._done
 
+    # Extended
+    @property
+    def turn_info(self):
+        """Access the variable holding who is in turn, offense or defense."""
+        return self._turn_info
+
     def close(self):
         """Send close messages to the external process and join them."""
         self._batch_env.close()
@@ -166,7 +181,7 @@ class InGraphBatchEnv(object):
         if isinstance(space, gym.spaces.Box):
             return space.shape
         # Extended
-        if isinstance(space, mTuple):
+        if isinstance(space, tools.ActTuple):
             return space.shape
         raise NotImplementedError()
 
@@ -187,6 +202,6 @@ class InGraphBatchEnv(object):
         if isinstance(space, gym.spaces.Box):
             return tf.float32
         # Extended
-        if isinstance(space, mTuple):
+        if isinstance(space, tools.ActTuple):
             return space.dtype
         raise NotImplementedError()

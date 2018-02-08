@@ -2,7 +2,7 @@ from gym import Space
 import numpy as np
 
 
-class Tuple(Space):
+class ActTuple(Space):
     """
     A tuple (i.e., product) of simpler spaces
 

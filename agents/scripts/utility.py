@@ -45,7 +45,9 @@ def define_simulation_graph(batch_env, algo_cls, config):
   should_log = tf.placeholder(tf.bool, name='should_log')
   do_report = tf.placeholder(tf.bool, name='do_report')
   force_reset = tf.placeholder(tf.bool, name='force_reset')
-  algo = algo_cls(batch_env, step, is_training, should_log, config)
+  # Extended
+  is_optimizing_offense = tf.placeholder(tf.bool, name='is_optimizing_offense')
+  algo = algo_cls(batch_env, step, is_training, should_log, config, is_optimizing_offense=is_optimizing_offense)
   done, score, summary = tools.simulate(
       batch_env, algo, should_log, force_reset)
   message = 'Graph contains {} trainable variables.'

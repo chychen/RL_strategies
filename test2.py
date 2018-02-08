@@ -1,18 +1,44 @@
-import tensorflow as tf
-import numpy as np 
+# import tensorflow as tf
+# import numpy as np
 
-# dist = tf.contrib.distributions.Categorical(logits=np.log([0.1, 0.3, 0.4]))
-dist = tf.contrib.distributions.Categorical(logits=[-1.0, -2.0, -3.0])
-# dist = tf.contrib.distributions.Categorical(probs=[0.1, 0.3, 0.4])
-n = 1e4
-empirical_prob = tf.cast(
-    tf.histogram_fixed_width(
-         tf.cast(dist.sample(int(n)), dtype=tf.float32),
-        [0., 2],
-        nbins=3),
-    dtype=tf.float32) / n
+# conditions = tf.constant([True, True, False, True])
+# a = tf.where(conditions, np.zeros([4,3]), np.ones([4,3]))
+# with tf.Session() as sess:
+#     print(sess.run(a))
+#########################################################
+import tensorflow as tf
+import numpy as np
+
+dist1 = tf.distributions.Categorical(logits=[1.0, 1.0, 1.0])
+dist2 = tf.distributions.Categorical(logits=[0.0, 0.0, 0.0])
+# dist1 = tf.distributions.Categorical(probs=[0.2, 0.3, 0.6])
+# dist2 = tf.distributions.Categorical(probs=[0.2, 0.3, 0.5])
+# dist1 = tf.contrib.distributions.MultivariateNormalDiag(
+#     loc=[0.3, 0.3, 0.5], scale_diag=[1.0, 1.0, 1.0])
+# dist2 = tf.contrib.distributions.MultivariateNormalDiag(
+#     loc=[0.2, 0.3, 0.5], scale_diag=[1.0, 1.0, 1.0])
+print(dist1.logits)
+print(dist1.parameters)
+kl = tf.distributions.kl_divergence(dist1, dist2)
 with tf.Session() as sess:
-    print(sess.run(empirical_prob))
+    print(sess.run(kl))
+
+# #################################################################
+# import tensorflow as tf
+# import numpy as np
+
+# # dist = tf.contrib.distributions.Categorical(logits=np.log([0.1, 0.3, 0.4]))
+# dist = tf.contrib.distributions.Categorical(logits=[-1.0, -2.0, -3.0])
+# # dist = tf.contrib.distributions.Categorical(probs=[0.1, 0.3, 0.4])
+# n = 1e4
+# empirical_prob = tf.cast(
+#     tf.histogram_fixed_width(
+#          tf.cast(dist.sample(int(n)), dtype=tf.float32),
+#         [0., 2],
+#         nbins=3),
+#     dtype=tf.float32) / n
+# with tf.Session() as sess:
+#     print(sess.run(empirical_prob))
 
 ##############################################
 

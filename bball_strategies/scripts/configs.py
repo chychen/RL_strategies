@@ -15,9 +15,9 @@ def default():
   """Default configuration for PPO."""
   # General
   algorithm = algorithms.TWO_TRUNK_PPO
-  num_agents = 30
+  num_agents = 2 # TODO 30?
   eval_episodes = 30
-  use_gpu = True
+  use_gpu = False
   # Environment
 #   normalize_ranges = True
   # Network
@@ -33,7 +33,9 @@ def default():
   update_epochs = 25
   optimizer = tf.train.AdamOptimizer
   learning_rate = 1e-4
-  # Losses
+#   batch_size = 20
+#   chunk_length = 50
+  # Losses  
   discount = 0.995
   kl_target = 1e-2
   kl_cutoff_factor = 2
@@ -43,7 +45,8 @@ def default():
 #   entropy_regularization = None
   # Environment
   env = 'bball-v0'
-#   max_length = 200
+  FPS = 5
+  max_length = 24 * FPS * 2
 #   steps = 1e6  # 1M
 
   return locals()

@@ -40,7 +40,55 @@ def _create_environment(config):
     env.if_vis_visual_aid = False
     env.init_positions = None
     env.init_ball_handler_idx = None
+    env.time_limit = config.max_length
+    env.FPS = config.FPS
     return env
+
+
+def _define_loop(graph, logdir, train_steps, eval_steps):
+    """Create and configure a training loop with training and evaluation phases.
+
+    Args:
+      graph: Object providing graph elements via attributes.
+      logdir: Log directory for storing checkpoints and summaries.
+      train_steps: Number of training steps per epoch.
+      eval_steps: Number of evaluation steps per epoch.
+
+    Returns:
+      Loop object.
+    """
+    loop = tools.Loop(
+        logdir, graph.step, graph.should_log, graph.do_report,
+        graph.force_reset)
+    loop.add_phase(
+        'train_offense', graph.done, graph.score, graph.summary, train_steps,
+        report_every=train_steps,
+        log_every=train_steps // 2,
+        checkpoint_every=None,
+        feed={graph.is_training: True,
+              graph.is_optimizing_offense: True})
+    loop.add_phase(
+        'train_defense', graph.done, graph.score, graph.summary, train_steps,
+        report_every=train_steps,
+        log_every=train_steps // 2,
+        checkpoint_every=None,
+        feed={graph.is_training: True,
+              graph.is_optimizing_offense: True})
+    loop.add_phase(
+        'eval_offense', graph.done, graph.score, graph.summary, eval_steps,
+        report_every=eval_steps,
+        log_every=eval_steps // 2,
+        checkpoint_every=10 * eval_steps,
+        feed={graph.is_training: False,
+              graph.is_optimizing_offense: True})
+    loop.add_phase(
+        'eval_defense', graph.done, graph.score, graph.summary, eval_steps,
+        report_every=eval_steps,
+        log_every=eval_steps // 2,
+        checkpoint_every=10 * eval_steps,
+        feed={graph.is_training: False,
+              graph.is_optimizing_offense: False})
+    return loop
 
 
 def train(config, env_processes):
@@ -64,8 +112,8 @@ def train(config, env_processes):
         batch_env = utility.define_batch_env(
             lambda: _create_environment(config),
             config.num_agents, env_processes)
-        # graph = utility.define_simulation_graph( #TODO
-        #     batch_env, config.algorithm, config)
+        graph = utility.define_simulation_graph(
+            batch_env, config.algorithm, config)
     yield 'test'
 
 
@@ -89,7 +137,7 @@ def main(_):
 if __name__ == '__main__':
     FLAGS = tf.app.flags.FLAGS
     tf.app.flags.DEFINE_string(
-        'logdir', 'logdir / v1 / 1',
+        'logdir', 'logdir/v1/1',
         'Base directory to store logs.')
     tf.app.flags.DEFINE_string(
         'timestamp', datetime.datetime.now().strftime('%Y%m%dT%H%M%S'),

@@ -60,7 +60,7 @@ def simulate(batch_env, algo, log=True, reset=False):
             return algo.begin_episode(agent_indices)
 
     def _define_step():
-        """Request actions from the algorithm and apply them to the environments.
+        """ (Extended) Request actions from the algorithm and apply them to the environments.
 
         Increments the lengths of all episodes and increases their scores by the
         current reward. After stepping the environments, provides the full
@@ -71,7 +71,7 @@ def simulate(batch_env, algo, log=True, reset=False):
         """
         prevob = batch_env.observ + 0  # Ensure a copy of the variable value.
         agent_indices = tf.range(len(batch_env))
-        action, step_summary = algo.perform(agent_indices, prevob)
+        action, step_summary = algo.perform(agent_indices, prevob, turn_info=batch_env.turn_info)
         action.set_shape(batch_env.action.shape)
         with tf.control_dependencies([batch_env.simulate(action)]):
             add_score = score.assign_add(batch_env.reward)
@@ -80,7 +80,10 @@ def simulate(batch_env, algo, log=True, reset=False):
             agent_indices = tf.range(len(batch_env))
             experience_summary = algo.experience(
                 agent_indices, prevob, batch_env.action, batch_env.reward,
-                batch_env.done, batch_env.observ)
+                batch_env.done, batch_env.observ, turn_info=batch_env.turn_info)
+            # experience_summary = algo.experience(
+            #     agent_indices, prevob, batch_env.action, batch_env.reward,
+            #     batch_env.done, batch_env.observ)
         return tf.summary.merge([step_summary, experience_summary])
 
     def _define_end_episode(agent_indices):
