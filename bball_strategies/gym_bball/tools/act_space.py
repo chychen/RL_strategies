@@ -1,5 +1,6 @@
 from gym import Space
 import numpy as np
+import tensorflow as tf
 
 
 class ActTuple(Space):
@@ -53,4 +54,4 @@ class ActTuple(Space):
     # Extended
     @property
     def dtype(self):
-        return np.float32
+        return tf.float32

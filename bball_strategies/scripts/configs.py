@@ -15,9 +15,9 @@ def default():
   """Default configuration for PPO."""
   # General
   algorithm = algorithms.TWO_TRUNK_PPO
-  num_agents = 2 # TODO 30?
+  num_agents = 30
   eval_episodes = 30
-  use_gpu = False
+  use_gpu = True
   # Environment
 #   normalize_ranges = True
   # Network
@@ -47,7 +47,7 @@ def default():
   env = 'bball-v0'
   FPS = 5
   max_length = 24 * FPS * 2
-#   steps = 1e6  # 1M
+  steps = 1e6  # 1M
 
   return locals()
 

@@ -165,10 +165,10 @@ class TWO_TRUNK_PPO(object):
                     x, 0, len(self._batch_env))
 
             policy_params = []
-            for _, v in ACT.items():
+            for i in range(3):
                 policy_params.append(tools.nested.filter(
-                    is_tensor, output.policy[v].parameters))
-                tools.nested.map(set_batch_dim, policy_params[v])
+                    is_tensor, output.policy[i].parameters))
+                tools.nested.map(set_batch_dim, policy_params[i])
 
             assert policy_params, 'Policy has no parameters to store.'
             remember_last_policy = tools.nested.map(
@@ -294,10 +294,10 @@ class TWO_TRUNK_PPO(object):
                 x, 0, len(self._batch_env))
 
         policy_params = []
-        for _, v in ACT.items():
+        for i in range(3):
             policy_params.append(tools.nested.filter(
-                is_tensor, output.policy[v].parameters))
-            tools.nested.map(set_batch_dim, policy_params[v])
+                is_tensor, output.policy[i].parameters))
+            tools.nested.map(set_batch_dim, policy_params[i])
 
         if output.state is not None:
             tools.nested.map(set_batch_dim, output.state)
@@ -631,8 +631,8 @@ class TWO_TRUNK_PPO(object):
           Summary tensor.
         """
         old_policy = []
-        for _, v in ACT.items():
-            old_policy.append(self._policy_type[v](**(old_policy_params[v])))
+        for i in range(3):
+            old_policy.append(self._policy_type[i](**(old_policy_params[i])))
         with tf.name_scope('adjust_penalty'):
             network = self._network(observ, length)
 

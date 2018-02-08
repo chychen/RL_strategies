@@ -114,7 +114,23 @@ def train(config, env_processes):
             config.num_agents, env_processes)
         graph = utility.define_simulation_graph(
             batch_env, config.algorithm, config)
-    yield 'test'
+        loop = _define_loop(
+            graph, config.logdir,
+            config.update_every * config.max_length,
+            config.eval_episodes * config.max_length)
+        total_steps = int(
+            config.steps / config.update_every *
+            (config.update_every + config.eval_episodes))
+    # Exclude episode related variables since the Python state of environments is
+    # not checkpointed and thus new episodes start after resuming.
+    saver = utility.define_saver(exclude=(r'.*_temporary.*',))
+    sess_config = tf.ConfigProto(allow_soft_placement=True)
+    sess_config.gpu_options.allow_growth = True
+    with tf.Session(config=sess_config) as sess:
+        utility.initialize_variables(sess, saver, config.logdir)
+        for score in loop.run(sess, saver, total_steps):
+            yield score
+    batch_env.close()
 
 
 def main(_):

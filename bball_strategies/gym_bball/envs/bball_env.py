@@ -222,7 +222,7 @@ class BBallEnv(gym.Env):
         14 : ball(1) + offense(5) + defense(5) + basket(1) + ball_boundry(2)
         2 : x and y positions
         """
-        obs = np.empty(shape=(5, 14, 2))
+        obs = np.empty(shape=(5, 14, 2), dtype=np.float32)
         for i in range(4):
             obs[i] = np.concatenate([np.expand_dims(
                 self.states.past_positions[i, STATE_LOOKUP['BALL']], axis=0),
@@ -265,9 +265,9 @@ class BBallEnv(gym.Env):
             off2ball_vec = off_positions - ball_pos
             ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
             positions = np.array(
-                [off_positions[ball_handler_idx], off_positions, def_positions])
-            vels = np.array([np.zeros_like(ball_pos), np.zeros_like(
-                off_positions), np.zeros_like(def_positions)])
+                [off_positions[bal_handler_idx], off_positions, def_positions])
+            vels = np.array([np.zeros_like(ball_pos, dtype=np.float32), np.zeros_like(
+                off_positions, dtype=np.float32), np.zeros_like(def_positions, dtype=np.float32)])
             self.states.reset(positions, ball_handler_idx)
         else:
             if self.init_mode == INIT_LOOKUP['DEFAULT']:
@@ -277,7 +277,7 @@ class BBallEnv(gym.Env):
                     [60, 25],
                     [70, 15],
                     [80, 10]
-                ], dtype=np.float)
+                ], dtype=np.float32)
                 ball_handler_idx = 2
             else:
                 off_positions = self.np_random_generator.uniform(
@@ -285,17 +285,19 @@ class BBallEnv(gym.Env):
                 ball_handler_idx = np.floor(self.np_random_generator.uniform(
                     low=0.0, high=5.0)).astype(np.int)
 
-            def_positions = np.array(off_positions, copy=True)
+            def_positions = np.array(
+                off_positions, copy=True, dtype=np.float32)
             vec = self.right_basket_pos - off_positions
             vec_length = length(vec, axis=1)
             # vec_length = np.sqrt(np.sum(vec * vec, axis=1))
             u_vec = vec / np.stack([vec_length, vec_length], axis=1)
             def_positions = def_positions + u_vec * self.screen_radius * 2
-            ball_pos = np.array(off_positions[ball_handler_idx, :], copy=True)
+            ball_pos = np.array(
+                off_positions[ball_handler_idx, :], copy=True, dtype=np.float32)
             positions = np.array([ball_pos, off_positions, def_positions])
             self.states.reset(positions, ball_handler_idx)
 
-        return self.states.positions
+        return self._get_obs()
 
     def _render(self, mode='human', close=False):
         if close:
@@ -464,13 +466,17 @@ class BBallEnv(gym.Env):
             ),
             # offense player DASH(power, direction)
             spaces.Box(
-                low=np.array([[0, -np.pi] for _ in range(5)]),
-                high=np.array([[self.pl_max_power, np.pi] for _ in range(5)])
+                low=np.array([[0, -np.pi]
+                              for _ in range(5)], dtype=np.float32),
+                high=np.array([[self.pl_max_power, np.pi]
+                               for _ in range(5)], dtype=np.float32)
             ),
             # defense player DASH(power, direction)
             spaces.Box(
-                low=np.array([[0, -np.pi] for _ in range(5)]),
-                high=np.array([[self.pl_max_power, np.pi] for _ in range(5)])
+                low=np.array([[0, -np.pi]
+                              for _ in range(5)], dtype=np.float32),
+                high=np.array([[self.pl_max_power, np.pi]
+                               for _ in range(5)], dtype=np.float32)
             )
         ))
 
@@ -529,7 +535,7 @@ class BBallEnv(gym.Env):
                      axis=-1) * self.pl_max_speed
         pl_speed = length(pl_vels, axis=1)
         # current moving direction (unit vector)
-        pl_vels_dir_vec = np.empty_like(pl_vels)
+        pl_vels_dir_vec = np.empty_like(pl_vels, dtype=np.float32)
         for i in range(pl_vels_dir_vec.shape[0]):
             # avoid divide zero
             pl_vels_dir_vec[i] = [0, 0] if pl_speed[i] == 0 else [
@@ -585,8 +591,9 @@ class BBallEnv(gym.Env):
             self.states.update_player(state_idx, pl_idx, next_pl_pos, pl_vel)
 
     def _find_zone_idx(self, next_pos, pos, vel, zone_positions, zone_radius):
-        shortest_dists = np.empty(shape=(len(zone_positions),))
-        modes = np.empty(shape=(len(zone_positions),))
+        shortest_dists = np.empty(
+            shape=(len(zone_positions),), dtype=np.float32)
+        modes = np.empty(shape=(len(zone_positions),), dtype=np.float32)
         next_pos2zone_vecs = zone_positions - next_pos
         pos2zone_vecs = zone_positions - pos
         for i, (next_vec, vec) in enumerate(zip(next_pos2zone_vecs, pos2zone_vecs)):
@@ -732,7 +739,7 @@ class BBallEnv(gym.Env):
         ball_dot_defs = np.inner(ball2cloesetdef_vecs, ball2basket_vec)
         def2ball_lens[np.argwhere(ball_dot_defs <= 0)] = self.max_reward
         # avoid divide zero
-        angle_values = np.empty(shape=(5,))
+        angle_values = np.empty(shape=(5,), dtype=np.float32)
         len_temp = length(ball2cloesetdef_vecs, axis=1) * \
             length(ball2basket_vec, axis=0)
         for i in range(5):
@@ -779,10 +786,10 @@ class States(object):
     def reset(self, positions, ball_handler_idx, past_buffer_amount=4):
         self.turn = FLAG_LOOPUP['OFFENSE']
         self.positions = positions
-        self.past_positions = np.tile(np.array([np.zeros_like(positions[0]), np.zeros_like(
-            positions[1]), np.zeros_like(positions[2])]), [past_buffer_amount, 1])
-        self.vels = np.array([np.zeros_like(positions[0]), np.zeros_like(
-            positions[1]), np.zeros_like(positions[2])])
+        self.past_positions = np.tile(np.array([np.zeros_like(positions[0], dtype=np.float32), np.zeros_like(
+            positions[1], dtype=np.float32), np.zeros_like(positions[2], dtype=np.float32)]), [past_buffer_amount, 1])
+        self.vels = np.array([np.zeros_like(positions[0], dtype=np.float32), np.zeros_like(
+            positions[1], dtype=np.float32), np.zeros_like(positions[2], dtype=np.float32)])
         self.done = False
         self.status = None
         self.steps = 0
@@ -797,7 +804,7 @@ class States(object):
         self.ball_handler_idx = ball_handler_idx
         self.is_passing = is_passing
         self.positions[STATE_LOOKUP['BALL']] = pos
-        self.vels[STATE_LOOKUP['BALL']] = np.array(velocity)
+        self.vels[STATE_LOOKUP['BALL']] = np.array(velocity, dtype=np.float32)
 
     def update_player(self, team_id, pl_idx, position, vel):
         self.positions[team_id][pl_idx] = position

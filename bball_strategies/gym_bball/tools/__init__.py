@@ -21,11 +21,11 @@ def back_to_act_tuple(inputs):
     transformed = []
     for input_ in inputs:
         transformed.append(
-            ActTuple((
+            np.array([
                 input_[0, 0],  # Discrete(3)
                 input_[0, 1],  # Box()
                 input_[1:6, :],  # Box(5, 2)
                 input_[6:11, :]  # Box(5, 2)
-            ))
+            ])
         )
     return transformed
