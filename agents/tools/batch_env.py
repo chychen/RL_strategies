@@ -82,14 +82,15 @@ class BatchEnv(object):
         Returns:
           Batch of observations, rewards, and done flags.
         """
+        ## no need to check action, because action will get force-clip before step()
+        # for index, (env, action) in enumerate(zip(self._envs, actions)):
+        #     if not env.action_space.contains(action):
+        #         message = 'Invalid action at index {}: {}'
+        #         raise ValueError(message.format(index, action))
+
         # Extended
         # transform action back to customized tuple
         actions = tools.back_to_act_tuple(actions)
-
-        for index, (env, action) in enumerate(zip(self._envs, actions)):
-            if not env.action_space.contains(action):
-                message = 'Invalid action at index {}: {}'
-                raise ValueError(message.format(index, action))
         if self._blocking:
             transitions = [
                 env.step(action)
@@ -105,7 +106,7 @@ class BatchEnv(object):
         done = np.stack(dones)
         info = tuple(infos)
         # Extended
-        turn_info = np.empty(shape=observ.shape[0], dtype=np.int)
+        turn_info = np.empty(shape=observ.shape[0], dtype=np.int8)
         for i, v in enumerate(info):
             turn_info[i] = v['turn']
         return observ, reward, done, turn_info

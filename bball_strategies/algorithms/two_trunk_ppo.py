@@ -97,6 +97,7 @@ class TWO_TRUNK_PPO(object):
         Args:
           agent_indices: Tensor containing current batch indices.
           observ: Tensor of a batch of observations for all agents.
+          turn_info : whose turn, offense or defense. (first must be offense)
 
         Returns:
           Tuple of action batch tensor and summary tensor.

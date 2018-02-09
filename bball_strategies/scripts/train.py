@@ -17,6 +17,7 @@ from agents import tools
 from agents.scripts import utility
 from bball_strategies import gym_bball
 from bball_strategies.scripts import configs
+from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
 
 # TODO
 # what is streaming estimation, and should we normalized the output?
@@ -34,13 +35,7 @@ def _create_environment(config):
     Wrapped OpenAI Gym environment.
     """
     env = gym.make(config.env)
-    env.init_mode = 0
-    env.if_vis_trajectory = False
-    env.if_vis_visual_aid = False
-    env.init_positions = None
-    env.init_ball_handler_idx = None
-    env.time_limit = config.max_length
-    env.FPS = config.FPS
+    env = BBallWrapper(env, fps=config.FPS, time_limit=config.max_length)
     return env
 
 

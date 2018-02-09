@@ -56,7 +56,7 @@ class InGraphBatchEnv(object):
             self._done = tf.Variable(
                 tf.cast(tf.ones((len(self._batch_env),)), tf.bool),
                 name='done', trainable=False)
-            # Extended
+            # Extended, who is next
             self._turn_info = tf.Variable(
                 tf.cast(tf.ones((len(self._batch_env),)), tf.int8),
                 name='turn_info', trainable=False)
@@ -128,10 +128,12 @@ class InGraphBatchEnv(object):
         observ = tf.check_numerics(observ, 'observ')
         reward = tf.zeros_like(indices, tf.float32)
         done = tf.zeros_like(indices, tf.bool)
+        turn_info = tf.zeros_like(indices, tf.int8) # offense is next
         with tf.control_dependencies([
                 tf.scatter_update(self._observ, indices, observ),
                 tf.scatter_update(self._reward, indices, reward),
-                tf.scatter_update(self._done, indices, done)]):
+                tf.scatter_update(self._done, indices, done),
+                tf.scatter_update(self._turn_info, indices, turn_info)]):
             return tf.identity(observ)
 
     @property

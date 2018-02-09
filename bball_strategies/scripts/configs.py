@@ -15,9 +15,9 @@ def default():
   """Default configuration for PPO."""
   # General
   algorithm = algorithms.TWO_TRUNK_PPO
-  num_agents = 2
+  num_agents = 10
   eval_episodes = 30
-  use_gpu = False
+  use_gpu = True
   # Environment
 #   normalize_ranges = True
   # Network
@@ -29,7 +29,7 @@ def default():
   init_output_factor = 0.1
   init_std = 0.35
   # Optimization
-  update_every = 2
+  update_every = 30
   update_epochs = 25
   optimizer = tf.train.AdamOptimizer
   learning_rate = 1e-4
