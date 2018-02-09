@@ -14,10 +14,9 @@ import gym
 import tensorflow as tf
 
 from agents import tools
-from bball_strategies.scripts import configs
 from agents.scripts import utility
-
 from bball_strategies import gym_bball
+from bball_strategies.scripts import configs
 
 # TODO
 # what is streaming estimation, and should we normalized the output?
