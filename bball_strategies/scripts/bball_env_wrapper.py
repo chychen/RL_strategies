@@ -10,8 +10,12 @@ from gym import spaces
 
 class BBallWrapper(object):
 
-    def __init__(self, env, init_mode=0, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, fps=5, time_limit=240):
+    def __init__(self, env, init_mode=1, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, fps=5, time_limit=240):
         """
+        Args
+        ----
+        init_mode : 0->default, 1->dataset, 2->customized
+
         1. Convert to 32 bit
         2. Clip actions
         3. Normalize obs and action

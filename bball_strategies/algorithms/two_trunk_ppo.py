@@ -41,6 +41,7 @@ class TWO_TRUNK_PPO(object):
         self._is_optimizing_offense = is_optimizing_offense
         self._should_log = should_log
         self._config = config
+        # NOTE: clipping!!!!!!!!!
         self._observ_filter = parts.StreamingNormalize(
             self._batch_env.observ[0], center=True, scale=True, clip=5,
             name='normalize_observ')
@@ -146,7 +147,7 @@ class TWO_TRUNK_PPO(object):
             # # pylint: disable=g-long-lambda
             # summary = tf.cond(self._should_log, lambda: tf.summary.merge([
             #     tf.summary.histogram('mode', mode_),
-            #     tf.summary.histogram('action', action_reshape),
+            #     tf.summary.histogram('action', action),
             #     tf.summary.histogram('logprob', logprob)]), str)
 
             # Remember current policy to append to memory in the experience callback.

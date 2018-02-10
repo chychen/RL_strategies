@@ -78,7 +78,7 @@ note :
 - velocity: scalar with direction
 - speed: scalar only
 """
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 FPS = 5.0
 

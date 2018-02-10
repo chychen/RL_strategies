@@ -1,3 +1,4 @@
+
 """ Script to train
 Command Line:
     python3 -m TODO
@@ -18,9 +19,6 @@ from agents.scripts import utility
 from bball_strategies import gym_bball
 from bball_strategies.scripts import configs
 from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
-
-# TODO
-# what is streaming estimation, and should we normalized the output?
 
 
 def _create_environment(config):
@@ -118,7 +116,8 @@ def train(config, env_processes):
     # Exclude episode related variables since the Python state of environments is
     # not checkpointed and thus new episodes start after resuming.
     saver = utility.define_saver(exclude=(r'.*_temporary.*',))
-    sess_config = tf.ConfigProto(allow_soft_placement=True)
+    sess_config = tf.ConfigProto(
+        allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(sess, saver, config.logdir)
@@ -156,6 +155,6 @@ if __name__ == '__main__':
         'config', 'default',
         'Configuration to execute.')
     tf.app.flags.DEFINE_boolean(
-        'env_processes', False,
+        'env_processes', True,
         'Step environments in separate processes to circumvent the GIL.')
     tf.app.run()
