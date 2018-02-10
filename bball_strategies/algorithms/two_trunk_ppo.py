@@ -408,6 +408,9 @@ class TWO_TRUNK_PPO(object):
         Returns:
           Summary tensor.
         """
+        # NOTE: the rewards of OFFENSE and of DEFENSE are opposite by multiplying -1
+        reward = tf.where(
+            self._is_optimizing_offense, reward, -reward)
         return_ = utility.discounted_return(
             reward, length, self._config.discount)
         value = self._network(observ, length).value
@@ -457,7 +460,8 @@ class TWO_TRUNK_PPO(object):
         Returns:
           Tuple of value loss, policy loss, and summary tensor.
         """
-        observ, action, DECISION, OFF_DASH, DEF_DASH, reward, advantage = sequence['sequence']
+        observ, action, DECISION, OFF_DASH, DEF_DASH, reward, advantage = sequence[
+            'sequence']
         length = sequence['length']
         old_policy = []
         old_policy.append(self._policy_type[ACT['DECISION']](**DECISION))

@@ -79,7 +79,7 @@ note :
 - velocity: scalar with direction
 - speed: scalar only
 """
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 FPS = 5.0
 
@@ -158,17 +158,18 @@ class BBallEnv(gym.Env):
         """
         decision = action[ACTION_LOOKUP['DECISION']]
         ball_pass_dir = action[ACTION_LOOKUP['BALL']]
-        pl_dash = action[ACTION_LOOKUP['DASH']]
+        off_pl_dash = action[ACTION_LOOKUP['OFF_DASH']]
+        def_pl_dash = action[ACTION_LOOKUP['DEF_DASH']]
         if self.states.turn == FLAG_LOOPUP['OFFENSE']:
             # logger.debug('[TURN] OFFENSE')
             self._update_player_state(
-                pl_dash, self.states.vels, STATE_LOOKUP['OFFENSE'])
+                off_pl_dash, self.states.vels, STATE_LOOKUP['OFFENSE'])
             # update ball state
             self._update_ball_state(decision, ball_pass_dir)
         elif self.states.turn == FLAG_LOOPUP['DEFENSE']:
             # logger.debug('[TURN] DEFENSE')
             self._update_player_state(
-                pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
+                def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
 
         # check if meets termination condition
         if decision == DESICION_LOOKUP['SHOOT']:
@@ -842,8 +843,8 @@ class States(object):
     def _clip_state(self, pos):
         pos[0] = self.x_low_bound if pos[0] < self.x_low_bound else pos[0]
         pos[0] = self.x_high_bound if pos[0] > self.x_high_bound else pos[0]
-        pos[1] = self.y_low_bound if pos[0] < self.y_low_bound else pos[0]
-        pos[1] = self.y_high_bound if pos[0] > self.y_high_bound else pos[0]
+        pos[1] = self.y_low_bound if pos[1] < self.y_low_bound else pos[1]
+        pos[1] = self.y_high_bound if pos[1] > self.y_high_bound else pos[1]
         return pos
 
     @property
@@ -894,10 +895,11 @@ STATE_LOOKUP = {
 }
 
 ACTION_LOOKUP = {
-    # Tuple(Discrete(3), Box(), Box(5, 2))
+    # Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
     'DECISION': 0,
     'BALL': 1,
-    'DASH': 2
+    'OFF_DASH': 2,
+    'DEF_DASH': 3
 }
 
 FLAG_LOOPUP = {

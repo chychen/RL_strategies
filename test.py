@@ -246,6 +246,7 @@ def main():
     global env
     env = gym.make('bball-v0')
     env = MonitorWrapper(env,
+                         init_mode=0,
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True)
     env.reset()
@@ -263,8 +264,8 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    rewards()
+    main()
+    # rewards()
 
 
 # gather：根據一個list來取用目標

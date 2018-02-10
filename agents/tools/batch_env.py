@@ -109,6 +109,11 @@ class BatchEnv(object):
         turn_info = np.empty(shape=observ.shape[0], dtype=np.int8)
         for i, v in enumerate(info):
             turn_info[i] = v['turn']
+        print(actions)
+        print(reward)
+        print(done)
+        print(turn_info)
+        input()
         return observ, reward, done, turn_info
 
     def reset(self, indices=None):

@@ -156,6 +156,6 @@ if __name__ == '__main__':
         'config', 'default',
         'Configuration to execute.')
     tf.app.flags.DEFINE_boolean(
-        'env_processes', True,
+        'env_processes', False,
         'Step environments in separate processes to circumvent the GIL.')
     tf.app.run()
