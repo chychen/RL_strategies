@@ -56,7 +56,6 @@ import numpy as np
 from os import path
 import copy
 import sys
-from gym.envs.classic_control import rendering
 from bball_strategies.gym_bball import tools
 """
 # TODO
@@ -307,6 +306,8 @@ class BBallEnv(gym.Env):
         #         self.viewer = None
         #     return
     def render(self, mode='human'):
+        if self.viewer is None:
+            from gym.envs.classic_control import rendering
         if not self.if_vis_trajectory:
             if self.viewer is None:
                 self.viewer = rendering.Viewer(940, 500)
