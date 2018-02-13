@@ -82,10 +82,10 @@ class StreamingNormalize(object):
                 value -= self._mean[None, ...]
             if self._scale:
                 # We cannot scale before seeing at least two samples.
-                # value /= tf.cond(
-                #     self._count > 1, lambda: self._std() + 1e-8,
-                #     lambda: tf.ones_like(self._var_sum))[None]
-                value /= tf.ones_like(self._var_sum)[None]
+                value /= tf.cond(
+                    self._count > 1, lambda: self._std() + 1e-8,
+                    lambda: tf.ones_like(self._var_sum))[None]
+                # value /= tf.ones_like(self._var_sum)[None]
             if self._clip:
                 value = tf.clip_by_value(value, -self._clip, self._clip)
             # Remove batch dimension if necessary.
@@ -108,9 +108,7 @@ class StreamingNormalize(object):
                 value = value[None, ...]
             count = tf.shape(value)[0]
             # TODO
-            tf.Print(self._count, [self._count])
             with tf.control_dependencies([self._count.assign_add(count)]):
-                tf.Print(self._count, [self._count])
                 step = tf.cast(self._count, tf.float32)
                 mean_delta = tf.reduce_sum(value - self._mean[None, ...], 0)
                 new_mean = self._mean + mean_delta / step

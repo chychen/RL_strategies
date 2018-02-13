@@ -10,9 +10,10 @@ from __future__ import print_function
 
 import datetime
 import os
-
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 import gym
 import tensorflow as tf
+from tensorflow.python import debug as tf_debug
 
 from agents import tools
 from agents.scripts import utility
@@ -120,6 +121,9 @@ def train(config, env_processes):
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
     with tf.Session(config=sess_config) as sess:
+        if FLAGS.debug:
+            sess = tf_debug.LocalCLIDebugWrapperSession(
+                sess, ui_type=FLAGS.ui_type)
         utility.initialize_variables(sess, saver, config.logdir)
         for score in loop.run(sess, saver, total_steps):
             yield score
@@ -157,4 +161,10 @@ if __name__ == '__main__':
     tf.app.flags.DEFINE_boolean(
         'env_processes', True,
         'Step environments in separate processes to circumvent the GIL.')
+    tf.app.flags.DEFINE_boolean(
+        'debug', False,
+        'whether to enable debug mode')
+    tf.app.flags.DEFINE_string(
+        'ui_type', 'curses',
+        "Command-line user interface type (curses | readline)")
     tf.app.run()
