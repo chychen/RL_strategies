@@ -33,11 +33,11 @@ def _create_environment(config, outdir):
     Returns:
       Wrapped OpenAI Gym environment.
     """
+    env = gym.make(config.env)
     # Ensure that the environment has the specification attribute set as expected
     # by the monitor wrapper.
     if not hasattr(env, 'spec'):
         setattr(env, 'spec', getattr(env, 'spec', None))
-    env = gym.make(config.env)
     env = BBallWrapper(env, fps=config.FPS, time_limit=config.max_length)
     env = gym.wrappers.Monitor(
         env, outdir, lambda unused_episode_number: True)
