@@ -158,9 +158,10 @@ def move_offense_right():
         action = tuple((
             np.array(2),
             np.array(0),
-            np.array([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]])
+            np.array([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]]),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])            
         ))
-        _, _, done, _ = env.step(action)
+        obs, _, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
@@ -168,6 +169,7 @@ def move_offense_right():
         action = tuple((
             np.array(2),
             np.array(0),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
@@ -249,7 +251,7 @@ def main():
                          init_mode=0,
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True)
-    env.reset()
+    obs = env.reset()
     env.render()
 
     # DEMO script
@@ -257,8 +259,8 @@ def main():
     # moving_around()
     # maxspeed()
     # ball_stealing()
-    # move_offense_right()
-    random_dancing()
+    move_offense_right()
+    # random_dancing()
 
     env.close()
 
