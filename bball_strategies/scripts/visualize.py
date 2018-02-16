@@ -40,7 +40,7 @@ def _create_environment(config, outdir):
         setattr(env, 'spec', getattr(env, 'spec', None))
     env = BBallWrapper(env, fps=config.FPS, time_limit=config.max_length)
     env = gym.wrappers.Monitor(
-        env, outdir, lambda unused_episode_number: True)
+        env, outdir, lambda unused_episode_number: True, force=True)
     return env
 
 

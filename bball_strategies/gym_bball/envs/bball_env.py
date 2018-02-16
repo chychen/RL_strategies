@@ -723,9 +723,12 @@ class BBallEnv(gym.Env):
         # 1. find distances between all defenders to ball handler
         def2ball_vecs = self.states.ball_position - self.states.defense_positions
         def2ball_lens = length(def2ball_vecs, axis=1)
+        # NOTE if too close, get -1
+        def2ball_lens[np.where(def2ball_lens<10.0)] = -1
+
         # 2. update distance to max if any offensive player in between
         off2ball_vecs = self.states.ball_position - self.states.offense_positions
-        for i, (def2ball_vec, def2ball_len) in enumerate(zip(def2ball_vecs, def2ball_lens)):
+        for i, (def2ball_vec, _) in enumerate(zip(def2ball_vecs, def2ball_lens)):
             off2def_vecs = self.states.defense_positions[i] - \
                 self.states.offense_positions
             off_dot_def = np.inner(off2ball_vecs, def2ball_vec)

@@ -16,6 +16,7 @@ def get_shoot_action():
     return tuple((  # shoot decision
         np.array(0),
         np.array(0),
+        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
     ))
 
