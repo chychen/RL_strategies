@@ -193,7 +193,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                 off_value = tf.layers.dense(
                     inputs=off_fc,
                     units=1,
-                    activation=tf.nn.relu,
+                    activation=None,
                     kernel_initializer=init_output_weights,
                 )
                 off_value = tf.reshape(off_value, shape=[batch_size, episode_len])
@@ -268,7 +268,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                 def_value = tf.layers.dense(
                     inputs=def_fc,
                     units=1,
-                    activation=tf.nn.relu,
+                    activation=None,
                     kernel_initializer=init_output_weights,
                 )
                 def_value = tf.reshape(def_value, shape=[batch_size, episode_len])

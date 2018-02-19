@@ -28,166 +28,186 @@ import tensorflow as tf
 from agents import tools
 
 
-def define_simulation_graph(batch_env, algo_cls, config):
-  """Define the algortihm and environment interaction.
-
-  Args:
-    batch_env: In-graph environments object.
-    algo_cls: Constructor of a batch algorithm.
-    config: Configuration object for the algorithm.
-
-  Returns:
-    Object providing graph elements via attributes.
-  """
-  # pylint: disable=unused-variable
-  step = tf.Variable(0, False, dtype=tf.int32, name='global_step')
-  is_training = tf.placeholder(tf.bool, name='is_training')
-  should_log = tf.placeholder(tf.bool, name='should_log')
-  do_report = tf.placeholder(tf.bool, name='do_report')
-  force_reset = tf.placeholder(tf.bool, name='force_reset')
-  # Extended
-  is_optimizing_offense = tf.placeholder(tf.bool, name='is_optimizing_offense')
-  algo = algo_cls(batch_env, step, is_training, should_log, config, is_optimizing_offense=is_optimizing_offense)
-  done, score, summary = tools.simulate(
-      batch_env, algo, should_log, force_reset)
-  message = 'Graph contains {} trainable variables.'
-  tf.logging.info(message.format(tools.count_weights()))
-  # pylint: enable=unused-variable
-  return tools.AttrDict(locals())
-
-
-def define_batch_env(constructor, num_agents, env_processes):
-  """Create environments and apply all desired wrappers.
-
-  Args:
-    constructor: Constructor of an OpenAI gym environment.
-    num_agents: Number of environments to combine in the batch.
-    env_processes: Whether to step environment in external processes.
-
-  Returns:
-    In-graph environments object.
-  """
-  with tf.variable_scope('environments'):
-    if env_processes:
-      envs = [
-          tools.wrappers.ExternalProcess(constructor)
-          for _ in range(num_agents)]
+def capped_cubic_video_schedule(episode_id):
+    if episode_id < 1000:
+        return episode_id % 10 == 0
     else:
-      envs = [constructor() for _ in range(num_agents)]
-    batch_env = tools.BatchEnv(envs, blocking=not env_processes)
-    batch_env = tools.InGraphBatchEnv(batch_env)
-  return batch_env
+        return episode_id % 1000 == 0
+
+
+def define_simulation_graph(batch_env, algo_cls, config):
+    """Define the algortihm and environment interaction.
+
+    Args:
+      batch_env: In-graph environments object.
+      algo_cls: Constructor of a batch algorithm.
+      config: Configuration object for the algorithm.
+
+    Returns:
+      Object providing graph elements via attributes.
+    """
+    # pylint: disable=unused-variable
+    step = tf.Variable(0, False, dtype=tf.int32, name='global_step')
+    is_training = tf.placeholder(tf.bool, name='is_training')
+    should_log = tf.placeholder(tf.bool, name='should_log')
+    do_report = tf.placeholder(tf.bool, name='do_report')
+    force_reset = tf.placeholder(tf.bool, name='force_reset')
+    # Extended
+    is_optimizing_offense = tf.placeholder(
+        tf.bool, name='is_optimizing_offense')
+    algo = algo_cls(batch_env, step, is_training, should_log,
+                    config, is_optimizing_offense=is_optimizing_offense)
+    done, score, summary = tools.simulate(
+        batch_env, algo, should_log, force_reset)
+    message = 'Graph contains {} trainable variables.'
+    tf.logging.info(message.format(tools.count_weights()))
+    # pylint: enable=unused-variable
+    return tools.AttrDict(locals())
+
+
+def define_batch_env(constructor, num_agents, env_processes, outdir=None):
+    """Create environments and apply all desired wrappers.
+
+    Args:
+      constructor: Constructor of an OpenAI gym environment.
+      num_agents: Number of environments to combine in the batch.
+      env_processes: Whether to step environment in external processes.
+
+    Returns:
+      In-graph environments object.
+    """
+    with tf.variable_scope('environments'):
+        if env_processes:
+            if num_agents > 1 and outdir is not None:
+                envs = []
+                envs = [
+                    tools.wrappers.ExternalProcess(constructor)
+                    for _ in range(num_agents-1)]
+                video_env = constructor()
+                import gym
+                video_env = gym.wrappers.Monitor(
+                    video_env, outdir, video_callable=capped_cubic_video_schedule, force=True)
+                envs.append(tools.wrappers.ExternalProcess(lambda: video_env))
+            else:
+                envs = [
+                    tools.wrappers.ExternalProcess(constructor)
+                    for _ in range(num_agents)]
+        else:
+            envs = [constructor() for _ in range(num_agents)]
+        batch_env = tools.BatchEnv(envs, blocking=not env_processes)
+        batch_env = tools.InGraphBatchEnv(batch_env)
+    return batch_env
 
 
 def define_saver(exclude=None):
-  """Create a saver for the variables we want to checkpoint.
+    """Create a saver for the variables we want to checkpoint.
 
-  Args:
-    exclude: List of regexes to match variable names to exclude.
+    Args:
+      exclude: List of regexes to match variable names to exclude.
 
-  Returns:
-    Saver object.
-  """
-  variables = []
-  exclude = exclude or []
-  exclude = [re.compile(regex) for regex in exclude]
-  for variable in tf.global_variables():
-    if any(regex.match(variable.name) for regex in exclude):
-      continue
-    variables.append(variable)
-  saver = tf.train.Saver(variables, keep_checkpoint_every_n_hours=5)
-  return saver
+    Returns:
+      Saver object.
+    """
+    variables = []
+    exclude = exclude or []
+    exclude = [re.compile(regex) for regex in exclude]
+    for variable in tf.global_variables():
+        if any(regex.match(variable.name) for regex in exclude):
+            continue
+        variables.append(variable)
+    saver = tf.train.Saver(variables, keep_checkpoint_every_n_hours=5)
+    return saver
 
 
 def initialize_variables(sess, saver, logdir, checkpoint=None, resume=None):
-  """Initialize or restore variables from a checkpoint if available.
+    """Initialize or restore variables from a checkpoint if available.
 
-  Args:
-    sess: Session to initialize variables in.
-    saver: Saver to restore variables.
-    logdir: Directory to search for checkpoints.
-    checkpoint: Specify what checkpoint name to use; defaults to most recent.
-    resume: Whether to expect recovering a checkpoint or starting a new run.
+    Args:
+      sess: Session to initialize variables in.
+      saver: Saver to restore variables.
+      logdir: Directory to search for checkpoints.
+      checkpoint: Specify what checkpoint name to use; defaults to most recent.
+      resume: Whether to expect recovering a checkpoint or starting a new run.
 
-  Raises:
-    ValueError: If resume expected but no log directory specified.
-    RuntimeError: If no resume expected but a checkpoint was found.
-  """
-  sess.run(tf.group(
-      tf.local_variables_initializer(),
-      tf.global_variables_initializer()))
-  if resume and not (logdir or checkpoint):
-    raise ValueError('Need to specify logdir to resume a checkpoint.')
-  if logdir:
-    state = tf.train.get_checkpoint_state(logdir)
-    if checkpoint:
-      checkpoint = os.path.join(logdir, checkpoint)
-    if not checkpoint and state and state.model_checkpoint_path:
-      checkpoint = state.model_checkpoint_path
-    if checkpoint and resume is False:
-      message = 'Found unexpected checkpoint when starting a new run.'
-      raise RuntimeError(message)
-    if checkpoint:
-      saver.restore(sess, checkpoint)
+    Raises:
+      ValueError: If resume expected but no log directory specified.
+      RuntimeError: If no resume expected but a checkpoint was found.
+    """
+    sess.run(tf.group(
+        tf.local_variables_initializer(),
+        tf.global_variables_initializer()))
+    if resume and not (logdir or checkpoint):
+        raise ValueError('Need to specify logdir to resume a checkpoint.')
+    if logdir:
+        state = tf.train.get_checkpoint_state(logdir)
+        if checkpoint:
+            checkpoint = os.path.join(logdir, checkpoint)
+        if not checkpoint and state and state.model_checkpoint_path:
+            checkpoint = state.model_checkpoint_path
+        if checkpoint and resume is False:
+            message = 'Found unexpected checkpoint when starting a new run.'
+            raise RuntimeError(message)
+        if checkpoint:
+            saver.restore(sess, checkpoint)
 
 
 def save_config(config, logdir=None):
-  """Save a new configuration by name.
+    """Save a new configuration by name.
 
-  If a logging directory is specified, is will be created and the configuration
-  will be stored there. Otherwise, a log message will be printed.
+    If a logging directory is specified, is will be created and the configuration
+    will be stored there. Otherwise, a log message will be printed.
 
-  Args:
-    config: Configuration object.
-    logdir: Location for writing summaries and checkpoints if specified.
+    Args:
+      config: Configuration object.
+      logdir: Location for writing summaries and checkpoints if specified.
 
-  Returns:
-    Configuration object.
-  """
-  if logdir:
-    with config.unlocked:
-      config.logdir = logdir
-    message = 'Start a new run and write summaries and checkpoints to {}.'
-    tf.logging.info(message.format(config.logdir))
-    tf.gfile.MakeDirs(config.logdir)
-    config_path = os.path.join(config.logdir, 'config.yaml')
-    with tf.gfile.FastGFile(config_path, 'w') as file_:
-      yaml.dump(config, file_, default_flow_style=False)
-  else:
-    message = (
-        'Start a new run without storing summaries and checkpoints since no '
-        'logging directory was specified.')
-    tf.logging.info(message)
-  return config
+    Returns:
+      Configuration object.
+    """
+    if logdir:
+        with config.unlocked:
+            config.logdir = logdir
+        message = 'Start a new run and write summaries and checkpoints to {}.'
+        tf.logging.info(message.format(config.logdir))
+        tf.gfile.MakeDirs(config.logdir)
+        config_path = os.path.join(config.logdir, 'config.yaml')
+        with tf.gfile.FastGFile(config_path, 'w') as file_:
+            yaml.dump(config, file_, default_flow_style=False)
+    else:
+        message = (
+            'Start a new run without storing summaries and checkpoints since no '
+            'logging directory was specified.')
+        tf.logging.info(message)
+    return config
 
 
 def load_config(logdir):
-  # pylint: disable=missing-raises-doc
-  """Load a configuration from the log directory.
+    # pylint: disable=missing-raises-doc
+    """Load a configuration from the log directory.
 
-  Args:
-    logdir: The logging directory containing the configuration file.
+    Args:
+      logdir: The logging directory containing the configuration file.
 
-  Raises:
-    IOError: The logging directory does not contain a configuration file.
+    Raises:
+      IOError: The logging directory does not contain a configuration file.
 
-  Returns:
-    Configuration object.
-  """
-  config_path = logdir and os.path.join(logdir, 'config.yaml')
-  if not config_path or not tf.gfile.Exists(config_path):
-    message = (
-        'Cannot resume an existing run since the logging directory does not '
-        'contain a configuration file.')
-    raise IOError(message)
-  with tf.gfile.FastGFile(config_path, 'r') as file_:
-    config = yaml.load(file_, Loader=yaml.Loader)
-  message = 'Resume run and write summaries and checkpoints to {}.'
-  tf.logging.info(message.format(config.logdir))
-  return config
+    Returns:
+      Configuration object.
+    """
+    config_path = logdir and os.path.join(logdir, 'config.yaml')
+    if not config_path or not tf.gfile.Exists(config_path):
+        message = (
+            'Cannot resume an existing run since the logging directory does not '
+            'contain a configuration file.')
+        raise IOError(message)
+    with tf.gfile.FastGFile(config_path, 'r') as file_:
+        config = yaml.load(file_, Loader=yaml.Loader)
+    message = 'Resume run and write summaries and checkpoints to {}.'
+    tf.logging.info(message.format(config.logdir))
+    return config
 
 
 def set_up_logging():
-  """Configure the TensorFlow logger."""
-  tf.logging.set_verbosity(tf.logging.INFO)
-  logging.getLogger('tensorflow').propagate = False
+    """Configure the TensorFlow logger."""
+    tf.logging.set_verbosity(tf.logging.INFO)
+    logging.getLogger('tensorflow').propagate = False

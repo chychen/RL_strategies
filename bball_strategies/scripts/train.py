@@ -22,12 +22,14 @@ from bball_strategies.scripts import configs
 from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
 
 
+
 def _create_environment(config):
     """Constructor for an instance of the environment.
 
     Args
     -----
     config : Object providing configurations via attributes.
+    outdir: Directory to store videos in.
 
     Returns
     -------
@@ -56,35 +58,35 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
     loop.add_phase(
         'train_offense', graph.done, graph.score, graph.summary, train_steps,
         report_every=train_steps,
-        log_every=train_steps // 2,
+        log_every=train_steps,
         checkpoint_every=None,
         feed={graph.is_training: True,
               graph.is_optimizing_offense: True})
-    loop.add_phase(
-        'train_defense', graph.done, graph.score, graph.summary, train_steps,
-        report_every=train_steps,
-        log_every=train_steps // 2,
-        checkpoint_every=None,
-        feed={graph.is_training: True,
-              graph.is_optimizing_offense: True})
+    # loop.add_phase(
+    #     'train_defense', graph.done, graph.score, graph.summary, train_steps,
+    #     report_every=train_steps,
+    #     log_every=train_steps,
+    #     checkpoint_every=None,
+    #     feed={graph.is_training: True,
+    #           graph.is_optimizing_offense: True})
     loop.add_phase(
         'eval_offense', graph.done, graph.score, graph.summary, eval_steps,
         report_every=eval_steps,
-        log_every=eval_steps // 2,
+        log_every=eval_steps,
         checkpoint_every=10 * eval_steps,
         feed={graph.is_training: False,
               graph.is_optimizing_offense: True})
-    loop.add_phase(
-        'eval_defense', graph.done, graph.score, graph.summary, eval_steps,
-        report_every=eval_steps,
-        log_every=eval_steps // 2,
-        checkpoint_every=10 * eval_steps,
-        feed={graph.is_training: False,
-              graph.is_optimizing_offense: False})
+    # loop.add_phase(
+    #     'eval_defense', graph.done, graph.score, graph.summary, eval_steps,
+    #     report_every=eval_steps,
+    #     log_every=eval_steps,
+    #     checkpoint_every=10 * eval_steps,
+    #     feed={graph.is_training: False,
+    #           graph.is_optimizing_offense: False})
     return loop
 
 
-def train(config, env_processes):
+def train(config, env_processes, outdir):
     """ Training and evaluation entry point yielding scores.
 
     Resolves some configuration attributes, creates environments, graph, and
@@ -104,7 +106,7 @@ def train(config, env_processes):
     with tf.device('/cpu:0'):
         batch_env = utility.define_batch_env(
             lambda: _create_environment(config),
-            config.num_agents, env_processes)
+            config.num_agents, env_processes, outdir=outdir)
         graph = utility.define_simulation_graph(
             batch_env, config.algorithm, config)
         loop = _define_loop(
@@ -138,12 +140,13 @@ def main(_):
         raise KeyError('You must specify a configuration.')
     logdir = FLAGS.logdir and os.path.expanduser(os.path.join(
         FLAGS.logdir, '{}-{}'.format(FLAGS.timestamp, FLAGS.config)))
+    outdir = os.path.join(logdir, 'train_output')
     try:
         config = utility.load_config(logdir)
     except IOError:
         config = tools.AttrDict(getattr(configs, FLAGS.config)())
         config = utility.save_config(config, logdir)
-    for score in train(config, FLAGS.env_processes):
+    for score in train(config, FLAGS.env_processes, None):
         tf.logging.info('Score {}.'.format(score))
 
 

@@ -18,7 +18,7 @@ def default():
     # General
     algorithm = algorithms.TWO_TRUNK_PPO
     num_agents = 20
-    eval_episodes = 30
+    eval_episodes = 10
     use_gpu = True
     # Environment
 #   normalize_ranges = True
