@@ -74,7 +74,7 @@ def back_to_act_tuple(inputs):
     for input_ in inputs:
         transformed.append(
             [
-                int(input_[0, 0]),  # Discrete(3) must be int
+                int(round(input_[0, 0])),  # Discrete(3) must be int
                 input_[0, 1],  # Box()
                 input_[1:6, :],  # Box(5, 2)
                 input_[6:11, :]  # Box(5, 2)

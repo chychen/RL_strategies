@@ -141,14 +141,19 @@ class TWO_TRUNK_PPO(object):
                 self._is_training, sample_, mode_)
             action = tf.reshape(action, shape=[observ.shape[0], 11, 2])
 
-            # TODO summary
-            summary = str()
-            # logprob = output.policy.log_prob(action)[:, 0]
-            # # pylint: disable=g-long-lambda
-            # summary = tf.cond(self._should_log, lambda: tf.summary.merge([
-            #     tf.summary.histogram('mode', mode_),
-            #     tf.summary.histogram('action', action),
-            #     tf.summary.histogram('logprob', logprob)]), str)
+            # summary = str()
+            # TODO log prob
+            # logprob = output.policy.log_prob(action)
+            # pylint: disable=g-long-lambda
+            summary = tf.cond(self._should_log, lambda: tf.summary.merge([
+                tf.summary.histogram('mode', mode_),
+                tf.summary.histogram('DECISION', action[:, 0, 0]),
+                tf.summary.histogram('PASS_ANG', action[:, 0, 1]),
+                tf.summary.histogram('OFF_DASH', action[:, 1:6]),
+                tf.summary.histogram('DEF_DASH', action[:, 6:11]),
+                # ,
+                # tf.summary.histogram('logprob', logprob)
+            ]), str)
 
             # Remember current policy to append to memory in the experience callback.
             if self._last_state is None:

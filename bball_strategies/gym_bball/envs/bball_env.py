@@ -135,7 +135,7 @@ class BBallEnv(gym.Env):
 
         # Env information
         self.states = States()
-        self.buffer_size = 10 # 10 steps =  5 frames = 1 second
+        self.buffer_size = 10  # 10 steps =  5 frames = 1 second
 
         # must define properties
         self.action_space = self._set_action_space()
@@ -175,7 +175,8 @@ class BBallEnv(gym.Env):
         if decision == DESICION_LOOKUP['SHOOT']:
             self.states.update_status(done=True, status=STATUS_LOOKUP['SHOOT'])
         # OOB
-        if self.states.ball_position[0] >= self.court_length or self.states.ball_position[0] < self.court_length / 2 or self.states.ball_position[1] >= self.court_width or self.states.ball_position[1] < 0.0:
+        oob_padding = 5
+        if self.states.ball_position[0] >= self.court_length + oob_padding or self.states.ball_position[0] < self.court_length / 2 - oob_padding or self.states.ball_position[1] >= self.court_width + oob_padding or self.states.ball_position[1] < 0.0 - oob_padding:
             self.states.update_status(done=True, status=STATUS_LOOKUP['OOB'])
         # OOT
         if self.states.steps >= self.time_limit:
@@ -245,7 +246,8 @@ class BBallEnv(gym.Env):
         if self.init_mode == INIT_LOOKUP['INPUT']:
             assert self.init_positions is not None
             assert self.init_ball_handler_idx is not None
-            self.states.reset(self.init_positions, self.init_ball_handler_idx, buffer_size=self.buffer_size)
+            self.states.reset(
+                self.init_positions, self.init_ball_handler_idx, buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET']:
             data = np.load('bball_strategies/data/FrameRate5.npy')
             ep_idx = np.floor(self.np_random_generator.uniform(
@@ -259,7 +261,8 @@ class BBallEnv(gym.Env):
                 [off_positions[ball_handler_idx], off_positions, def_positions])
             vels = np.array([np.zeros_like(ball_pos, dtype=np.float32), np.zeros_like(
                 off_positions, dtype=np.float32), np.zeros_like(def_positions, dtype=np.float32)])
-            self.states.reset(positions, ball_handler_idx, buffer_size=self.buffer_size)
+            self.states.reset(positions, ball_handler_idx,
+                              buffer_size=self.buffer_size)
         else:
             if self.init_mode == INIT_LOOKUP['DEFAULT']:
                 off_positions = np.array([
@@ -286,7 +289,8 @@ class BBallEnv(gym.Env):
             ball_pos = np.array(
                 off_positions[ball_handler_idx, :], copy=True, dtype=np.float32)
             positions = np.array([ball_pos, off_positions, def_positions])
-            self.states.reset(positions, ball_handler_idx, buffer_size=self.buffer_size)
+            self.states.reset(positions, ball_handler_idx,
+                              buffer_size=self.buffer_size)
 
         return self._get_obs()
 
