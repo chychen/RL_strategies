@@ -140,13 +140,16 @@ def main(_):
         raise KeyError('You must specify a configuration.')
     logdir = FLAGS.logdir and os.path.expanduser(os.path.join(
         FLAGS.logdir, '{}-{}'.format(FLAGS.timestamp, FLAGS.config)))
-    outdir = os.path.join(logdir, 'train_output')
+    if FLAGS.vis:
+        outdir = os.path.join(logdir, 'train_output')
+    else:
+        outdir = None
     try:
         config = utility.load_config(logdir)
     except IOError:
         config = tools.AttrDict(getattr(configs, FLAGS.config)())
         config = utility.save_config(config, logdir)
-    for score in train(config, FLAGS.env_processes, None):
+    for score in train(config, FLAGS.env_processes, outdir):
         tf.logging.info('Score {}.'.format(score))
 
 
@@ -164,6 +167,9 @@ if __name__ == '__main__':
     tf.app.flags.DEFINE_boolean(
         'env_processes', True,
         'Step environments in separate processes to circumvent the GIL.')
+    tf.app.flags.DEFINE_boolean(
+        'vis', False,
+        'whether to vis during training')
     tf.app.flags.DEFINE_boolean(
         'debug', False,
         'whether to enable debug mode')
