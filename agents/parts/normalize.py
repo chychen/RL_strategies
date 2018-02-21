@@ -107,7 +107,6 @@ class StreamingNormalize(object):
                 # Add a batch dimension if necessary.
                 value = value[None, ...]
             count = tf.shape(value)[0]
-            # TODO
             with tf.control_dependencies([self._count.assign_add(count)]):
                 step = tf.cast(self._count, tf.float32)
                 mean_delta = tf.reduce_sum(value - self._mean[None, ...], 0)

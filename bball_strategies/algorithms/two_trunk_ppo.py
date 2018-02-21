@@ -571,8 +571,10 @@ class TWO_TRUNK_PPO(object):
 
             def get_kl_divergence(category):
                 return tf.contrib.distributions.kl_divergence(old_policy[category], policy[category])
-            off_kl = (get_kl_divergence(
-                ACT['DECISION']) + get_kl_divergence(ACT['OFF_DASH'])) / 2.0  # NOTE: weighted sum maybe
+
+            off_deci_kl = get_kl_divergence(ACT['DECISION'])
+            off_dash_kl = get_kl_divergence(ACT['OFF_DASH'])
+            off_kl = (off_deci_kl + off_dash_kl) / 2.0  # NOTE: weighted sum maybe
             def_kl = get_kl_divergence(ACT['DEF_DASH'])
             kl = tf.where(self._is_optimizing_offense, off_kl, def_kl)
             # Infinite values in the KL, even for padding frames that we mask out,
@@ -608,10 +610,13 @@ class TWO_TRUNK_PPO(object):
                                off_entropy, def_entropy)
             if self._config.entropy_regularization:
                 policy_loss -= self._config.entropy_regularization * entropy
-            # TODO summary
             summary = tf.summary.merge([
                 tf.summary.histogram('entropy', entropy),
                 tf.summary.histogram('kl', kl),
+                tf.summary.histogram('off_deci_kl', off_deci_kl),
+                tf.summary.histogram('off_dash_kl', off_dash_kl),
+                tf.summary.histogram('off_kl', off_kl),
+                tf.summary.histogram('def_kl', def_kl),
                 tf.summary.histogram('surrogate_loss', surrogate_loss),
                 tf.summary.histogram('kl_penalty', kl_penalty),
                 tf.summary.histogram('kl_cutoff', kl_cutoff),

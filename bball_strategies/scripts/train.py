@@ -1,7 +1,7 @@
 
 """ Script to train
 Command Line:
-    python3 -m TODO
+    python3 -m bball_strategies.scripts.train
 """
 
 from __future__ import absolute_import

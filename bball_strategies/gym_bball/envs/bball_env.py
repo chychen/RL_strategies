@@ -59,9 +59,9 @@ import copy
 import sys
 from bball_strategies.gym_bball import tools
 """
-# TODO
+# NOTE
 # 把一些環境資訊物件化
-# check what is the screen range?
+# check if the screen range reasonable?
 # screen_radius = circle with radius 2.0 feets (about 0.61 meter)
 # wingspan_radius = circle with radius 3.5 feets (about 1.06 meter)
 # stolen_radius = circle with radius 5.0 feets (about 1.52 meter)
@@ -124,7 +124,7 @@ class BBallEnv(gym.Env):
         self.screen_radius = 2.0 * 2
         self.wingspan_radius = 3.5
         self.stolen_radius = 5.0
-        # physics limitations TODO per frame
+        # physics limitations per frame
         self.ball_passing_speed = 35.0 / FPS
         self.pl_max_speed = 38.9379818754 / FPS
         # cost at least one second to cross over the opponent
@@ -205,7 +205,6 @@ class BBallEnv(gym.Env):
             elif self.states.status == STATUS_LOOKUP['OOT']:
                 logger.debug(
                     '[GAME OVER], Max time limit for the episode is reached')
-                # reward = self._calculate_reward() TODO
                 reward = -1.0
                 pass
         else:

@@ -95,7 +95,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
     - policy : [Categorical(3), CustomKLDiagNormal(11), CustomKLDiagNormal(10)]
     - value : [off_value, def_value]
 
-    TODO
+    NOTE
     maybe softmax will limit the exploration ability
     tf.contrib.distributions.TransformedDistribution 或許可考慮？！
     because the action space might? like lognormal? than gaussian
@@ -162,7 +162,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                         directions = tf.layers.dense(
                             inputs=off_fc,
                             units=6,
-                            activation=tf.tanh,  # TODO tanh is not good?
+                            activation=tf.tanh,  # NOTE tanh is not good?
                             kernel_initializer=init_output_weights,
                         )
                     off_actions_mean = tf.concat(
@@ -244,7 +244,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                         directions = tf.layers.dense(
                             inputs=def_fc,
                             units=5,
-                            activation=tf.tanh,  # TODO tanh is not good?
+                            activation=tf.tanh,  # NOTE tanh is not good?
                             kernel_initializer=init_output_weights,
                         )
                     def_actions_mean = tf.concat(
