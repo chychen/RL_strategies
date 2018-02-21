@@ -1,3 +1,4 @@
+
 """ Define the basketball game environment with continuous state spaces and continuous, discrete action spaces, containing two agents:
 1. offensive team (and ball):
     - actions:
@@ -171,11 +172,11 @@ class BBallEnv(gym.Env):
             self._update_player_state(
                 def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
 
-        # check if meets termination condition
-        if decision == DESICION_LOOKUP['SHOOT']:
+        # check if meets termination condition TODO
+        if decision == DESICION_LOOKUP['SHOOT'] and self.states.steps >= 10*FPS*2:
             self.states.update_status(done=True, status=STATUS_LOOKUP['SHOOT'])
         # OOB
-        oob_padding = 5
+        oob_padding = 3
         if self.states.ball_position[0] >= self.court_length + oob_padding or self.states.ball_position[0] < self.court_length / 2 - oob_padding or self.states.ball_position[1] >= self.court_width + oob_padding or self.states.ball_position[1] < 0.0 - oob_padding:
             self.states.update_status(done=True, status=STATUS_LOOKUP['OOB'])
         # OOT
@@ -204,7 +205,8 @@ class BBallEnv(gym.Env):
             elif self.states.status == STATUS_LOOKUP['OOT']:
                 logger.debug(
                     '[GAME OVER], Max time limit for the episode is reached')
-                reward = self._calculate_reward()
+                # reward = self._calculate_reward() TODO
+                reward = -1.0
                 pass
         else:
             if self.states.status == STATUS_LOOKUP['PASS']:
@@ -305,8 +307,8 @@ class BBallEnv(gym.Env):
             from gym.envs.classic_control import rendering
         if not self.if_vis_trajectory:
             if self.viewer is None:
-                self.viewer = rendering.Viewer(940, 500)
-                self.viewer.set_bounds(0, 94, 0, 50)  # feet
+                self.viewer = rendering.Viewer(940+100, 500+100)
+                self.viewer.set_bounds(0-5, 94+5, 0-5, 50+5)  # feet
                 # background img
                 fname = path.join(path.dirname(__file__), "fullcourt.png")
                 img = rendering.Image(fname, 94, 50)
@@ -501,8 +503,14 @@ class BBallEnv(gym.Env):
         # ))
 
         # boundries are defined in self.states._clip_state(pos)
-        return spaces.Box(low=-np.inf, high=np.inf, shape=(10, 14, 2), dtype=np.float32)
+        # return spaces.Box(low=-np.inf, high=np.inf, shape=(10, 14, 2), dtype=np.float32)
         # return spaces.Box(low=-np.inf, high=np.inf, shape=(5, 14, 2), dtype=np.float32)
+        
+        low_ = np.array([self.court_length//2-5, 0-5]) * \
+            np.ones(shape=[10, 14, 2])
+        high_ = np.array([50+5, 94+5]) * \
+            np.ones(shape=[10, 14, 2])
+        return spaces.Box(low=low_, high=high_, dtype=np.float32)
 
     def _update_player_state(self, pl_dash, vels, state_idx):
         """ Update the player's movement following the physics limitation predefined
@@ -532,7 +540,7 @@ class BBallEnv(gym.Env):
         pl_vels = np.add(vels[state_idx], pl_acc_vec)
         pl_speed = length(pl_vels, axis=1)
         # can't not exceed the limits
-        indices = np.argwhere(pl_speed > self.pl_max_speed)
+        indices = np.argwhere(pl_speed >= self.pl_max_speed)
         pl_vels[indices] = pl_vels[indices] / \
             np.stack([pl_speed[indices], pl_speed[indices]],
                      axis=-1) * self.pl_max_speed
@@ -645,11 +653,6 @@ class BBallEnv(gym.Env):
             offensive team's decision, including SHOOT, NOOP, and PASS.
         """
         if self.states.is_passing:
-            # # ball update with the same velocity
-            # self.states.is_passing[STATE_LOOKUP['BALL']
-            #            ] = self.states.is_passing[STATE_LOOKUP['BALL']] + self.states.ball_vel
-            # # TODO if decision == DESICION_LOOKUP['SHOOT'] or decision == DESICION_LOOKUP['PASS'] return negative reward
-
             # check if ball caught/stolen
             # Prerequisites:
             # 1. if any defenders is close enough to offender (depend on stolen_radius)
@@ -670,21 +673,19 @@ class BBallEnv(gym.Env):
                 if value['distance'] <= self.stolen_radius:
                     if length(def2oldball_vecs[value['idx']], axis=0) <= length(off2oldball_vecs[key], axis=0):
                         candidates.append(value['idx'])
-
+            # TODO skip
             # 3. if any in (2), check is any defender able to fetch ball (depend on defender's wingspan_radius), then go (5)
             def_zone_idx = None
-            if len(candidates) != 0:
-                def_zone_idx, _ = self._find_zone_idx(
-                    next_ball_pos, ball_pos, self.states.ball_vel, self.states.defense_positions[candidates], self.wingspan_radius)
-            # 5. if any candidates, choose the best catcher among them
-                if def_zone_idx is not None:
-                    # assign catcher pos to ball pos
-                    self.states.update_ball(self.states.defense_positions[candidates][def_zone_idx],
-                                            None, False, [0, 0])
-                    # TODO if if_def_catch_ball:
-                    # game ends with negative reward to offense, positive reward to defense
-                    self.states.update_status(
-                        done=True, status=STATUS_LOOKUP['CAPTURED'])
+            # if len(candidates) != 0:
+            #     def_zone_idx, _ = self._find_zone_idx(
+            #         next_ball_pos, ball_pos, self.states.ball_vel, self.states.defense_positions[candidates], self.wingspan_radius)
+            # # 5. if any candidates, choose the best catcher among them
+            #     if def_zone_idx is not None:
+            #         # assign catcher pos to ball pos
+            #         self.states.update_ball(self.states.defense_positions[candidates][def_zone_idx],
+            #                                 None, False, [0, 0])
+            #         self.states.update_status(
+            #             done=True, status=STATUS_LOOKUP['CAPTURED'])
             # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
             off_zone_idx = None
             if len(candidates) == 0 or (def_zone_idx is None):
@@ -843,9 +844,9 @@ class States(object):
 
     def _clip_state(self, pos):
         pos[0] = self.x_low_bound if pos[0] < self.x_low_bound else pos[0]
-        pos[0] = self.x_high_bound if pos[0] > self.x_high_bound else pos[0]
+        pos[0] = self.x_high_bound if pos[0] >= self.x_high_bound else pos[0]
         pos[1] = self.y_low_bound if pos[1] < self.y_low_bound else pos[1]
-        pos[1] = self.y_high_bound if pos[1] > self.y_high_bound else pos[1]
+        pos[1] = self.y_high_bound if pos[1] >= self.y_high_bound else pos[1]
         return pos
 
     @property

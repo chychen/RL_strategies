@@ -1,3 +1,4 @@
+
 # Copyright 2017 The TensorFlow Agents Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,7 +31,7 @@ from agents import tools
 
 def capped_cubic_video_schedule(episode_id):
     if episode_id < 1000:
-        return episode_id % 10 == 0
+        return episode_id % 100 == 0
     else:
         return episode_id % 1000 == 0
 

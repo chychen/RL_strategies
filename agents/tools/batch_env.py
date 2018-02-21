@@ -1,3 +1,4 @@
+
 # Copyright 2017 The TensorFlow Agents Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -82,7 +83,7 @@ class BatchEnv(object):
         Returns:
           Batch of observations, rewards, and done flags.
         """
-        ## no need to check action, because action will get force-clip before step()
+        # no need to check action, because action will get force-clip before step()
         # for index, (env, action) in enumerate(zip(self._envs, actions)):
         #     if not env.action_space.contains(action):
         #         message = 'Invalid action at index {}: {}'

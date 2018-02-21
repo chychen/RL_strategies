@@ -56,7 +56,7 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
         logdir, graph.step, graph.should_log, graph.do_report,
         graph.force_reset)
     loop.add_phase(
-        'train_offense', graph.done, graph.score, graph.summary, train_steps,
+        'train_offense', graph.done, graph.score, graph.summary, train_steps*1000,
         report_every=train_steps,
         log_every=train_steps,
         checkpoint_every=None,
@@ -69,13 +69,13 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
     #     checkpoint_every=None,
     #     feed={graph.is_training: True,
     #           graph.is_optimizing_offense: True})
-    loop.add_phase(
-        'eval_offense', graph.done, graph.score, graph.summary, eval_steps,
-        report_every=eval_steps,
-        log_every=eval_steps,
-        checkpoint_every=10 * eval_steps,
-        feed={graph.is_training: False,
-              graph.is_optimizing_offense: True})
+    # loop.add_phase(
+    #     'eval_offense', graph.done, graph.score, graph.summary, eval_steps,
+    #     report_every=eval_steps,
+    #     log_every=eval_steps,
+    #     checkpoint_every=10 * eval_steps,
+    #     feed={graph.is_training: False,
+    #           graph.is_optimizing_offense: True})
     # loop.add_phase(
     #     'eval_defense', graph.done, graph.score, graph.summary, eval_steps,
     #     report_every=eval_steps,

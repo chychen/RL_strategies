@@ -259,8 +259,8 @@ def main():
     # moving_around()
     # maxspeed()
     # ball_stealing()
-    move_offense_right()
-    # random_dancing()
+    # move_offense_right()
+    random_dancing()
 
     env.close()
 
