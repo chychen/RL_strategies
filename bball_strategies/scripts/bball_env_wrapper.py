@@ -6,11 +6,12 @@ from __future__ import print_function
 
 import numpy as np
 from gym import spaces
+from bball_strategies.gym_bball import tools
 
 
 class BBallWrapper(object):
 
-    def __init__(self, env, init_mode=1, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, fps=5, time_limit=240):
+    def __init__(self, env, if_norm_obs=True, if_norm_act=True, init_mode=1, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, fps=5, time_limit=240):
         """
         Args
         ----
@@ -31,7 +32,7 @@ class BBallWrapper(object):
         self._env.time_limit = time_limit
 
         self._env = ConvertTo32Bit(self._env)
-        # TODO normalization
+        self._env = RangeNormalize(self._env, observ=if_norm_obs, action=if_norm_act)
 
     def __getattr__(self, name):
         return getattr(self._env, name)
@@ -39,13 +40,13 @@ class BBallWrapper(object):
     def reset(self):
         return self._env.reset()
 
-    @property
-    def action_space(self):
-        """
-        to walk around for value range validation, we will force clip action value before step()
-        """
-        shape = self._env.action_space.shape  # (11,2)
-        return spaces.Box(-np.inf * np.ones(shape), np.inf * np.ones(shape), dtype=np.float32)
+    # @property
+    # def action_space(self):
+    #     """
+    #     to walk around for value range validation, we will force clip action value before step()
+    #     """
+    #     shape = self._env.action_space.shape  # (11,2)
+    #     return spaces.Box(-np.inf * np.ones(shape), np.inf * np.ones(shape), dtype=np.float32)
 
     def step(self, action):
         """
@@ -63,69 +64,89 @@ class BBallWrapper(object):
         return self._env.step(action)
 
 
-# class RangeNormalize(object):
-#     """ TODO Normalize the specialized observation and action ranges to [-1, 1]."""
+class RangeNormalize(object):
+    """ Normalize the specialized observation and action ranges to [-1, 1]."""
 
-#     def __init__(self, env, observ=None, action=None):
-#         self._env = env
-#         self._should_normalize_observ = (
-#             observ is not False and self._is_finite(self._env.observation_space))
-#         if observ is True and not self._should_normalize_observ:
-#             raise ValueError('Cannot normalize infinite observation range.')
-#         if observ is None and not self._should_normalize_observ:
-#             tf.logging.info('Not normalizing infinite observation range.')
-#         self._should_normalize_action = (
-#             action is not False and self._is_finite(self._env.action_space))
-#         if action is True and not self._should_normalize_action:
-#             raise ValueError('Cannot normalize infinite action range.')
-#         if action is None and not self._should_normalize_action:
-#             tf.logging.info('Not normalizing infinite action range.')
+    def __init__(self, env, observ=None, action=None):
+        self._env = env
+        # validate
+        self._should_normalize_observ = (
+            observ is not False and self._is_finite(self._env.observation_space))
+        if observ is True and not self._should_normalize_observ:
+            raise ValueError('Cannot normalize infinite observation range.')
+        if observ is None and not self._should_normalize_observ:
+            tf.logging.info('Not normalizing infinite observation range.')
+        self._should_normalize_action = (
+            action is not False and self._is_finite(self._env.action_space))
+        if action is True and not self._should_normalize_action:
+            raise ValueError('Cannot normalize infinite action range.')
+        if action is None and not self._should_normalize_action:
+            tf.logging.info('Not normalizing infinite action range.')
 
-#     def __getattr__(self, name):
-#         return getattr(self._env, name)
+    def __getattr__(self, name):
+        return getattr(self._env, name)
 
-#     @property
-#     def observation_space(self):
-#         space = self._env.observation_space
-#         if not self._should_normalize_observ:
-#             return space
-#         return gym.spaces.Box(-np.ones(space.shape), np.ones(space.shape))
+    @property
+    def observation_space(self):
+        space = self._env.observation_space
+        if not self._should_normalize_observ:
+            return space
+        return spaces.Box(-np.ones(space.shape), np.ones(space.shape), dtype=np.float32)
 
-#     @property
-#     def action_space(self):
-#         space = self._env.action_space
-#         if not self._should_normalize_action:
-#             return space
-#         return gym.spaces.Box(-np.ones(space.shape), np.ones(space.shape))
+    @property
+    def action_space(self):
+        space = self._env.action_space
+        if not self._should_normalize_action:
+            return space
+        return tools.ActTuple((
+            spaces.Discrete(3),  # offensive decision
+            # ball theta
+            spaces.Box(-np.ones(space[1].shape), np.ones(space[1].shape), dtype=np.float32),
+            # offense player DASH(power, direction)
+            spaces.Box(-np.ones(space[2].shape), np.ones(space[2].shape), dtype=np.float32),
+            # defense player DASH(power, direction)
+            spaces.Box(-np.ones(space[3].shape), np.ones(space[3].shape), dtype=np.float32)
+        ))
 
-#     def step(self, action):
-#         if self._should_normalize_action:
-#             action = self._denormalize_action(action)
-#         observ, reward, done, info = self._env.step(action)
-#         if self._should_normalize_observ:
-#             observ = self._normalize_observ(observ)
-#         return observ, reward, done, info
+    def step(self, action):
+        if self._should_normalize_action:
+            action = self._denormalize_action(action)
+        observ, reward, done, info = self._env.step(action)
+        if self._should_normalize_observ:
+            observ = self._normalize_observ(observ)
+        return observ, reward, done, info
 
-#     def reset(self):
-#         observ = self._env.reset()
-#         if self._should_normalize_observ:
-#             observ = self._normalize_observ(observ)
-#         return observ
+    def reset(self):
+        observ = self._env.reset()
+        if self._should_normalize_observ:
+            observ = self._normalize_observ(observ)
+        return observ
 
-#     def _denormalize_action(self, action):
-#         min_ = self._env.action_space.low
-#         max_ = self._env.action_space.high
-#         action = (action + 1) / 2 * (max_ - min_) + min_
-#         return action
+    def _denormalize_action(self, action):
+        # skip discrete item (self._env.action_space[0])
+        for i in [1,2,3]:
+            min_ = self._env.action_space[i].low
+            max_ = self._env.action_space[i].high
+            action[i] = (action[i] + 1) / 2 * (max_ - min_) + min_
+        return action
 
-#     def _normalize_observ(self, observ):
-#         min_ = self._env.observation_space.low
-#         max_ = self._env.observation_space.high
-#         observ = 2 * (observ - min_) / (max_ - min_) - 1
-#         return observ
+    def _normalize_observ(self, observ):
+        min_ = self._env.observation_space.low
+        max_ = self._env.observation_space.high
+        observ = 2 * (observ - min_) / (max_ - min_) - 1
+        return observ
 
-#     def _is_finite(self, space):
-#         return np.isfinite(space.low).all() and np.isfinite(space.high).all()
+    def _is_finite(self, space):
+        check = True
+        if hasattr(space, 'low'):  # observation is Box
+            check = np.isfinite(space.low).all(
+            ) and np.isfinite(space.high).all()
+        else:  # action is ActTuple
+            check = check and space[0].dtype==np.int64  # Discrete
+            for i in [1,2,3]:
+                check = check and np.isfinite(space[i].low).all(
+                ) and np.isfinite(space[i].high).all()  # Box
+        return check
 
 
 class ConvertTo32Bit(object):

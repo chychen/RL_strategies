@@ -37,6 +37,9 @@ class ActTuple(Space):
         for v in list(self.spaces):
             yield v
 
+    def __getitem__(self, idx):
+        return self.spaces[idx]
+
     # Extended
     @property
     def shape(self):
