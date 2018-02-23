@@ -155,7 +155,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                         powers = tf.layers.dense(
                             inputs=off_fc,
                             units=5,
-                            activation=tf.nn.relu,
+                            activation=tf.tanh,  # NOTE tanh is not good?
                             kernel_initializer=init_output_weights,
                         )
                     with tf.variable_scope('directions'):
@@ -237,7 +237,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                         powers = tf.layers.dense(
                             inputs=def_fc,
                             units=5,
-                            activation=tf.nn.relu,
+                            activation=tf.tanh,  # NOTE tanh is not good?
                             kernel_initializer=init_output_weights,
                         )
                     with tf.variable_scope('directions'):
