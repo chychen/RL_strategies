@@ -44,7 +44,7 @@ def default():
     kl_cutoff_coef = 1000
     kl_init_penalty = 1
 #   gae_lambda = None
-#   entropy_regularization = None
+    entropy_regularization = None
     # Environment
     env = 'bball-v0'
     FPS = 5

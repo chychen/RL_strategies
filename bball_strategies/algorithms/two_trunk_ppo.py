@@ -113,44 +113,59 @@ class TWO_TRUNK_PPO(object):
             with tf.device('/gpu:0' if self._use_gpu else '/cpu:0'):
                 output = self._network(
                     observ[:, None], tf.ones(observ.shape[0]), state)
-            # offense turn sample
-            off_turn_sample = tf.concat([
+            # # offense turn sample
+            # off_turn_sample = tf.concat([
+            #     tf.cast(output.policy[ACT['DECISION']].sample()[
+            #             :, :, None], tf.float32),
+            #     output.policy[ACT['OFF_DASH']].sample(),
+            #     tf.zeros(shape=[observ.shape[0], 1, 10])], axis=2)
+            # off_turn_mode = tf.concat([
+            #     tf.cast(output.policy[ACT['DECISION']].mode()[
+            #             :, :, None], tf.float32),
+            #     output.policy[ACT['OFF_DASH']].mode(),
+            #     tf.zeros(shape=[observ.shape[0], 1, 10])], axis=2)
+            # # defense turn policy
+            # def_turn_sample = tf.concat([
+            #     tf.zeros(shape=[observ.shape[0], 1, 1]),
+            #     tf.zeros(shape=[observ.shape[0], 1, 11]),
+            #     output.policy[ACT['DEF_DASH']].sample()], axis=2)
+            # def_turn_mode = tf.concat([
+            #     tf.zeros(shape=[observ.shape[0], 1, 1]),
+            #     tf.zeros(shape=[observ.shape[0], 1, 11]),
+            #     output.policy[ACT['DEF_DASH']].mode()], axis=2)
+            # sample_ = tf.where(tf.equal(turn_info, 0),
+            #                    off_turn_sample, def_turn_sample)
+            # mode_ = tf.where(tf.equal(turn_info, 0),
+            #                  off_turn_mode, def_turn_mode)
+            # action = tf.where(
+            #     self._is_training, sample_, mode_)
+            # action = tf.reshape(action, shape=[observ.shape[0], 11, 2])
+
+            # policy
+            sample_ = tf.concat([
                 tf.cast(output.policy[ACT['DECISION']].sample()[
-                        :, :, None], tf.float32),
+                    :, :, None], tf.float32),
                 output.policy[ACT['OFF_DASH']].sample(),
-                tf.zeros(shape=[observ.shape[0], 1, 10])], axis=2)
-            off_turn_mode = tf.concat([
+                output.policy[ACT['DEF_DASH']].sample()], axis=2)
+            mode_ = tf.concat([
                 tf.cast(output.policy[ACT['DECISION']].mode()[
                         :, :, None], tf.float32),
                 output.policy[ACT['OFF_DASH']].mode(),
-                tf.zeros(shape=[observ.shape[0], 1, 10])], axis=2)
-            # defense turn policy
-            def_turn_sample = tf.concat([
-                tf.zeros(shape=[observ.shape[0], 1, 1]),
-                tf.zeros(shape=[observ.shape[0], 1, 11]),
-                output.policy[ACT['DEF_DASH']].sample()], axis=2)
-            def_turn_mode = tf.concat([
-                tf.zeros(shape=[observ.shape[0], 1, 1]),
-                tf.zeros(shape=[observ.shape[0], 1, 11]),
                 output.policy[ACT['DEF_DASH']].mode()], axis=2)
-            sample_ = tf.where(tf.equal(turn_info, 0),
-                               off_turn_sample, def_turn_sample)
-            mode_ = tf.where(tf.equal(turn_info, 0),
-                             off_turn_mode, def_turn_mode)
-            action = tf.where(
+            action_w = tf.where(
                 self._is_training, sample_, mode_)
-            action = tf.reshape(action, shape=[observ.shape[0], 11, 2])
-
+            action = tf.reshape(
+                action_w, shape=[tf.shape(action_w)[0], tf.shape(action_w)[1], 11, 2])
             # summary = str()
             # TODO log prob
             # logprob = output.policy.log_prob(action)
             # pylint: disable=g-long-lambda
             summary = tf.cond(self._should_log, lambda: tf.summary.merge([
                 tf.summary.histogram('mode', mode_),
-                tf.summary.histogram('DECISION', action[:, 0, 0]),
-                tf.summary.histogram('PASS_ANG', action[:, 0, 1]),
-                tf.summary.histogram('OFF_DASH', action[:, 1:6]),
-                tf.summary.histogram('DEF_DASH', action[:, 6:11]),
+                tf.summary.histogram('DECISION', action[:, 0, 0, 0]),
+                tf.summary.histogram('PASS_ANG', action[:, 0, 0, 1]),
+                tf.summary.histogram('OFF_DASH', action[:, 0, 1:6]),
+                tf.summary.histogram('DEF_DASH', action[:, 0, 6:11]),
                 # ,
                 # tf.summary.histogram('logprob', logprob)
             ]), str)
@@ -162,29 +177,28 @@ class TWO_TRUNK_PPO(object):
                 assign_state = utility.assign_nested_vars(
                     self._last_state, output.state, agent_indices)
             remember_last_action = tf.scatter_update(
-                self._last_action, agent_indices, action)
+                self._last_action, agent_indices, action[:, 0])
 
             def is_tensor(x):
                 return isinstance(x, tf.Tensor)
 
-            def set_batch_dim(x):
-                return utility.set_dimension(
-                    x, 0, len(self._batch_env))
-
             policy_params = []
+            remember_last_policy = tuple()
             for i in range(3):
                 policy_params.append(tools.nested.filter(
                     is_tensor, output.policy[i].parameters))
-                tools.nested.map(set_batch_dim, policy_params[i])
-
+                remember_last_policy += tools.nested.map(
+                    lambda var, val: tf.scatter_update(
+                        var, agent_indices, val[:, 0]),
+                    self._last_policy[i], policy_params[i], flatten=True)
             assert policy_params, 'Policy has no parameters to store.'
-            remember_last_policy = tools.nested.map(
-                lambda var, val: tf.scatter_update(
-                    var, agent_indices, val[:, 0]),
-                self._last_policy, policy_params, flatten=True)
+            # remember_last_policy = tools.nested.map(
+            #     lambda var, val: tf.scatter_update(
+            #         var, agent_indices, val[:, 0]),
+            #     self._last_policy, policy_params, flatten=True)
             with tf.control_dependencies((
                     assign_state, remember_last_action) + remember_last_policy):
-                return action, tf.identity(summary)
+                return action[:, 0], tf.identity(summary)
 
     def experience(
             self, agent_indices, observ, action, reward, unused_done, unused_nextob, turn_info):
@@ -516,6 +530,7 @@ class TWO_TRUNK_PPO(object):
             value = self._network(observ, length).value
             value = tf.where(self._is_optimizing_offense,
                              value[TEAM['OFFENSE']], value[TEAM['DEFENSE']])
+            # TODO calcuate either offense or defense (doesn't matter, because defensive turn always get zeros for reward, rewards are from offensive turn)
             return_ = utility.discounted_return(
                 reward, length, self._config.discount)
             advantage = return_ - value
@@ -563,8 +578,10 @@ class TWO_TRUNK_PPO(object):
 
             def get_policy_gradient(category):
                 return tf.exp(policy[category].log_prob(action_policy_format[category]) - old_policy[category].log_prob(action_policy_format[category]))
-            off_policy_gradient = (get_policy_gradient(
-                ACT['DECISION']) + get_policy_gradient(ACT['OFF_DASH'])) / 2.0  # NOTE: weighted sum maybe
+            off_deci_grad = get_policy_gradient(ACT['DECISION'])
+            off_dash_grad = get_policy_gradient(ACT['OFF_DASH'])
+            # NOTE: weighted sum maybe
+            off_policy_gradient = (off_deci_grad + off_dash_grad) / 2.0
             def_policy_gradient = get_policy_gradient(ACT['DEF_DASH'])
             policy_gradient = tf.where(
                 self._is_optimizing_offense, off_policy_gradient, def_policy_gradient)
@@ -574,7 +591,8 @@ class TWO_TRUNK_PPO(object):
 
             off_deci_kl = get_kl_divergence(ACT['DECISION'])
             off_dash_kl = get_kl_divergence(ACT['OFF_DASH'])
-            off_kl = (off_deci_kl + off_dash_kl) / 2.0  # NOTE: weighted sum maybe
+            # NOTE: weighted sum maybe
+            off_kl = (off_deci_kl + off_dash_kl) / 2.0
             def_kl = get_kl_divergence(ACT['DEF_DASH'])
             kl = tf.where(self._is_optimizing_offense, off_kl, def_kl)
             # Infinite values in the KL, even for padding frames that we mask out,
@@ -612,12 +630,20 @@ class TWO_TRUNK_PPO(object):
                 policy_loss -= self._config.entropy_regularization * entropy
             summary = tf.summary.merge([
                 tf.summary.histogram('entropy', entropy),
-                tf.summary.histogram('kl', kl),
-                tf.summary.histogram('off_deci_kl', off_deci_kl),
-                tf.summary.histogram('off_dash_kl', off_dash_kl),
-                tf.summary.histogram('off_kl', off_kl),
-                tf.summary.histogram('def_kl', def_kl),
+                # policy gradient # importance sampling
+                tf.summary.histogram(
+                    'policy_gradient_importance_sampling', policy_gradient),
                 tf.summary.histogram('surrogate_loss', surrogate_loss),
+                # kl
+                tf.summary.histogram('kl', kl),
+                tf.summary.histogram('off_deci_kl', tf.reduce_mean(
+                    self._mask(off_deci_kl, length), 1)),
+                tf.summary.histogram('off_dash_kl', tf.reduce_mean(
+                    self._mask(off_dash_kl, length), 1)),
+                tf.summary.histogram('off_kl', tf.reduce_mean(
+                    self._mask(off_kl, length), 1)),
+                tf.summary.histogram('def_kl', tf.reduce_mean(
+                    self._mask(def_kl, length), 1)),
                 tf.summary.histogram('kl_penalty', kl_penalty),
                 tf.summary.histogram('kl_cutoff', kl_cutoff),
                 tf.summary.histogram('kl_penalty_combined',
