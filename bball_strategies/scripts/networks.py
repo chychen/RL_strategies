@@ -100,7 +100,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
     tf.contrib.distributions.TransformedDistribution 或許可考慮？！
     because the action space might? like lognormal? than gaussian
     """
-    # observation space = shape=(batch_size, episode_length, 5, 14, 2)
+    # observation space = shape=(batch_size, episode_length, 10, 14, 2)
     # action space = shape=(batch, episode_length, 11, 2)
     batch_size = tf.shape(observations)[0]
     episode_len = tf.shape(observations)[1]

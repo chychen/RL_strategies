@@ -125,7 +125,7 @@ class BBallEnv(gym.Env):
         self.wingspan_radius = 3.5
         self.stolen_radius = 5.0
         # physics limitations per frame
-        self.ball_passing_speed = 35.0 / FPS
+        self.ball_passing_speed = 40.0 / FPS
         self.pl_max_speed = 38.9379818754 / FPS
         # cost at least one second to cross over the opponent
         self.pl_collision_speed = self.screen_radius / FPS
