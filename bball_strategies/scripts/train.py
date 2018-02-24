@@ -126,7 +126,7 @@ def train(config, env_processes, outdir):
         if FLAGS.debug:
             sess = tf_debug.LocalCLIDebugWrapperSession(
                 sess, ui_type=FLAGS.ui_type)
-        utility.initialize_variables(sess, saver, config.logdir)
+        utility.initialize_variables(sess, saver, config.logdir, resume=FLAGS.resume)
         for score in loop.run(sess, saver, total_steps):
             yield score
     batch_env.close()
@@ -138,8 +138,11 @@ def main(_):
     utility.set_up_logging()
     if not FLAGS.config:
         raise KeyError('You must specify a configuration.')
-    logdir = FLAGS.logdir and os.path.expanduser(os.path.join(
-        FLAGS.logdir, '{}-{}'.format(FLAGS.timestamp, FLAGS.config)))
+    if not FLAGS.resume:
+        logdir = FLAGS.logdir and os.path.expanduser(os.path.join(
+            FLAGS.logdir, '{}-{}'.format(FLAGS.timestamp, FLAGS.config)))
+    else:
+        logdir = FLAGS.logdir
     if FLAGS.vis:
         outdir = os.path.join(logdir, 'train_output')
     else:
@@ -173,6 +176,9 @@ if __name__ == '__main__':
     tf.app.flags.DEFINE_boolean(
         'debug', False,
         'whether to enable debug mode')
+    tf.app.flags.DEFINE_boolean(
+        'resume', False,
+        'whether to restore checkpoint in logdir')
     tf.app.flags.DEFINE_string(
         'ui_type', 'curses',
         "Command-line user interface type (curses | readline)")
