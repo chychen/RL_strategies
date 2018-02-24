@@ -1,3 +1,4 @@
+
 """ configuration using the PPO algorithm on BBall strategies"""
 
 from __future__ import absolute_import
@@ -54,6 +55,19 @@ def default():
     return locals()
 
 
-def bball_strategies():
+def example():
     locals().update(default())
+    return locals()
+
+
+def v2():
+    """
+    - larger batch size
+    - smaller max length (smaller buffer)
+    """
+    locals().update(default())
+    update_every = 500
+    update_epochs = 1
+    max_length = 10 * FPS * 2
+    steps = 1e10  # 1M
     return locals()

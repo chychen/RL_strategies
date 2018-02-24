@@ -173,7 +173,7 @@ class BBallEnv(gym.Env):
                 def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
 
         # check if meets termination condition TODO
-        if decision == DESICION_LOOKUP['SHOOT'] and self.states.steps >= 10*FPS*2:
+        if decision == DESICION_LOOKUP['SHOOT'] and self.states.steps >= 5*FPS*2:
             self.states.update_status(done=True, status=STATUS_LOOKUP['SHOOT'])
         # OOB
         oob_padding = 3
