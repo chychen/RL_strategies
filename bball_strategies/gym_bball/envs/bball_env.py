@@ -504,10 +504,10 @@ class BBallEnv(gym.Env):
         # return spaces.Box(low=-np.inf, high=np.inf, shape=(10, 14, 2), dtype=np.float32)
         # return spaces.Box(low=-np.inf, high=np.inf, shape=(5, 14, 2), dtype=np.float32)
 
-        low_ = np.array([self.court_length//2-5, 0-5]) * \
-            np.ones(shape=[10, 14, 2])
-        high_ = np.array([50+5, 94+5]) * \
-            np.ones(shape=[10, 14, 2])
+        low_ = np.array([self.states.x_low_bound, self.states.y_low_bound]) * \
+            np.ones(shape=[self.buffer_size, 14, 2])
+        high_ = np.array([self.states.x_high_bound, self.states.y_high_bound]) * \
+            np.ones(shape=[self.buffer_size, 14, 2])
         return spaces.Box(low=low_, high=high_, dtype=np.float32)
 
     def _update_player_state(self, pl_dash, vels, state_idx):
@@ -791,9 +791,8 @@ class States(object):
     def reset(self, positions, ball_handler_idx, buffer_size=5):
         self.turn = FLAG_LOOPUP['OFFENSE']
         self.positions = positions
-        self.buffer_positions = np.tile(np.array([np.zeros_like(positions[0], dtype=np.float32), np.zeros_like(
-            positions[1], dtype=np.float32), np.zeros_like(positions[2], dtype=np.float32)]), [buffer_size, 1])
-        self.buffer_positions[-1] = self.positions  # first frame
+        # fill all with first frames
+        self.buffer_positions = np.tile(positions, [buffer_size, 1])
         self.vels = np.array([np.zeros_like(positions[0], dtype=np.float32), np.zeros_like(
             positions[1], dtype=np.float32), np.zeros_like(positions[2], dtype=np.float32)])
         self.done = False
