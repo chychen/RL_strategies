@@ -11,6 +11,7 @@ import tensorflow as tf
 from bball_strategies import algorithms
 from bball_strategies.scripts import networks
 
+FPS = 5
 
 def default():
     """Default configuration for PPO."""
@@ -48,7 +49,6 @@ def default():
     entropy_regularization = None
     # Environment
     env = 'bball-v0'
-    FPS = 5
     max_length = 24 * FPS * 2
     steps = 1e6  # 1M
 

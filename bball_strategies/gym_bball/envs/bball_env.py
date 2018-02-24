@@ -136,7 +136,7 @@ class BBallEnv(gym.Env):
 
         # Env information
         self.states = States()
-        self.buffer_size = 10  # 10 steps =  5 frames = 1 second
+        self.buffer_size = 5  # 5 frames = 1 second = 10 steps
 
         # must define properties
         self.action_space = self._set_action_space()
@@ -227,15 +227,14 @@ class BBallEnv(gym.Env):
         """
         obs = np.empty(shape=(self.buffer_size, 14, 2), dtype=np.float32)
         for i in range(self.buffer_size):
-            obs[i] = np.concatenate([np.expand_dims(
-                self.states.buffer_positions[i, STATE_LOOKUP['BALL']], axis=0),
+            obs[i] = np.concatenate([
+                np.expand_dims(
+                    self.states.buffer_positions[i, STATE_LOOKUP['BALL']], axis=0),
                 self.states.buffer_positions[i, STATE_LOOKUP['OFFENSE']],
                 self.states.buffer_positions[i, STATE_LOOKUP['DEFENSE']],
                 np.expand_dims(self.right_basket_pos, axis=0),
-                np.expand_dims(
-                [self.court_length / 2, 0], axis=0),
-                np.expand_dims(
-                [self.court_length, self.court_width], axis=0)
+                np.expand_dims([self.court_length / 2, 0], axis=0),
+                np.expand_dims([self.court_length, self.court_width], axis=0)
             ], axis=0)
         return obs
 
@@ -504,7 +503,7 @@ class BBallEnv(gym.Env):
         # boundries are defined in self.states._clip_state(pos)
         # return spaces.Box(low=-np.inf, high=np.inf, shape=(10, 14, 2), dtype=np.float32)
         # return spaces.Box(low=-np.inf, high=np.inf, shape=(5, 14, 2), dtype=np.float32)
-        
+
         low_ = np.array([self.court_length//2-5, 0-5]) * \
             np.ones(shape=[10, 14, 2])
         high_ = np.array([50+5, 94+5]) * \
@@ -789,11 +788,12 @@ class States(object):
         self.y_high_bound = 50.0 + self.clip_padding
         self.y_low_bound = 0 - self.clip_padding
 
-    def reset(self, positions, ball_handler_idx, buffer_size=10):
+    def reset(self, positions, ball_handler_idx, buffer_size=5):
         self.turn = FLAG_LOOPUP['OFFENSE']
         self.positions = positions
         self.buffer_positions = np.tile(np.array([np.zeros_like(positions[0], dtype=np.float32), np.zeros_like(
             positions[1], dtype=np.float32), np.zeros_like(positions[2], dtype=np.float32)]), [buffer_size, 1])
+        self.buffer_positions[-1] = self.positions  # first frame
         self.vels = np.array([np.zeros_like(positions[0], dtype=np.float32), np.zeros_like(
             positions[1], dtype=np.float32), np.zeros_like(positions[2], dtype=np.float32)])
         self.done = False
@@ -823,12 +823,27 @@ class States(object):
         self.vels[team_id][pl_idx] = vel
 
     def take_turn(self):
+        """
+        self.buffer_positions : 
+        t : index of frame
+        if offensive turn : [ball,off,def] 5 frames as obs -> [t-4, t-4, t-5],[t-3, t-3, t-4],[t-2, t-2, t-3],[t-1, t-1, t-2],[t-0, t-0, t-1]
+        if defensive turn : [ball,off,def] 5 frames as obs -> [t-4, t-4, t-4],[t-3, t-3, t-3],[t-2, t-2, t-2],[t-1, t-1, t-1],[t-0, t-0, t-0]
+        """
+        def update_buffer(team_idx):
+            for last_pos, pos in zip(self.buffer_positions[:-1], self.buffer_positions[1:]):
+                if team_idx==STATE_LOOKUP['OFFENSE']:
+                    last_pos[STATE_LOOKUP['BALL']] = copy.deepcopy(pos[STATE_LOOKUP['BALL']])
+                last_pos[team_idx] = copy.deepcopy(pos[team_idx])
+            if team_idx==STATE_LOOKUP['OFFENSE']:
+                self.buffer_positions[-1][STATE_LOOKUP['BALL']] = copy.deepcopy(self.positions[STATE_LOOKUP['BALL']])
+            self.buffer_positions[-1][team_idx] = copy.deepcopy(self.positions[team_idx])
+        team_idx = STATE_LOOKUP['OFFENSE'] if self.turn == FLAG_LOOPUP['OFFENSE'] else STATE_LOOKUP['DEFENSE']
+        update_buffer(team_idx)
+
         self.turn = FLAG_LOOPUP['DEFENSE'] if self.turn == FLAG_LOOPUP['OFFENSE'] else FLAG_LOOPUP['OFFENSE']
         self.steps = self.steps + 1
         self.update_closest_map()
         self.status = None
-        self.buffer_positions = np.concatenate(
-            [copy.deepcopy(self.buffer_positions[1:]), copy.deepcopy(np.expand_dims(self.positions, axis=0))], axis=0)
 
     def update_status(self, done, status):
         self.done = done
