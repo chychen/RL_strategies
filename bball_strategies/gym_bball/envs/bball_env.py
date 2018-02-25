@@ -662,14 +662,17 @@ class BBallEnv(gym.Env):
         """
         if self.states.is_passing or decision == DESICION_LOOKUP['PASS']:
             if decision == DESICION_LOOKUP['PASS']:
-                assert self.states.is_passing == False
-                ball_pass_dir = np.clip(
-                    ball_pass_dir, -np.pi, np.pi)
-                new_vel = [self.ball_passing_speed * np.cos(ball_pass_dir),
-                        self.ball_passing_speed * np.sin(ball_pass_dir)]
-                self.states.update_ball(self.states.ball_position,
-                                        None, True, new_vel)
-                logger.debug('[BALL] Flying')
+                if self.states.is_passing:
+                    # maybe return negative reward!?
+                    logger.debug('[BALL] You cannot do PASS decision while ball is passing')
+                else:
+                    ball_pass_dir = np.clip(
+                        ball_pass_dir, -np.pi, np.pi)
+                    new_vel = [self.ball_passing_speed * np.cos(ball_pass_dir),
+                            self.ball_passing_speed * np.sin(ball_pass_dir)]
+                    self.states.update_ball(self.states.ball_position,
+                                            None, True, new_vel)
+                    logger.debug('[BALL] Start Flying')
             
             # check if ball caught/stolen
             # Prerequisites:
