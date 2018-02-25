@@ -18,8 +18,8 @@ class BBallWrapper(object):
         init_mode : 0->default, 1->dataset, 2->customized
 
         1. Convert to 32 bit
-        2. Clip actions
-        3. Normalize obs and action
+        2. Normalize obs and action
+        3. Clip actions (useless when applied normalized)
         time_limit : default value = 24 sec * 5 fps * 2 teams
         """
         self._env = env
@@ -48,20 +48,20 @@ class BBallWrapper(object):
     #     shape = self._env.action_space.shape  # (11,2)
     #     return spaces.Box(-np.inf * np.ones(shape), np.inf * np.ones(shape), dtype=np.float32)
 
-    def step(self, action):
-        """
-        action : shape=[Discrete(3), Box(), Box(5, 2), Box(5, 2)]
-        """
-        action_space = self._env.action_space  # Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
-        for i, space in enumerate(action_space):
-            if isinstance(space, spaces.Discrete):
-                pass
-            elif isinstance(space, spaces.Box):
-                action[i] = np.clip(action[i], space.low, space.high)
-            else:
-                raise ValueError(
-                    'action space is not defined, {}'.format(action[i]))
-        return self._env.step(action)
+    # def step(self, action):
+    #     """
+    #     action : shape=[Discrete(3), Box(), Box(5, 2), Box(5, 2)]
+    #     """
+    #     action_space = self._env.action_space  # Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
+    #     for i, space in enumerate(action_space):
+    #         if isinstance(space, spaces.Discrete):
+    #             pass
+    #         elif isinstance(space, spaces.Box):
+    #             action[i] = np.clip(action[i], space.low, space.high)
+    #         else:
+    #             raise ValueError(
+    #                 'action space is not defined, {}'.format(action[i]))
+    #     return self._env.step(action)
 
 
 class RangeNormalize(object):
