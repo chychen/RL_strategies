@@ -173,7 +173,7 @@ class BBallEnv(gym.Env):
                 def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
 
         # check if meets termination condition TODO
-        if decision == DESICION_LOOKUP['SHOOT'] and self.states.steps >= 5*FPS*2:
+        if decision == DESICION_LOOKUP['SHOOT'] and self.states.steps >= 2*FPS*2:
             self.states.update_status(done=True, status=STATUS_LOOKUP['SHOOT'])
         # OOB
         oob_padding = 3
@@ -562,7 +562,7 @@ class BBallEnv(gym.Env):
             zone_idx, mode = self._find_zone_idx(
                 next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius, team_id)
         # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
-            if zone_idx is not None and mode != MODE_LOOKUP['LEAVE-CATCH']:
+            if zone_idx is not None and mode != MODE_LOOKUP['PASS-OUT']:
                 logger.debug(
                     '[COLLISION] mode {}, {}-{} colide into {}-{}'.format(mode, state_idx, pl_idx, opp_idx, zone_idx))
                 if mode == MODE_LOOKUP['IN'] or mode == MODE_LOOKUP['IN-THEN-OUT']:
@@ -611,23 +611,15 @@ class BBallEnv(gym.Env):
             next_dotvalue = np.dot(next_vec, vel)
             dotvalue = np.dot(vec, vel)
             vec2zone_dist = length(vec, axis=0)
-            if vec2zone_dist <= zone_radius and dotvalue > 0.0:                    
+            if vec2zone_dist <= zone_radius and dotvalue > 0.0:
                 modes[i] = MODE_LOOKUP['IN']
                 temp = np.inner(next_vec, np.multiply(-1, vel)
                                 ) / length(vel, axis=0)
                 shortest_dists[i] = 0.0 if abs(length(
                     next_vec, axis=0)**2 - temp**2) < 1e-5 else np.sqrt(length(next_vec, axis=0)**2 - temp**2)
             elif next_dotvalue <= 0.0 and dotvalue <= 0.0:  # out or leave
-                if team_id == FLAG_LOOKUP['OFFENSE']:
-                    if length(vec, axis=0) < 1e-8:
-                        modes[i] = MODE_LOOKUP['LEAVE']
-                        shortest_dists[i] = sys.float_info.max
-                    else:
-                        modes[i] = MODE_LOOKUP['LEAVE-CATCH']
-                        shortest_dists[i] = length(vec, axis=0)
-                elif team_id == FLAG_LOOKUP['DEFENSE']:
-                    modes[i] = MODE_LOOKUP['LEAVE']
-                    shortest_dists[i] = sys.float_info.max
+                modes[i] = MODE_LOOKUP['LEAVE']
+                shortest_dists[i] = sys.float_info.max
             elif next_dotvalue > 0.0 and dotvalue > 0.0:  # in or come
                 next2zone_dist = length(next_vec, axis=0)
                 if next2zone_dist <= zone_radius:
@@ -642,6 +634,11 @@ class BBallEnv(gym.Env):
                                 ) / length(vel, axis=0)
                 shortest_dists[i] = 0.0 if abs(length(
                     next_vec, axis=0)**2 - temp**2) < 1e-5 else np.sqrt(length(next_vec, axis=0)**2 - temp**2)
+            # PASS OUT
+            if team_id == FLAG_LOOKUP['OFFENSE']:
+                if i == self.states.last_ball_handler_idx:
+                    modes[i] = MODE_LOOKUP['PASS-OUT']
+                    shortest_dists[i] = sys.float_info.max
         candidates = np.argwhere(
             shortest_dists <= zone_radius).reshape([-1])
         zone_idx = None
@@ -670,8 +667,7 @@ class BBallEnv(gym.Env):
                         ball_pass_dir, -np.pi, np.pi)
                     new_vel = [self.ball_passing_speed * np.cos(ball_pass_dir),
                             self.ball_passing_speed * np.sin(ball_pass_dir)]
-                    self.states.update_ball(self.states.ball_position,
-                                            None, True, new_vel)
+                    self.states.update_ball_vel(new_vel)
                     logger.debug('[BALL] Start Flying')
             
             # check if ball caught/stolen
@@ -797,6 +793,7 @@ class States(object):
         # self.__dirs = None
         # ball state
         self.is_passing = None
+        self.last_ball_handler_idx = None
         self.ball_handler_idx = None
         self.off_def_closest_map = None
         # court information
@@ -818,10 +815,17 @@ class States(object):
         self.steps = 0
         # self.__dirs = None
         # ball state
+        self.last_ball_handler_idx = ball_handler_idx
         self.ball_handler_idx = ball_handler_idx
         self.is_passing = False
         self.off_def_closest_map = dict()
         self.update_closest_map()
+
+    def update_ball_vel(self, velocity):
+        assert self.ball_handler_idx is not None
+        self.last_ball_handler_idx = self.ball_handler_idx
+        self.ball_handler_idx = None
+        self.vels[STATE_LOOKUP['BALL']] = np.array(velocity, dtype=np.float32)
 
     def update_ball(self, pos, ball_handler_idx, is_passing, velocity):
         # clip
@@ -913,7 +917,7 @@ MODE_LOOKUP = {
     'IN': 2,
     'COME-THEN-IN': 3,
     'IN-THEN-OUT': 4,
-    'LEAVE-CATCH': 5
+    'PASS-OUT': 5
 }
 
 DASH_LOOKUP = {

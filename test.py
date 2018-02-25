@@ -28,7 +28,7 @@ def ball_looping():
         action = tuple((
             np.array(1),
             np.array(np.pi / 4),
-            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+            np.array([[0, 0], [0, 0], [100, np.pi / 4], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)

@@ -436,7 +436,7 @@ class TWO_TRUNK_PPO(object):
         value = self._network(observ, length).value
         value = tf.where(self._is_optimizing_offense,
                          value[TEAM['OFFENSE']], value[TEAM['DEFENSE']])
-        if self._config.gae_lambda:
+        if self._config.gae_lambda: # TODO
             advantage = utility.lambda_advantage(
                 reward, value, length, self._config.discount,
                 self._config.gae_lambda)
