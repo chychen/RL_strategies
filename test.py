@@ -12,6 +12,7 @@ def no_op():
         # np.array([1, 0]),
         np.array(2),
         np.array(0),
+        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
     ))
     _, _, done, _ = env.step(action)
@@ -27,6 +28,7 @@ def ball_looping():
         action = tuple((
             np.array(1),
             np.array(np.pi / 4),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
@@ -44,6 +46,7 @@ def ball_looping():
         action = tuple((
             np.array(1),
             np.array(-np.pi / 2),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
@@ -61,6 +64,7 @@ def ball_looping():
         action = tuple((
             np.array(1),
             np.array(np.pi * 3 / 4),
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
@@ -256,16 +260,16 @@ def main():
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True)
     obs = env.reset()
-    input(obs[-1])
+    print(obs)
     print('#########################################')
     env.render()
 
     # DEMO script
-    # ball_looping()
+    ball_looping()
     # moving_around()
     # maxspeed()
     # ball_stealing()
-    move_offense_right()
+    # move_offense_right()
     # random_dancing()
 
     env.close()
