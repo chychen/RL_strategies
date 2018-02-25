@@ -267,7 +267,7 @@ class BBallEnv(gym.Env):
             if self.init_mode == INIT_LOOKUP['DEFAULT']:
                 off_positions = np.array([
                     [80, 40],
-                    [61, 26],
+                    [70, 35],
                     [60, 25],
                     [70, 15],
                     [80, 10]
