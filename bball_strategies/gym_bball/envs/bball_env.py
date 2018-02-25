@@ -560,7 +560,7 @@ class BBallEnv(gym.Env):
         opp_positions = self.states.positions[opp_idx]
         for pl_idx, (pl_pos, next_pl_pos, pl_vel) in enumerate(zip(self.states.positions[state_idx], self.states.positions[state_idx] + pl_vels, pl_vels)):
             zone_idx, mode = self._find_zone_idx(
-                next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius, team_id)
+                next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius)
         # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
             if zone_idx is not None and mode != MODE_LOOKUP['PASS-OUT']:
                 logger.debug(
@@ -601,7 +601,7 @@ class BBallEnv(gym.Env):
         # 4. if none collisions, update with velocity
             self.states.update_player(state_idx, pl_idx, next_pl_pos, pl_vel)
 
-    def _find_zone_idx(self, next_pos, pos, vel, zone_positions, zone_radius, team_id):
+    def _find_zone_idx(self, next_pos, pos, vel, zone_positions, zone_radius, if_off_ball=False):
         shortest_dists = np.empty(
             shape=(len(zone_positions),), dtype=np.float32)
         modes = np.empty(shape=(len(zone_positions),), dtype=np.float32)
@@ -635,10 +635,9 @@ class BBallEnv(gym.Env):
                 shortest_dists[i] = 0.0 if abs(length(
                     next_vec, axis=0)**2 - temp**2) < 1e-5 else np.sqrt(length(next_vec, axis=0)**2 - temp**2)
             # PASS OUT
-            if team_id == FLAG_LOOKUP['OFFENSE']:
-                if i == self.states.last_ball_handler_idx:
-                    modes[i] = MODE_LOOKUP['PASS-OUT']
-                    shortest_dists[i] = sys.float_info.max
+            if if_off_ball and i == self.states.last_ball_handler_idx:
+                modes[i] = MODE_LOOKUP['PASS-OUT']
+                shortest_dists[i] = sys.float_info.max
         candidates = np.argwhere(
             shortest_dists <= zone_radius).reshape([-1])
         zone_idx = None
@@ -695,7 +694,7 @@ class BBallEnv(gym.Env):
             def_zone_idx = None
             # if len(candidates) != 0:
             #     def_zone_idx, _ = self._find_zone_idx(
-            #         next_ball_pos, ball_pos, self.states.ball_vel, self.states.defense_positions[candidates], self.wingspan_radius, FLAG_LOOKUP['DEFENSE'])
+            #         next_ball_pos, ball_pos, self.states.ball_vel, self.states.defense_positions[candidates], self.wingspan_radius)
             # # 5. if any candidates, choose the best catcher among them
             #     if def_zone_idx is not None:
             #         # assign catcher pos to ball pos
@@ -708,7 +707,7 @@ class BBallEnv(gym.Env):
             off_zone_idx = None
             if len(candidates) == 0 or (def_zone_idx is None):
                 off_zone_idx, _ = self._find_zone_idx(
-                    next_ball_pos, ball_pos, self.states.ball_vel, self.states.offense_positions, self.wingspan_radius, FLAG_LOOKUP['OFFENSE'])
+                    next_ball_pos, ball_pos, self.states.ball_vel, self.states.offense_positions, self.wingspan_radius, if_off_ball=True)
             # 5. if any candidates, choose the best catcher among them
                 if off_zone_idx is not None:
                     # assign catcher pos to ball pos

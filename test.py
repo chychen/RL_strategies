@@ -265,11 +265,11 @@ def main():
     env.render()
 
     # DEMO script
-    ball_looping()
+    # ball_looping()
     # moving_around()
     # maxspeed()
     # ball_stealing()
-    # move_offense_right()
+    move_offense_right()
     # random_dancing()
 
     env.close()
