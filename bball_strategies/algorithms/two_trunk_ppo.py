@@ -630,10 +630,18 @@ class TWO_TRUNK_PPO(object):
                 policy_loss -= self._config.entropy_regularization * entropy
             summary = tf.summary.merge([
                 tf.summary.histogram('entropy', entropy),
-                # policy gradient # importance sampling
+                # policy gradient # importance sampling TODO
                 tf.summary.histogram(
-                    'policy_gradient_importance_sampling', policy_gradient),
+                    'policy_gradient', policy_gradient),
                 tf.summary.histogram('surrogate_loss', surrogate_loss),
+                tf.summary.histogram('off_deci_grad', tf.reduce_mean(
+                    self._mask(off_deci_grad, length), 1)),
+                tf.summary.histogram('off_dash_grad', tf.reduce_mean(
+                    self._mask(off_dash_grad, length), 1)),
+                tf.summary.histogram('off_policy_gradient', tf.reduce_mean(
+                    self._mask(off_policy_gradient, length), 1)),
+                tf.summary.histogram('def_policy_gradient', tf.reduce_mean(
+                    self._mask(def_policy_gradient, length), 1)),
                 # kl
                 tf.summary.histogram('kl', kl),
                 tf.summary.histogram('off_deci_kl', tf.reduce_mean(
