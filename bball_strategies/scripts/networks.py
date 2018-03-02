@@ -63,72 +63,32 @@ def _custom_diag_normal_kl(lhs, rhs, name=None):  # pylint: disable=unused-argum
             tf.reduce_sum(logstd1_2, -1) - tf.reduce_sum(logstd0_2, -1) -
             mean0.shape[-1].value)
 
+def net(observations, config):
 
-def two_trunk_gaussian(config, action_space, observations, unused_length, state=None):
-    """
-    ### Structure
-    ### O_Trunk : offensive crown, shape=(15)
-        - policy : [Categorical(3), CustomKLDiagNormal(11)]
-            3 for discrete decisions, 1 for ball's direction, 10 for five ofensive players' dash(power, direction).
-        - value : shape=(1)
-
-    ### D_Trunk : defensive crown, shape=(11)
-        - policy : [CustomKLDiagNormal(10)]
-            10 for five defensive players' dash(power, direction)
-        - value : shape=(1)
-
-    Args
-    ----
-    config : Configuration object.
-    action_space : Action space of the environment.
-    observations : shape=[batch_size, episode_length, 5, 14, 2]
-        Sequences of observations.
-    unused_length : Batch of sequence lengths.
-    state : Unused batch of initial states.
-
-    Raises:
-        ValueError: Unexpected action space.
-
-    Returns
-    -------
-    Attribute dictionary containing the policy, value, and unused state.
-    - policy : [Categorical(3), CustomKLDiagNormal(11), CustomKLDiagNormal(10)]
-    - value : [off_value, def_value]
-
-    NOTE
-    maybe softmax will limit the exploration ability
-    tf.contrib.distributions.TransformedDistribution 或許可考慮？！
-    because the action space might? like lognormal? than gaussian
-    """
     # observation space = shape=(batch_size, episode_length, 10, 14, 2)
     # action space = shape=(batch, episode_length, 11, 2)
     batch_size = tf.shape(observations)[0]
     episode_len = tf.shape(observations)[1]
 
-    # config
+    input_ = tf.reshape(observations, shape=[batch_size, episode_len, observations.shape.as_list()[
+                        2], functools.reduce(operator.mul, observations.shape.as_list()[3:], 1)])
     init_xavier_weights = tf.variance_scaling_initializer(
         scale=1.0, mode='fan_avg', distribution='uniform')
     init_output_weights = tf.variance_scaling_initializer(
         scale=config.init_output_factor, mode='fan_in', distribution='normal')
-    before_softplus_std_initializer = tf.constant_initializer(
-        np.log(np.exp(config.init_std) - 1))
-
-    input_ = tf.reshape(observations, shape=[batch_size, episode_len, observations.shape.as_list()[
-                        2], functools.reduce(operator.mul, observations.shape.as_list()[3:], 1)])
-
     with tf.variable_scope('o_trunk'):
         conv1 = tf.layers.conv2d(
             inputs=input_,
             filters=64,
-            kernel_size=[3, input_.shape.as_list()[-1]],
+            kernel_size=[1, 3],
             padding='same',
             activation=tf.nn.relu,
-            kernel_initializer=init_xavier_weights,
+            kernel_initializer=init_xavier_weights
         )
         conv2 = tf.layers.conv2d(
             inputs=conv1,
             filters=64,
-            kernel_size=[3, conv1.shape.as_list()[-1]],
+            kernel_size=[1, 3],            
             padding='same',
             activation=tf.nn.relu,
             kernel_initializer=init_xavier_weights,
@@ -167,18 +127,6 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                         )
                     off_actions_mean = tf.concat(
                         [directions[:, :, 0:1], powers, directions[:, :, 1:6]], axis=2)  # shape=(batch, len, 1+5+5)
-                    off_actions_std = tf.nn.softplus(tf.get_variable(  # TODO
-                        'before_softplus_std', off_actions_mean.shape[2:], tf.float32,
-                        before_softplus_std_initializer))
-                    off_actions_std = tf.tile(
-                        off_actions_std[None, None],
-                        [batch_size, episode_len, 1])
-                    off_actions_mean = tf.check_numerics(
-                        off_actions_mean, 'off_actions_mean')
-                    off_actions_std = tf.check_numerics(
-                        off_actions_std, 'off_actions_std')
-                    off_actions = CustomKLDiagNormal(
-                        off_actions_mean, off_actions_std)
                 with tf.variable_scope('decision'):
                     logits = tf.layers.dense(
                         inputs=off_fc,
@@ -186,8 +134,6 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                         activation=None,
                         kernel_initializer=init_output_weights,
                     )
-                    off_decision = tfd.Categorical(logits)
-                off_policy = [off_decision, off_actions]
             with tf.variable_scope('value'):
                 off_value = tf.layers.dense(
                     inputs=off_fc,
@@ -195,14 +141,15 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                     activation=None,
                     kernel_initializer=init_output_weights,
                 )
-                off_value = tf.reshape(off_value, shape=[batch_size, episode_len])
+                off_value = tf.reshape(
+                    off_value, shape=[batch_size, episode_len])
                 off_value = tf.check_numerics(off_value, 'off_value')
 
     with tf.variable_scope('d_trunk'):
         conv1 = tf.layers.conv2d(
             inputs=input_,
             filters=64,
-            kernel_size=[3, input_.shape.as_list()[-1]],
+            kernel_size=[1, 3],
             padding='same',
             activation=tf.nn.relu,
             kernel_initializer=init_xavier_weights,
@@ -210,7 +157,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
         conv2 = tf.layers.conv2d(
             inputs=conv1,
             filters=64,
-            kernel_size=[3, conv1.shape.as_list()[-1]],
+            kernel_size=[1, 3],
             padding='same',
             activation=tf.nn.relu,
             kernel_initializer=init_xavier_weights,
@@ -249,19 +196,6 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                         )
                     def_actions_mean = tf.concat(
                         [powers, directions], axis=2)  # shape=[batch, len, 5+5]
-                    def_actions_std = tf.nn.softplus(tf.get_variable(  # TODO
-                        'before_softplus_std', def_actions_mean.shape[2:], tf.float32,
-                        before_softplus_std_initializer))
-                    def_actions_std = tf.tile(
-                        def_actions_std[None, None],
-                        [batch_size, episode_len, 1])
-                    def_actions_mean = tf.check_numerics(
-                        def_actions_mean, 'def_actions_mean')
-                    def_actions_std = tf.check_numerics(
-                        def_actions_std, 'def_actions_std')
-                    def_actions = CustomKLDiagNormal(
-                        def_actions_mean, def_actions_std)
-                def_policy = def_actions
             with tf.variable_scope('value'):
                 def_value = tf.layers.dense(
                     inputs=def_fc,
@@ -269,10 +203,113 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
                     activation=None,
                     kernel_initializer=init_output_weights,
                 )
-                def_value = tf.reshape(def_value, shape=[batch_size, episode_len])
+                def_value = tf.reshape(
+                    def_value, shape=[batch_size, episode_len])
                 def_value = tf.check_numerics(def_value, 'def_value')
-                
+
+    return logits, off_actions_mean, off_value, def_actions_mean, def_value
+
+
+def offense_pretrain(config, observations):
+    """
+    """
+    logits, off_actions_mean, _, _, _ = net(
+        observations, config)
+    decisions = tf.nn.softmax(logits)
+
+    return decisions, off_actions_mean, 
+
+def defense_pretrain(config, observations):
+    """
+    """
+    _, _, _, def_actions_mean, _ = net(
+        observations, config)
+
+    return def_actions_mean
+
+
+def two_trunk_gaussian(config, action_space, observations, unused_length, state=None):
+    """
+    ### Structure
+    ### O_Trunk : offensive crown, shape=(15)
+        - policy : [Categorical(3), CustomKLDiagNormal(11)]
+            3 for discrete decisions, 1 for ball's direction, 10 for five ofensive players' dash(power, direction).
+        - value : shape=(1)
+
+    ### D_Trunk : defensive crown, shape=(11)
+        - policy : [CustomKLDiagNormal(10)]
+            10 for five defensive players' dash(power, direction)
+        - value : shape=(1)
+
+    Args
+    ----
+    config : Configuration object.
+    action_space : Action space of the environment.
+    observations : shape=[batch_size, episode_length, 5, 14, 2]
+        Sequences of observations.
+    unused_length : Batch of sequence lengths.
+    state : Unused batch of initial states.
+
+    Raises:
+        ValueError: Unexpected action space.
+
+    Returns
+    -------
+    Attribute dictionary containing the policy, value, and unused state.
+    - policy : [Categorical(3), CustomKLDiagNormal(11), CustomKLDiagNormal(10)]
+    - value : [off_value, def_value]
+
+    NOTE
+    maybe softmax will limit the exploration ability
+    tf.contrib.distributions.TransformedDistribution 或許可考慮？！
+    because the action space might? like lognormal? than gaussian
+    """
+
+    # config
+    before_softplus_std_initializer = tf.constant_initializer(
+        np.log(np.exp(config.init_std) - 1))
+
+    logits, off_actions_mean, off_value, def_actions_mean, def_value = net(
+        observations, config)
+
+    off_actions_std = tf.nn.softplus(tf.get_variable(  # TODO
+        'off_before_softplus_std', off_actions_mean.shape[2:], tf.float32,
+        before_softplus_std_initializer))
+    off_actions_std = tf.tile(
+        off_actions_std[None, None],
+        [tf.shape(observations)[0], tf.shape(observations)[1], 1])
+    off_actions_mean = tf.check_numerics(
+        off_actions_mean, 'off_actions_mean')
+    off_actions_std = tf.check_numerics(
+        off_actions_std, 'off_actions_std')
+    off_actions = CustomKLDiagNormal(
+        off_actions_mean, off_actions_std)
+
+    off_decision = tfd.Categorical(logits)
+    off_policy = [off_decision, off_actions]
+
+    def_actions_std = tf.nn.softplus(tf.get_variable(  # TODO
+        'def_before_softplus_std', def_actions_mean.shape[2:], tf.float32,
+        before_softplus_std_initializer))
+    def_actions_std = tf.tile(
+        def_actions_std[None, None],
+        [tf.shape(observations)[0], tf.shape(observations)[1], 1])
+    def_actions_mean = tf.check_numerics(
+        def_actions_mean, 'def_actions_mean')
+    def_actions_std = tf.check_numerics(
+        def_actions_std, 'def_actions_std')
+    def_actions = CustomKLDiagNormal(
+        def_actions_mean, def_actions_std)
+    def_policy = def_actions
 
     policy = off_policy + [def_policy]
     value = [off_value, def_value]
     return agents.tools.AttrDict(state=state, policy=policy, value=value)
+
+
+def offense_pretrain_net():
+    pass
+
+
+def defense_pretrain_net():
+    pass
