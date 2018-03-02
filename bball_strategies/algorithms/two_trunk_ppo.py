@@ -436,7 +436,7 @@ class TWO_TRUNK_PPO(object):
         value = self._network(observ, length).value
         value = tf.where(self._is_optimizing_offense,
                          value[TEAM['OFFENSE']], value[TEAM['DEFENSE']])
-        if self._config.gae_lambda: # TODO
+        if self._config.gae_lambda:  # TODO
             advantage = utility.lambda_advantage(
                 reward, value, length, self._config.discount,
                 self._config.gae_lambda)
@@ -630,10 +630,8 @@ class TWO_TRUNK_PPO(object):
                 policy_loss -= self._config.entropy_regularization * entropy
             summary = tf.summary.merge([
                 tf.summary.histogram('entropy', entropy),
-                # policy gradient # importance sampling TODO
-                tf.summary.histogram(
-                    'policy_gradient', policy_gradient),
                 tf.summary.histogram('surrogate_loss', surrogate_loss),
+                # policy gradient # importance sampling
                 tf.summary.histogram('off_deci_grad', tf.reduce_mean(
                     self._mask(off_deci_grad, length), 1)),
                 tf.summary.histogram('off_dash_grad', tf.reduce_mean(
@@ -702,13 +700,14 @@ class TWO_TRUNK_PPO(object):
                     kl_change > 1.3 * self._config.kl_target,
                     # pylint: disable=g-long-lambda
                     lambda: tf.Print(self._penalty.assign(
-                        self._penalty * 1.5), [0], 'increase penalty '),
+                        self._penalty * 1.5), [self._penalty], 'increase penalty '),
                     float)
                 maybe_decrease = tf.cond(
                     kl_change < 0.7 * self._config.kl_target,
                     # pylint: disable=g-long-lambda
+                    # + 1e-8 prevent vanished
                     lambda: tf.Print(self._penalty.assign(
-                        self._penalty / 1.5), [0], 'decrease penalty '),
+                        self._penalty / 1.5 + 1e-8), [self._penalty], 'decrease penalty '),
                     float)
             with tf.control_dependencies([maybe_increase, maybe_decrease]):
                 return tf.summary.merge([
