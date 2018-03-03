@@ -167,51 +167,51 @@ class BBallEnv(gym.Env):
                 off_pl_dash, self.states.vels, STATE_LOOKUP['OFFENSE'])
             # update ball state
             self._update_ball_state(decision, ball_pass_dir)
+            # check if meets termination condition
+            if decision == DESICION_LOOKUP['SHOOT']:
+                self.states.update_status(done=True, status=STATUS_LOOKUP['SHOOT'])
+            # OOB
+            oob_padding = 3
+            if self.states.ball_position[0] >= self.court_length + oob_padding or self.states.ball_position[0] < self.court_length / 2 - oob_padding or self.states.ball_position[1] >= self.court_width + oob_padding or self.states.ball_position[1] < 0.0 - oob_padding:
+                self.states.update_status(done=True, status=STATUS_LOOKUP['OOB'])
+            # OOT
+            if self.states.steps + 1 >= self.time_limit: # zero-based
+                self.states.update_status(done=True, status=STATUS_LOOKUP['OOT'])
+            # termination conditions
+            reward = 2.0
+            if self.states.done:
+                if self.states.status == STATUS_LOOKUP['SHOOT']:
+                    logger.debug('[GAME OVER], A shoot decision is made')
+                    if self.states.ball_handler_idx is None:
+                        logger.debug('[GAME OVER], No ball handler ...')
+                        reward = 1.0
+                    else:
+                        reward += self._calculate_reward()
+                    pass
+                elif self.states.status == STATUS_LOOKUP['CAPTURED']:
+                    logger.debug(
+                        '[GAME OVER], A defender gets possession of the ball')
+                    reward = 1.0
+                    pass
+                elif self.states.status == STATUS_LOOKUP['OOB']:
+                    logger.debug('[GAME OVER], The ball is out of bounds.')
+                    reward = 1.0
+                    pass
+                elif self.states.status == STATUS_LOOKUP['OOT']:
+                    logger.debug(
+                        '[GAME OVER], Max time limit for the episode is reached')
+                    reward = 1.0
+                    pass
+            else:
+                if self.states.status == STATUS_LOOKUP['CATCH']:
+                    logger.debug('[GAME STATUS] Successfully Pass :D')
+                    reward += 10.0
+                    pass
         elif self.states.turn == FLAG_LOOKUP['DEFENSE']:
             # logger.debug('[TURN] DEFENSE')
             self._update_player_state(
                 def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
-
-        # check if meets termination condition
-        if decision == DESICION_LOOKUP['SHOOT']:
-            self.states.update_status(done=True, status=STATUS_LOOKUP['SHOOT'])
-        # OOB
-        oob_padding = 3
-        if self.states.ball_position[0] >= self.court_length + oob_padding or self.states.ball_position[0] < self.court_length / 2 - oob_padding or self.states.ball_position[1] >= self.court_width + oob_padding or self.states.ball_position[1] < 0.0 - oob_padding:
-            self.states.update_status(done=True, status=STATUS_LOOKUP['OOB'])
-        # OOT
-        if self.states.steps + 1 >= self.time_limit:
-            self.states.update_status(done=True, status=STATUS_LOOKUP['OOT'])
-        # termination conditions
-        reward = 2.0
-        if self.states.done:
-            if self.states.status == STATUS_LOOKUP['SHOOT']:
-                logger.debug('[GAME OVER], A shoot decision is made')
-                if self.states.ball_handler_idx is None:
-                    logger.debug('[GAME OVER], No ball handler ...')
-                    reward = 1.0
-                else:
-                    reward += self._calculate_reward()
-                pass
-            elif self.states.status == STATUS_LOOKUP['CAPTURED']:
-                logger.debug(
-                    '[GAME OVER], A defender gets possession of the ball')
-                reward = 1.0
-                pass
-            elif self.states.status == STATUS_LOOKUP['OOB']:
-                logger.debug('[GAME OVER], The ball is out of bounds.')
-                reward = 1.0
-                pass
-            elif self.states.status == STATUS_LOOKUP['OOT']:
-                logger.debug(
-                    '[GAME OVER], Max time limit for the episode is reached')
-                reward = 1.0
-                pass
-        else:
-            if self.states.status == STATUS_LOOKUP['CATCH']:
-                logger.debug('[GAME STATUS] Successfully Pass :D')
-                reward += 10.0
-                pass
+            reward = 0.0
 
         # update env information
         self.states.take_turn()

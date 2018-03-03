@@ -76,13 +76,22 @@ def v2():
 
 def v3():
     """
-    - small batch size
     - no repeat epoch
     - smaller max length (smaller buffer)
     """
     locals().update(default())
-    update_every = 40
     update_epochs = 1
+    max_length = 10 * FPS * 2
+    steps = 1e10  # 1M
+    return locals()
+
+
+def v4():
+    """
+    - smaller max length (smaller buffer)
+    """
+    locals().update(default())
+    update_epochs = 25
     max_length = 10 * FPS * 2
     steps = 1e10  # 1M
     return locals()
