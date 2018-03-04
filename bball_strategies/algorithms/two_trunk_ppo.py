@@ -192,10 +192,6 @@ class TWO_TRUNK_PPO(object):
                         var, agent_indices, val[:, 0]),
                     self._last_policy[i], policy_params[i], flatten=True)
             assert policy_params, 'Policy has no parameters to store.'
-            # remember_last_policy = tools.nested.map(
-            #     lambda var, val: tf.scatter_update(
-            #         var, agent_indices, val[:, 0]),
-            #     self._last_policy, policy_params, flatten=True)
             with tf.control_dependencies((
                     assign_state, remember_last_action) + remember_last_policy):
                 return action[:, 0], tf.identity(summary)
@@ -436,7 +432,7 @@ class TWO_TRUNK_PPO(object):
         value = self._network(observ, length).value
         value = tf.where(self._is_optimizing_offense,
                          value[TEAM['OFFENSE']], value[TEAM['DEFENSE']])
-        if self._config.gae_lambda:  # TODO
+        if self._config.gae_lambda:  # NOTE
             advantage = utility.lambda_advantage(
                 reward, value, length, self._config.discount,
                 self._config.gae_lambda)

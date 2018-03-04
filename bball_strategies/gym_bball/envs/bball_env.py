@@ -10,33 +10,30 @@
             ` PASS: move players after pass the ball.
             ` NO_OP: do nothing but moving, excluding the ball.
         * (maybe the communication protocol to encourage set offense)
-    - rewards (open score):
-        * the farther to the cloest defender the better
-        * the closer to the basket the better
-        * (maybe encourage passing decision)
 2. defensive team:
     - actions:
         * DASH (power, degree): move the agents with power and direction,
             for each player and ball sampled from policy output's probability distribution
         * (maybe the communication protocol to encourage set defense)
-    - rewards (neg open score):
-        * the closer to shooting man the better
-        * the more defenders closest to ball-holder the better
-        * possess the ball in the end of the episode
-        * (maybe encourage person-to-person defenses)
 
 Environment:
     - The task is episodic, and an episode ends when one of four events occurs:
-        * A shoot decision is made,
-        * The ball is out of bounds,
-        * A defender gets possession of the ball,
-        * A max time limit for the episode is reached.
+        * SHOOT : A shoot decision is made,
+        * OOB : The ball is out of bounds,
+        * CAPTURED : A defender gets possession of the ball,
+        * OOT : A max time limit for the episode is reached.
     - Constraints:
         * Catching/Stealing Ball
         * Collision
     - Rewards:
         * Offensive team:
+            * the farther to the cloest defender the better
+            * the closer to the basket the better
+            * if successfully catch the ball
+            * (the fewer defenders closest to ball-holder the better)
         * Defensive team:
+            * the negative value while the offense step() or 0.
+            
 court size: 94 by 50 (feet)
 1 feet = 30.48 cm = 0.3048 m
 1 m = 3.2808 feet
@@ -60,8 +57,7 @@ import sys
 from bball_strategies.gym_bball import tools
 """
 # NOTE
-# 把一些環境資訊物件化
-# check if the screen range reasonable?
+# check if the following ranges reasonable?
 # screen_radius = circle with radius 2.0 feets (about 0.61 meter)
 # wingspan_radius = circle with radius 3.5 feets (about 1.06 meter)
 # stolen_radius = circle with radius 5.0 feets (about 1.52 meter)
@@ -94,7 +90,7 @@ def distance(pos_a, pos_b, axis=1):
 
 
 class BBallEnv(gym.Env):
-    """
+    """ the simulated environment designed for studying the strategies of basketball games.
     """
     metadata = {
         'render.modes': ['human', 'rgb_array'],
@@ -168,11 +164,13 @@ class BBallEnv(gym.Env):
             # update ball state
             self._update_ball_state(decision, ball_pass_dir)
             if decision == DESICION_LOOKUP['SHOOT']:
-                self.states.update_status(done=True, status=STATUS_LOOKUP['SHOOT'])
+                self.states.update_status(
+                    done=True, status=STATUS_LOOKUP['SHOOT'])
             # OOB
             oob_padding = 3
             if self.states.ball_position[0] >= self.court_length + oob_padding or self.states.ball_position[0] < self.court_length / 2 - oob_padding or self.states.ball_position[1] >= self.court_width + oob_padding or self.states.ball_position[1] < 0.0 - oob_padding:
-                self.states.update_status(done=True, status=STATUS_LOOKUP['OOB'])
+                self.states.update_status(
+                    done=True, status=STATUS_LOOKUP['OOB'])
             reward = 2.0
         elif self.states.turn == FLAG_LOOKUP['DEFENSE']:
             # logger.debug('[TURN] DEFENSE')
@@ -180,7 +178,7 @@ class BBallEnv(gym.Env):
                 def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
             reward = 0.0
         # OOT
-        if self.states.steps + 1 >= self.time_limit: # zero-based
+        if self.states.steps + 1 >= self.time_limit:  # zero-based
             self.states.update_status(done=True, status=STATUS_LOOKUP['OOT'])
 
         # termination conditions
@@ -239,9 +237,9 @@ class BBallEnv(gym.Env):
         return obs
 
     def reset(self):
-        """ random init positions in the right half court
-        1. init offensive team randomlu
-        2. add defensive team next to each offensive player in the basket side.
+        """ Resets the state of the environment and returns an initial observation.
+
+        Returns : self._get_obs()
         """
         if self.init_mode == INIT_LOOKUP['INPUT']:
             assert self.init_positions is not None
@@ -283,7 +281,6 @@ class BBallEnv(gym.Env):
                 off_positions, copy=True, dtype=np.float32)
             vec = self.right_basket_pos - off_positions
             vec_length = length(vec, axis=1)
-            # vec_length = np.sqrt(np.sum(vec * vec, axis=1))
             u_vec = vec / np.stack([vec_length, vec_length], axis=1)
             def_positions = def_positions + u_vec * self.screen_radius * 2
             ball_pos = np.array(
@@ -294,19 +291,18 @@ class BBallEnv(gym.Env):
 
         return self._get_obs()
 
-    # def render(self, mode='human', close=False):
-        # if close:
-        #     if self.viewer is not None:
-        #         self.viewer.close()
-        #         self.viewer = None
-        #     return
     def render(self, mode='human'):
+        """ Renders the environment.
+
+        if_vis_trajectory : whether to vis the trajectory
+        if_vis_visual_aid : whether vis the collision range, fetchable range, and stealable range.
+        """
         if self.viewer is None:
             from gym.envs.classic_control import rendering
         if not self.if_vis_trajectory:
             if self.viewer is None:
                 self.viewer = rendering.Viewer(940+100, 500+100)
-                self.viewer.set_bounds(0-5, 94+5, 0-5, 50+5)  # feet
+                self.viewer.set_bounds(0-5, 94+5, 0-5, 50+5)  # feet # coordinates
                 # background img
                 fname = path.join(path.dirname(__file__), "fullcourt.png")
                 img = rendering.Image(fname, 94, 50)
@@ -454,7 +450,7 @@ class BBallEnv(gym.Env):
         """
         Return
         ------
-        Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        ActTuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
         """
         return tools.ActTuple((
             spaces.Discrete(3),  # offensive decision
@@ -487,23 +483,6 @@ class BBallEnv(gym.Env):
         14 : ball(1) + offense(5) + defense(5) + basket(1) + ball_boundry(2)
         2 : x and y positions
         """
-        # # Tuple(Box(2,), Box(5, 2), Box(5, 2))
-        # return tools.ObsTuple((
-        #     # ball position
-        #     spaces.Box(low=np.array([self.court_length // 2, 0]),
-        #                high=np.array([self.court_length, self.court_width])),
-        #     # offense player positions
-        #     spaces.Box(low=np.array([[0, 0] for _ in range(5)]),
-        #                high=np.array([[self.court_length, self.court_width] for _ in range(5)])),
-        #     # defense player positions
-        #     spaces.Box(low=np.array([[0, 0] for _ in range(5)]),
-        #                high=np.array([[self.court_length, self.court_width] for _ in range(5)]))
-        # ))
-
-        # boundries are defined in self.states._clip_state(pos)
-        # return spaces.Box(low=-np.inf, high=np.inf, shape=(10, 14, 2), dtype=np.float32)
-        # return spaces.Box(low=-np.inf, high=np.inf, shape=(5, 14, 2), dtype=np.float32)
-
         low_ = np.array([self.states.x_low_bound, self.states.y_low_bound]) * \
             np.ones(shape=[self.buffer_size, 14, 2])
         high_ = np.array([self.states.x_high_bound, self.states.y_high_bound]) * \
@@ -602,6 +581,33 @@ class BBallEnv(gym.Env):
             self.states.update_player(state_idx, pl_idx, next_pl_pos, pl_vel)
 
     def _find_zone_idx(self, next_pos, pos, vel, zone_positions, zone_radius, if_off_ball=False):
+        """ find the zone index most reasonable to the vel
+        for applications: 
+            * who is the most reasonable one to catch ball 
+            * who is going to collide to other.
+        
+        Inputs
+        ------
+        next_pos : float, shape=[2,]
+            next position of the moving object 
+        pos : float, shape=[2,]
+            position of the moving object
+        vel : float, shape=[2,]
+            velocity of the moving object, pos + vel = next_pos
+        zone_positions : float, shape=(5, 2)
+            the positions of all candidates
+        zone_radius : float
+            the effective range to find zone index
+        if_off_ball : bool
+            flag only for offense team while passing ball, which the ball passer could not catch the ball.
+
+        Return
+        ------
+        zone_idx : int, could be None
+            the most reasonable index
+        modes : 
+            for debug prupose only, what status for each candidates? 
+        """
         shortest_dists = np.empty(
             shape=(len(zone_positions),), dtype=np.float32)
         modes = np.empty(shape=(len(zone_positions),), dtype=np.float32)
@@ -660,15 +666,16 @@ class BBallEnv(gym.Env):
             if decision == DESICION_LOOKUP['PASS']:
                 if self.states.is_passing:
                     # maybe return negative reward!?
-                    logger.debug('[BALL] You cannot do PASS decision while ball is passing')
+                    logger.debug(
+                        '[BALL] You cannot do PASS decision while ball is passing')
                 else:
                     ball_pass_dir = np.clip(
                         ball_pass_dir, -np.pi, np.pi)
                     new_vel = [self.ball_passing_speed * np.cos(ball_pass_dir),
-                            self.ball_passing_speed * np.sin(ball_pass_dir)]
+                               self.ball_passing_speed * np.sin(ball_pass_dir)]
                     self.states.update_ball_vel(new_vel)
                     logger.debug('[BALL] Start Flying')
-            
+
             # check if ball caught/stolen
             # Prerequisites:
             # 1. if any defenders is close enough to offender (depend on stolen_radius)
@@ -689,20 +696,19 @@ class BBallEnv(gym.Env):
                 if value['distance'] <= self.stolen_radius:
                     if length(def2oldball_vecs[value['idx']], axis=0) <= length(off2oldball_vecs[key], axis=0):
                         candidates.append(value['idx'])
-            # TODO skip
             # 3. if any in (2), check is any defender able to fetch ball (depend on defender's wingspan_radius), then go (5)
             def_zone_idx = None
-            # if len(candidates) != 0:
-            #     def_zone_idx, _ = self._find_zone_idx(
-            #         next_ball_pos, ball_pos, self.states.ball_vel, self.states.defense_positions[candidates], self.wingspan_radius)
-            # # 5. if any candidates, choose the best catcher among them
-            #     if def_zone_idx is not None:
-            #         # assign catcher pos to ball pos
-            #         self.states.update_ball(self.states.defense_positions[candidates][def_zone_idx],
-            #                                 None, False, [0, 0])
-            #         self.states.update_status(
-            #             done=True, status=STATUS_LOOKUP['CAPTURED'])
-            #         return
+            if len(candidates) != 0:
+                def_zone_idx, _ = self._find_zone_idx(
+                    next_ball_pos, ball_pos, self.states.ball_vel, self.states.defense_positions[candidates], self.wingspan_radius)
+            # 5. if any candidates, choose the best catcher among them
+                if def_zone_idx is not None:
+                    # assign catcher pos to ball pos
+                    self.states.update_ball(self.states.defense_positions[candidates][def_zone_idx],
+                                            None, False, [0, 0])
+                    self.states.update_status(
+                        done=True, status=STATUS_LOOKUP['CAPTURED'])
+                    return
             # 4. if none in (2), check is any offender able to fetch ball (depend on offender's wingspan_radius), then go (5)
             off_zone_idx = None
             if len(candidates) == 0 or (def_zone_idx is None):
@@ -779,8 +785,6 @@ class States(object):
     """ modulize all states into class """
 
     def __init__(self):
-        """
-        """
         # ball and players [ball, offense, defense]
         self.turn = None
         self.positions = None
@@ -851,12 +855,15 @@ class States(object):
         """
         def update_buffer(team_idx):
             for last_pos, pos in zip(self.buffer_positions[:-1], self.buffer_positions[1:]):
-                if team_idx==STATE_LOOKUP['OFFENSE']:
-                    last_pos[STATE_LOOKUP['BALL']] = copy.deepcopy(pos[STATE_LOOKUP['BALL']])
+                if team_idx == STATE_LOOKUP['OFFENSE']:
+                    last_pos[STATE_LOOKUP['BALL']] = copy.deepcopy(
+                        pos[STATE_LOOKUP['BALL']])
                 last_pos[team_idx] = copy.deepcopy(pos[team_idx])
-            if team_idx==STATE_LOOKUP['OFFENSE']:
-                self.buffer_positions[-1][STATE_LOOKUP['BALL']] = copy.deepcopy(self.positions[STATE_LOOKUP['BALL']])
-            self.buffer_positions[-1][team_idx] = copy.deepcopy(self.positions[team_idx])
+            if team_idx == STATE_LOOKUP['OFFENSE']:
+                self.buffer_positions[-1][STATE_LOOKUP['BALL']
+                                          ] = copy.deepcopy(self.positions[STATE_LOOKUP['BALL']])
+            self.buffer_positions[-1][team_idx] = copy.deepcopy(
+                self.positions[team_idx])
         team_idx = STATE_LOOKUP['OFFENSE'] if self.turn == FLAG_LOOKUP['OFFENSE'] else STATE_LOOKUP['DEFENSE']
         update_buffer(team_idx)
 

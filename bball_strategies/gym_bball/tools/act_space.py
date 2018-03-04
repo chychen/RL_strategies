@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 class ActTuple(Space):
-    """
+    """ customized action scace containing one Discrete() and three continuous Box()
     """
 
     def __init__(self, spaces):

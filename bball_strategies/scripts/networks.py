@@ -64,7 +64,6 @@ def _custom_diag_normal_kl(lhs, rhs, name=None):  # pylint: disable=unused-argum
             mean0.shape[-1].value)
 
 def net(observations, config):
-
     # observation space = shape=(batch_size, episode_length, 10, 14, 2)
     # action space = shape=(batch, episode_length, 11, 2)
     batch_size = tf.shape(observations)[0]
@@ -248,7 +247,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
     observations : shape=[batch_size, episode_length, 5, 14, 2]
         Sequences of observations.
     unused_length : Batch of sequence lengths.
-    state : Unused batch of initial states.
+    state : Unused batch of initial states. (for rnn net)
 
     Raises:
         ValueError: Unexpected action space.
@@ -261,7 +260,7 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
 
     NOTE
     maybe softmax will limit the exploration ability
-    tf.contrib.distributions.TransformedDistribution 或許可考慮？！
+    tf.contrib.distributions.TransformedDistribution (lognormal)？！
     because the action space might? like lognormal? than gaussian
     """
 
@@ -305,11 +304,3 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
     policy = off_policy + [def_policy]
     value = [off_value, def_value]
     return agents.tools.AttrDict(state=state, policy=policy, value=value)
-
-
-def offense_pretrain_net():
-    pass
-
-
-def defense_pretrain_net():
-    pass

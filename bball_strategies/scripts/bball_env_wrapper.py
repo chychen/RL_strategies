@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import tensorflow as tf
 from gym import spaces
 from bball_strategies.gym_bball import tools
 
@@ -17,9 +18,10 @@ class BBallWrapper(object):
         ----
         init_mode : 0->default, 1->dataset, 2->customized
 
-        1. Convert to 32 bit
-        2. Normalize obs and action
-        3. Clip actions (useless when applied normalized)
+        1. Convert to 32 bit (just make sure)
+        2. Normalize obs and denormalize action
+        3. Clip actions by env settings
+
         time_limit : default value = 24 sec * 5 fps * 2 teams
         """
         self._env = env
@@ -31,8 +33,10 @@ class BBallWrapper(object):
         self._env.FPS = fps
         self._env.time_limit = time_limit
 
+        self._env = ClipAction(self._env)
+        self._env = RangeNormalize(
+            self._env, observ=if_norm_obs, action=if_norm_act)
         self._env = ConvertTo32Bit(self._env)
-        self._env = RangeNormalize(self._env, observ=if_norm_obs, action=if_norm_act)
 
     def __getattr__(self, name):
         return getattr(self._env, name)
@@ -40,28 +44,29 @@ class BBallWrapper(object):
     def reset(self):
         return self._env.reset()
 
-    # @property
-    # def action_space(self):
-    #     """
-    #     to walk around for value range validation, we will force clip action value before step()
-    #     """
-    #     shape = self._env.action_space.shape  # (11,2)
-    #     return spaces.Box(-np.inf * np.ones(shape), np.inf * np.ones(shape), dtype=np.float32)
+class ClipAction(object):
+    """Clip out of range actions to the action space of the environment."""
 
-    # def step(self, action):
-    #     """
-    #     action : shape=[Discrete(3), Box(), Box(5, 2), Box(5, 2)]
-    #     """
-    #     action_space = self._env.action_space  # Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
-    #     for i, space in enumerate(action_space):
-    #         if isinstance(space, spaces.Discrete):
-    #             pass
-    #         elif isinstance(space, spaces.Box):
-    #             action[i] = np.clip(action[i], space.low, space.high)
-    #         else:
-    #             raise ValueError(
-    #                 'action space is not defined, {}'.format(action[i]))
-    #     return self._env.step(action)
+    def __init__(self, env):
+        self._env = env
+
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+
+    def step(self, action):
+        """ clip action to acceptable range before step()
+        action : shape=[Discrete(3), Box(), Box(5, 2), Box(5, 2)]
+        """
+        action_space = self._env.action_space  # Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        for i, space in enumerate(action_space):
+            if isinstance(space, spaces.Discrete):  # no need to clip
+                pass
+            elif isinstance(space, spaces.Box):
+                action[i] = np.clip(action[i], space.low, space.high)
+            else:
+                raise ValueError(
+                    'action space is not defined, {}'.format(action[i]))
+        return self._env.step(action)
 
 
 class RangeNormalize(object):
@@ -101,11 +106,14 @@ class RangeNormalize(object):
         return tools.ActTuple((
             spaces.Discrete(3),  # offensive decision
             # ball theta
-            spaces.Box(-np.ones(space[1].shape), np.ones(space[1].shape), dtype=np.float32),
+            spaces.Box(-np.ones(space[1].shape),
+                       np.ones(space[1].shape), dtype=np.float32),
             # offense player DASH(power, direction)
-            spaces.Box(-np.ones(space[2].shape), np.ones(space[2].shape), dtype=np.float32),
+            spaces.Box(-np.ones(space[2].shape),
+                       np.ones(space[2].shape), dtype=np.float32),
             # defense player DASH(power, direction)
-            spaces.Box(-np.ones(space[3].shape), np.ones(space[3].shape), dtype=np.float32)
+            spaces.Box(-np.ones(space[3].shape),
+                       np.ones(space[3].shape), dtype=np.float32)
         ))
 
     def step(self, action):
@@ -124,7 +132,7 @@ class RangeNormalize(object):
 
     def _denormalize_action(self, action):
         # skip discrete item (self._env.action_space[0])
-        for i in [1,2,3]:
+        for i in [1, 2, 3]:
             min_ = self._env.action_space[i].low
             max_ = self._env.action_space[i].high
             action[i] = (action[i] + 1) / 2 * (max_ - min_) + min_
@@ -142,8 +150,8 @@ class RangeNormalize(object):
             check = np.isfinite(space.low).all(
             ) and np.isfinite(space.high).all()
         else:  # action is ActTuple
-            check = check and space[0].dtype==np.int64  # Discrete
-            for i in [1,2,3]:
+            check = check and space[0].dtype == np.int64  # Discrete
+            for i in [1, 2, 3]:
                 check = check and np.isfinite(space[i].low).all(
                 ) and np.isfinite(space[i].high).all()  # Box
         return check

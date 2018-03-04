@@ -1,7 +1,9 @@
 
 """ Script to train
-Command Line:
-    python3 -m bball_strategies.scripts.train
+Command Line :
+    train : python3 -m bball_strategies.scripts.train --config={function name}
+    retrain : python3 -m bball_strategies.scripts.train --resume --logdir={checkpoint/dir/path}
+    vis : python3 -m bball_strategies.scripts.train --vis
 """
 
 from __future__ import absolute_import
@@ -37,6 +39,7 @@ def _create_environment(config):
     """
     env = gym.make(config.env)
     env = BBallWrapper(env, fps=config.FPS, time_limit=config.max_length)
+    env.step(0)
     return env
 
 
@@ -95,6 +98,8 @@ def train(config, env_processes, outdir):
     Args
     ----
     config : Object providing configurations via attributes.
+    env_processes : Whether to step environment in external processes.
+    outdir : Directory path to save rendering result while traning.
 
     Yields
     ------
@@ -136,8 +141,6 @@ def main(_):
     """ Create or load configuration and launch the trainer.
     """
     utility.set_up_logging()
-    if not FLAGS.config:
-        raise KeyError('You must specify a configuration.')
     if not FLAGS.resume:
         logdir = FLAGS.logdir and os.path.expanduser(os.path.join(
             FLAGS.logdir, '{}-{}'.format(FLAGS.timestamp, FLAGS.config)))
@@ -150,6 +153,8 @@ def main(_):
     try:
         config = utility.load_config(logdir)
     except IOError:
+        if not FLAGS.config:
+            raise KeyError('You must specify a configuration.')
         config = tools.AttrDict(getattr(configs, FLAGS.config)())
         config = utility.save_config(config, logdir)
     for score in train(config, FLAGS.env_processes, outdir):
@@ -159,13 +164,13 @@ def main(_):
 if __name__ == '__main__':
     FLAGS = tf.app.flags.FLAGS
     tf.app.flags.DEFINE_string(
-        'logdir', 'logdir/v1/1',
+        'logdir', 'logdir/offense_only',
         'Base directory to store logs.')
     tf.app.flags.DEFINE_string(
         'timestamp', datetime.datetime.now().strftime('%Y%m%dT%H%M%S'),
         'Sub directory to store logs.')
     tf.app.flags.DEFINE_string(
-        'config', 'default',
+        'config', None,
         'Configuration to execute.')
     tf.app.flags.DEFINE_boolean(
         'env_processes', True,
