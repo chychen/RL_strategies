@@ -139,7 +139,6 @@ class TWO_TRUNK_PPO(object):
             #                  off_turn_mode, def_turn_mode)
             # action = tf.where(
             #     self._is_training, sample_, mode_)
-            # action = tf.reshape(action, shape=[observ.shape[0], 11, 2])
 
             # policy
             sample_ = tf.concat([
@@ -561,10 +560,8 @@ class TWO_TRUNK_PPO(object):
             # action.shape=(batch_size,episode_len,11,2)
             batch_size = tf.shape(action)[0]
             episode_len = action.shape.as_list()[1]
-            off_action_policy_format = tf.reshape(
-                action[:, :, :6], shape=[batch_size, episode_len, 12])
-            def_dash_policy_format = tf.reshape(
-                action[:, :, 6:], shape=[batch_size, episode_len, 10])
+            off_action_policy_format = action[:, :, :13]
+            def_dash_policy_format = action[:, :, 13:]
             action_policy_format = []
             action_policy_format.append(off_action_policy_format[:, :, 0])
             action_policy_format.append(off_action_policy_format[:, :, 1:])
