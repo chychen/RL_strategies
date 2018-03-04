@@ -152,20 +152,18 @@ class TWO_TRUNK_PPO(object):
                         :, :, None], tf.float32),
                 output.policy[ACT['OFF_DASH']].mode(),
                 output.policy[ACT['DEF_DASH']].mode()], axis=2)
-            action_w = tf.where(
+            action = tf.where(
                 self._is_training, sample_, mode_)
-            action = tf.reshape(
-                action_w, shape=[tf.shape(action_w)[0], tf.shape(action_w)[1], 11, 2])
             # summary = str()
-            # TODO log prob
+            # TODO log probm
             # logprob = output.policy.log_prob(action)
             # pylint: disable=g-long-lambda
             summary = tf.cond(self._should_log, lambda: tf.summary.merge([
                 tf.summary.histogram('mode', mode_),
-                tf.summary.histogram('DECISION', action[:, 0, 0, 0]),
-                tf.summary.histogram('PASS_ANG', action[:, 0, 0, 1]),
-                tf.summary.histogram('OFF_DASH', action[:, 0, 1:6]),
-                tf.summary.histogram('DEF_DASH', action[:, 0, 6:11]),
+                tf.summary.histogram('DECISION', action[:, 0, 0]),
+                tf.summary.histogram('PASS_ANG', action[:, 0, 1:3]),
+                tf.summary.histogram('OFF_DASH', action[:, 0, 3:13]),
+                tf.summary.histogram('DEF_DASH', action[:, 0, 13:23]),
                 # ,
                 # tf.summary.histogram('logprob', logprob)
             ]), str)
@@ -296,7 +294,7 @@ class TWO_TRUNK_PPO(object):
         decision_shape = output.policy[ACT['DECISION']].event_shape
         off_dash_shape = output.policy[ACT['OFF_DASH']].event_shape
         def_dash_shape = output.policy[ACT['DEF_DASH']].event_shape
-        if decision_shape != () or off_dash_shape != (11,) or def_dash_shape != (10,):
+        if decision_shape != () or off_dash_shape != (12,) or def_dash_shape != (10,):
             message = 'Policy event shape does not match action shape.'
             raise ValueError(message)
         self._policy_type = [type(output.policy[ACT['DECISION']]),

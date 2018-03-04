@@ -1,3 +1,4 @@
+import numpy as np
 from gym import Space
 import tensorflow as tf
 
@@ -34,8 +35,8 @@ class ActTuple(Space):
         return all([space == o_space for space, o_space in zip(self.spaces, other.spaces)])
 
     def __iter__(self):
-        for v in list(self.spaces):
-            yield v
+        for space in list(self.spaces):
+            yield space
 
     def __getitem__(self, idx):
         return self.spaces[idx]
@@ -45,15 +46,15 @@ class ActTuple(Space):
     def shape(self):
         """ 
         ### original shape
-        - Tuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        - Tuple(Discrete(3), Box(2,), Box(5, 2), Box(5, 2))
 
-        ### reshape to (11, 2)
-        - spaces[0,0] = Discrete(3), 
-        - spaces[0,1] = Box(), 
-        - spaces[1:6,:] = Box(5, 2), 
-        - spaces[6:11,:] = Box(5, 2) 
+        ### reshape to (23,)
+        - spaces[0] = Discrete(3),
+        - spaces[1:3] = Box(2), 
+        - spaces[3:13] = Box(5, 2), 
+        - spaces[13:23] = Box(5, 2) 
         """
-        return (11, 2)
+        return (23,)
     # Extended
 
     @property
@@ -65,22 +66,22 @@ def back_to_act_tuple(inputs):
     """
     Args
     ----
-    inputs : shape=[num_agents, 11, 2]
-        - off_action_space shape=(6, 2)  # [decision, ball_dir] + player_dash(5, 2)
-        - def_action_space shape=(5, 2)  # player_dash(5, 2)
+    inputs : shape=[num_agents, 23]
+        - off_action_space shape=(13)  # decision(1) + ball_dir(2) + player_dash(5, 2)
+        - def_action_space shape=(10)  # player_dash(5, 2)
 
     Returns
     -------
-    [num_agents, [Discrete(3), Box(), Box(5, 2), Box(5, 2)]]
+    [num_agents, [Discrete(3), Box(2), Box(5, 2), Box(5, 2)]]
     """
     transformed = []
     for input_ in inputs:
         transformed.append(
             [
-                int(round(input_[0, 0])),  # Discrete(3) must be int
-                input_[0, 1],  # Box()
-                input_[1:6, :],  # Box(5, 2)
-                input_[6:11, :]  # Box(5, 2)
+                int(round(input_[0])),  # Discrete(3) must be int
+                input_[1:3],  # Box(2,)
+                np.reshape(input_[3:13], [5,2]),  # Box(5, 2)
+                np.reshape(input_[13:23], [5,2])  # Box(5, 2)
             ]
         )
     return transformed

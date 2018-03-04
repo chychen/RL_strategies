@@ -1,46 +1,5 @@
 
-""" Define the basketball game environment with continuous state spaces and continuous, discrete action spaces, containing two agents:
-1. offensive team (and ball):
-    - actions:
-        * DASH (power, degree): move the agents with power and direction,
-            for each player and ball sampled from policy output's probability distribution
-        * decision (discrete): one hot vector, shape=[3]
-            choosed by policy softmax layers' max output
-            ` SHOOT: after moving, calculate the open score, episode ends.
-            ` PASS: move players after pass the ball.
-            ` NO_OP: do nothing but moving, excluding the ball.
-        * (maybe the communication protocol to encourage set offense)
-2. defensive team:
-    - actions:
-        * DASH (power, degree): move the agents with power and direction,
-            for each player and ball sampled from policy output's probability distribution
-        * (maybe the communication protocol to encourage set defense)
-
-Environment:
-    - The task is episodic, and an episode ends when one of four events occurs:
-        * SHOOT : A shoot decision is made,
-        * OOB : The ball is out of bounds,
-        * CAPTURED : A defender gets possession of the ball,
-        * OOT : A max time limit for the episode is reached.
-    - Constraints:
-        * Catching/Stealing Ball
-        * Collision
-    - Rewards:
-        * Offensive team:
-            * the farther to the cloest defender the better
-            * the closer to the basket the better
-            * if successfully catch the ball
-            * (the fewer defenders closest to ball-holder the better)
-        * Defensive team:
-            * the negative value while the offense step() or 0.
-            
-court size: 94 by 50 (feet)
-1 feet = 30.48 cm = 0.3048 m
-1 m = 3.2808 feet
-# analized from real NBA dataset
-(maximum = mean + 3 * stddev)
-FPS = 5
-all analized results are recorded in bball_strategies/analysis/physics_limitation.py
+""" use vector (x,y) rather than (power, direction)
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -55,26 +14,8 @@ from os import path
 import copy
 import sys
 from bball_strategies.gym_bball import tools
-"""
-# NOTE
-# check if the following ranges reasonable?
-# screen_radius = circle with radius 2.0 feets (about 0.61 meter)
-# wingspan_radius = circle with radius 3.5 feets (about 1.06 meter)
-# stolen_radius = circle with radius 5.0 feets (about 1.52 meter)
 
-    self.screen_radius = 2.0 * 2
-    self.wingspan_radius = 3.5
-    self.stolen_radius = 5.0
-    self.pl_max_speed = 38.9379818754 / FPS
-    # cost at least one second to cross over the opponent
-    self.pl_collision_speed = self.screen_radius / FPS
-    self.pl_max_power = 24.5810950984 / FPS
-    self.ball_passing_speed = 30.0 / FPS
 
-note :
-- velocity: scalar with direction
-- speed: scalar only
-"""
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 FPS = 5.0
@@ -145,6 +86,11 @@ class BBallEnv(gym.Env):
         """
         rewards value is only designed for offense agent.
         the negative rewards of offense could be reckoned as the rewards of defense. 
+
+        Inputs
+        ------
+        action : list
+            as [decision(1,), ball_dir(2,), offense_dash(5,2), defense_dash(5,2)]
 
         Returns
         -------
@@ -297,12 +243,12 @@ class BBallEnv(gym.Env):
         if_vis_trajectory : whether to vis the trajectory
         if_vis_visual_aid : whether vis the collision range, fetchable range, and stealable range.
         """
-        if self.viewer is None:
-            from gym.envs.classic_control import rendering
+        from gym.envs.classic_control import rendering
         if not self.if_vis_trajectory:
             if self.viewer is None:
                 self.viewer = rendering.Viewer(940+100, 500+100)
-                self.viewer.set_bounds(0-5, 94+5, 0-5, 50+5)  # feet # coordinates
+                # feet # coordinates
+                self.viewer.set_bounds(0-5, 94+5, 0-5, 50+5)
                 # background img
                 fname = path.join(path.dirname(__file__), "fullcourt.png")
                 img = rendering.Image(fname, 94, 50)
@@ -373,8 +319,9 @@ class BBallEnv(gym.Env):
 
         if self.if_vis_trajectory:
             if self.viewer is None:
-                self.viewer = rendering.Viewer(940, 500)
-                self.viewer.set_bounds(0, 94, 0, 50)  # feet
+                self.viewer = rendering.Viewer(940+100, 500+100)
+                # feet # coordinates
+                self.viewer.set_bounds(0-5, 94+5, 0-5, 50+5)
                 # background img
                 fname = path.join(path.dirname(__file__), "fullcourt.png")
                 img = rendering.Image(fname, 94, 50)
@@ -450,28 +397,26 @@ class BBallEnv(gym.Env):
         """
         Return
         ------
-        ActTuple(Discrete(3), Box(), Box(5, 2), Box(5, 2))
+        ActTuple(Discrete(3), Box(2), Box(5, 2), Box(5, 2))
         """
         return tools.ActTuple((
             spaces.Discrete(3),  # offensive decision
-            # ball theta
+            # ball dir
             spaces.Box(
-                low=-np.pi, high=np.pi, shape=(), dtype=np.float32
+                low=-1, high=1, shape=(2,), dtype=np.float32
             ),
-            # offense player DASH(power, direction)
+            # offense player DASH(x, y)
             spaces.Box(
-                low=np.array([[0, -np.pi]
-                              for _ in range(5)], dtype=np.float32),
-                high=np.array([[self.pl_max_power, np.pi]
-                               for _ in range(5)], dtype=np.float32),
+                low=-self.pl_max_power,
+                high=self.pl_max_power,
+                shape=(5, 2),
                 dtype=np.float32
             ),
-            # defense player DASH(power, direction)
+            # defense player DASH(x, y)
             spaces.Box(
-                low=np.array([[0, -np.pi]
-                              for _ in range(5)], dtype=np.float32),
-                high=np.array([[self.pl_max_power, np.pi]
-                               for _ in range(5)], dtype=np.float32),
+                low=-self.pl_max_power,
+                high=self.pl_max_power,
+                shape=(5, 2),
                 dtype=np.float32
             )
         ))
@@ -504,19 +449,15 @@ class BBallEnv(gym.Env):
         # 1. update the vels by player's power (with max speed limit = self.pl_max_speed)
         # update player state
         assert pl_dash.shape == (5, 2)
-        # decomposing into power and direction
-        pl_power = np.clip(
-            pl_dash[:, DASH_LOOKUP['POWER']], 0, self.pl_max_power)
-        pl_acc_dir = np.clip(
-            pl_dash[:, DASH_LOOKUP['DIRECTION']], -np.pi, np.pi)
-        pl_acc_dir_vec = np.stack(
-            [np.cos(pl_acc_dir), np.sin(pl_acc_dir)], axis=1)
-        pl_acc_vec = np.stack(
-            [pl_acc_dir_vec[:, 0] * pl_power, pl_acc_dir_vec[:, 1] * pl_power], axis=1)
-        assert pl_acc_vec.shape == vels[state_idx].shape
-        pl_vels = np.add(vels[state_idx], pl_acc_vec)
+        # can't not exceed the acc limits
+        pl_dash_len = length(pl_dash, axis=1)
+        indices = np.argwhere(pl_dash_len >= self.pl_max_power)
+        pl_dash[indices] = pl_dash[indices] / \
+            np.stack([pl_dash_len[indices], pl_dash_len[indices]],
+                     axis=-1) * self.pl_max_power
+        # can't not exceed the speed limits
+        pl_vels = np.add(vels[state_idx], pl_dash)
         pl_speed = length(pl_vels, axis=1)
-        # can't not exceed the limits
         indices = np.argwhere(pl_speed >= self.pl_max_speed)
         pl_vels[indices] = pl_vels[indices] / \
             np.stack([pl_speed[indices], pl_speed[indices]],
@@ -585,7 +526,7 @@ class BBallEnv(gym.Env):
         for applications: 
             * who is the most reasonable one to catch ball 
             * who is going to collide to other.
-        
+
         Inputs
         ------
         next_pos : float, shape=[2,]
@@ -669,10 +610,9 @@ class BBallEnv(gym.Env):
                     logger.debug(
                         '[BALL] You cannot do PASS decision while ball is passing')
                 else:
-                    ball_pass_dir = np.clip(
-                        ball_pass_dir, -np.pi, np.pi)
-                    new_vel = [self.ball_passing_speed * np.cos(ball_pass_dir),
-                               self.ball_passing_speed * np.sin(ball_pass_dir)]
+                    ball_pass_dir_len = length(ball_pass_dir, axis=0)
+                    new_vel = [self.ball_passing_speed * ball_pass_dir[0] / ball_pass_dir_len,
+                               self.ball_passing_speed * ball_pass_dir[1] / ball_pass_dir_len]
                     self.states.update_ball_vel(new_vel)
                     logger.debug('[BALL] Start Flying')
 
@@ -924,11 +864,6 @@ MODE_LOOKUP = {
     'COME-THEN-IN': 3,
     'IN-THEN-OUT': 4,
     'PASS-OUT': 5
-}
-
-DASH_LOOKUP = {
-    'POWER': 0,
-    'DIRECTION': 1
 }
 
 STATE_LOOKUP = {

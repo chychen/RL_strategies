@@ -39,7 +39,6 @@ def _create_environment(config):
     """
     env = gym.make(config.env)
     env = BBallWrapper(env, fps=config.FPS, time_limit=config.max_length)
-    env.step(0)
     return env
 
 
