@@ -160,7 +160,7 @@ class TWO_TRUNK_PPO(object):
             summary = tf.cond(self._should_log, lambda: tf.summary.merge([
                 tf.summary.histogram('mode', mode_),
                 tf.summary.histogram('DECISION', action[:, 0, 0]),
-                tf.summary.histogram('PASS_ANG', action[:, 0, 1:3]),
+                tf.summary.histogram('PASS_DIR', action[:, 0, 1:3]),
                 tf.summary.histogram('OFF_DASH', action[:, 0, 3:13]),
                 tf.summary.histogram('DEF_DASH', action[:, 0, 13:23]),
                 # ,
