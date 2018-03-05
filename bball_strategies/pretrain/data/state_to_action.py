@@ -76,7 +76,7 @@ def get_ball_status(last_ball_pos, ball_pos, next_ball_pos, last_off_pos, off_po
         else:
             status = 'PASSED'
         ball_dir = ball_vel / length(ball_vel, axis=0)
-        input(status)
+        # input(status)
         # print(ball_dir)
     elif judge == [True, True, True] or judge == [False, True, True]:
         status = 'DRIBBLED'
@@ -174,7 +174,7 @@ def packing_data(data, mode):
                 # ball's direction
                 actions[epi_idx, ret_len_idx, 3:5] = ball_dir
                 # if 'DRIBBLED' or 'CAUGHT', assign the ball handler position to ball position
-                if ball_status=='DRIBBLED' or ball_status=='CAUGHT':
+                if ball_status == 'DRIBBLED' or ball_status == 'CAUGHT':
                     assert ball_handler_idx is not None
                     ball_pos = off_pos[ball_handler_idx]
                 # action's dash
@@ -242,10 +242,14 @@ def main():
     # 2. state_2_action : shoot, pass, dash
     off_obs, def_obs, off_actions, def_actions = state_2_action(data)
     # 3. save as numpy
-    np.save('off_obs.npy', off_obs)
-    np.save('def_obs.npy', def_obs)
-    np.save('off_actions.npy', off_actions)
-    np.save('def_actions.npy', def_actions)
+    np.save('off_obs.npy', np.reshape(
+        off_obs, [off_obs.shape[0] * off_obs.shape[1], 5, 14, 2]))
+    np.save('def_obs.npy', np.reshape(
+        def_obs, [def_obs.shape[0] * def_obs.shape[1], 5, 14, 2]))
+    np.save('off_actions.npy', np.reshape(
+        off_actions, [off_actions.shape[0] * off_actions.shape[1], 15]))
+    np.save('def_actions.npy', np.reshape(
+        def_actions, [def_actions.shape[0] * def_actions.shape[1], 10]))
 
 
 if __name__ == '__main__':
