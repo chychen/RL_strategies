@@ -110,13 +110,12 @@ def net(observations, config):
             )
             with tf.variable_scope('policy'):
                 with tf.variable_scope('actions'):
-                    with tf.variable_scope('dash'):
-                        off_dash_mean = tf.layers.dense(
-                            inputs=off_fc,
-                            units=12,
-                            activation=tf.tanh,  # NOTE tanh is not good?
-                            kernel_initializer=init_output_weights,
-                        )
+                    off_action_mean = tf.layers.dense(
+                        inputs=off_fc,
+                        units=12,
+                        activation=tf.tanh,  # NOTE tanh is not good?
+                        kernel_initializer=init_output_weights,
+                    )
                 with tf.variable_scope('decision'):
                     logits = tf.layers.dense(
                         inputs=off_fc,
@@ -170,13 +169,12 @@ def net(observations, config):
             )
             with tf.variable_scope('policy'):
                 with tf.variable_scope('actions'):
-                    with tf.variable_scope('dash'):
-                        def_dash_mean = tf.layers.dense(
-                            inputs=def_fc,
-                            units=10,
-                            activation=tf.tanh,  # NOTE tanh is not good?
-                            kernel_initializer=init_output_weights,
-                        )
+                    def_action_mean = tf.layers.dense(
+                        inputs=def_fc,
+                        units=10,
+                        activation=tf.tanh,  # NOTE tanh is not good?
+                        kernel_initializer=init_output_weights,
+                    )
             with tf.variable_scope('value'):
                 def_value = tf.layers.dense(
                     inputs=def_fc,
@@ -188,25 +186,24 @@ def net(observations, config):
                     def_value, shape=[batch_size, episode_len])
                 def_value = tf.check_numerics(def_value, 'def_value')
 
-    return logits, off_dash_mean, off_value, def_dash_mean, def_value
+    return logits, off_action_mean, off_value, def_action_mean, def_value
 
 
 def offense_pretrain(config, observations):
     """
     """
-    logits, off_dash_mean, _, _, _ = net(
+    logits, off_action_mean, _, _, _ = net(
         observations, config)
-    decisions = tf.nn.softmax(logits)
 
-    return decisions, off_dash_mean, 
+    return logits, off_action_mean
 
 def defense_pretrain(config, observations):
     """
     """
-    _, _, _, def_dash_mean, _ = net(
+    _, _, _, def_action_mean, _ = net(
         observations, config)
 
-    return def_dash_mean
+    return def_action_mean
 
 
 def two_trunk_gaussian(config, action_space, observations, unused_length, state=None):
@@ -250,37 +247,37 @@ def two_trunk_gaussian(config, action_space, observations, unused_length, state=
     before_softplus_std_initializer = tf.constant_initializer(
         np.log(np.exp(config.init_std) - 1))
 
-    logits, off_dash_mean, off_value, def_dash_mean, def_value = net(
+    logits, off_action_mean, off_value, def_action_mean, def_value = net(
         observations, config)
 
     off_actions_std = tf.nn.softplus(tf.get_variable(  # TODO
-        'off_before_softplus_std', off_dash_mean.shape[2:], tf.float32,
+        'off_before_softplus_std', off_action_mean.shape[2:], tf.float32,
         before_softplus_std_initializer))
     off_actions_std = tf.tile(
         off_actions_std[None, None],
         [tf.shape(observations)[0], tf.shape(observations)[1], 1])
-    off_dash_mean = tf.check_numerics(
-        off_dash_mean, 'off_dash_mean')
+    off_action_mean = tf.check_numerics(
+        off_action_mean, 'off_action_mean')
     off_actions_std = tf.check_numerics(
         off_actions_std, 'off_actions_std')
     off_actions = CustomKLDiagNormal(
-        off_dash_mean, off_actions_std)
+        off_action_mean, off_actions_std)
 
     off_decision = tfd.Categorical(logits)
     off_policy = [off_decision, off_actions]
 
     def_actions_std = tf.nn.softplus(tf.get_variable(  # TODO
-        'def_before_softplus_std', def_dash_mean.shape[2:], tf.float32,
+        'def_before_softplus_std', def_action_mean.shape[2:], tf.float32,
         before_softplus_std_initializer))
     def_actions_std = tf.tile(
         def_actions_std[None, None],
         [tf.shape(observations)[0], tf.shape(observations)[1], 1])
-    def_dash_mean = tf.check_numerics(
-        def_dash_mean, 'def_dash_mean')
+    def_action_mean = tf.check_numerics(
+        def_action_mean, 'def_action_mean')
     def_actions_std = tf.check_numerics(
         def_actions_std, 'def_actions_std')
     def_actions = CustomKLDiagNormal(
-        def_dash_mean, def_actions_std)
+        def_action_mean, def_actions_std)
     def_policy = def_actions
 
     policy = off_policy + [def_policy]

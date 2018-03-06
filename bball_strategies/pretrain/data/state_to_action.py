@@ -243,13 +243,13 @@ def main():
     off_obs, def_obs, off_actions, def_actions = state_2_action(data)
     # 3. save as numpy
     np.save('off_obs.npy', np.reshape(
-        off_obs, [off_obs.shape[0] * off_obs.shape[1], 5, 14, 2]))
+        off_obs, [off_obs.shape[0] * off_obs.shape[1], 1, 5, 14, 2]))
     np.save('def_obs.npy', np.reshape(
-        def_obs, [def_obs.shape[0] * def_obs.shape[1], 5, 14, 2]))
+        def_obs, [def_obs.shape[0] * def_obs.shape[1], 1, 5, 14, 2]))
     np.save('off_actions.npy', np.reshape(
-        off_actions, [off_actions.shape[0] * off_actions.shape[1], 15]))
+        off_actions, [off_actions.shape[0] * off_actions.shape[1], 1, 15]))
     np.save('def_actions.npy', np.reshape(
-        def_actions, [def_actions.shape[0] * def_actions.shape[1], 10]))
+        def_actions, [def_actions.shape[0] * def_actions.shape[1], 1, 10]))
 
 
 if __name__ == '__main__':
