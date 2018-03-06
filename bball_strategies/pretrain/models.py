@@ -5,7 +5,15 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import tensorflow as tf
+from bball_strategies.gym_bball.envs.bball_env import BBallEnv
 
+
+def denormalize_action(action):
+    # skip discrete item (self._env.action_space[0])
+    min_ = -BBallEnv().pl_max_power
+    max_ = BBallEnv().pl_max_power
+    action = (action + 1.0) / 2.0 * (max_ - min_) + min_
+    return action
 
 class PretrainOffense(object):
     """ supervised pretraining for offensive policy
@@ -23,6 +31,7 @@ class PretrainOffense(object):
         # inference
         self._logits, self._off_action_mean = self._config.network(
             self._config, self._input_obs)
+        self._off_action_mean = denormalize_action(self._off_action_mean)
         self._loss, self._summary = self.loss_function()
         # train
         optimizer = self._config.optimizer(self._config.learning_rate)
@@ -92,6 +101,7 @@ class PretrainDefense(object):
         # inference
         self._def_action_mean = self._config.network(
             self._config, self._input_obs)
+        self._def_action_mean = denormalize_action(self._def_action_mean)
         self._loss, self._summary = self.loss_function()
         # train
         optimizer = self._config.optimizer(self._config.learning_rate)

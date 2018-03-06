@@ -10,29 +10,24 @@ from __future__ import print_function
 
 import datetime
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 import numpy as np
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
 from agents import tools
 from agents.scripts import utility
-from bball_strategies import gym_bball
 from bball_strategies.pretrain import configs
-from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
 from bball_strategies.pretrain import models
 
 
-def training(sess, model, data, label, config):
+def training(sess, model, data, label, config, writter):
     """
     """
     # shuffle
     idx = np.random.permutation(len(data))
     data, label = data[idx], label[idx]
     num_batch = data.shape[0] // config.batch_size
-    # summary writter
-    writter = tf.summary.FileWriter(os.path.join(
-        config.logdir, 'train'), tf.get_default_graph())
     total_loss = 0
     for batch_idx in range(num_batch):
         data_idx = batch_idx * config.batch_size
@@ -44,22 +39,22 @@ def training(sess, model, data, label, config):
     tf.logging.info('Training Mean Loss {}.'.format(total_loss/num_batch))
 
 
-def evaluating(sess, model, data, label, config):
+def evaluating(sess, model, data, label, config, writter):
     """
     """
-    num_batch = data.shape[0] // config.batch_size
-    # summary writter
-    writter = tf.summary.FileWriter(os.path.join(
-        config.logdir, 'eval'), tf.get_default_graph())
-    total_loss = 0
-    for batch_idx in range(num_batch):
-        data_idx = batch_idx * config.batch_size
-        b_data = data[data_idx:data_idx + config.batch_size]
-        b_label = label[data_idx:data_idx + config.batch_size]
-        summary, loss, steps = model.eval(sess, b_data, b_label)
-        total_loss = total_loss + loss
-        writter.add_summary(summary, global_step=steps)
-    tf.logging.info('Evaluating Mean Loss {}.'.format(total_loss/num_batch))
+    summary, loss, steps = model.eval(sess, data, label)
+    writter.add_summary(summary, global_step=steps)
+    tf.logging.info('Evaluating Mean Loss {}.'.format(loss))
+    # num_batch = data.shape[0] // config.batch_size
+    # total_loss = 0
+    # for batch_idx in range(num_batch):
+    #     data_idx = batch_idx * config.batch_size
+    #     b_data = data[data_idx:data_idx + config.batch_size]
+    #     b_label = label[data_idx:data_idx + config.batch_size]
+    #     summary, loss, steps = model.eval(sess, b_data, b_label)
+    #     total_loss = total_loss + loss
+    #     # writter.add_summary(summary, global_step=steps)
+    # tf.logging.info('Evaluating Mean Loss {}.'.format(total_loss/num_batch))
 
 
 def testing(sess, model, data, outdir):
@@ -79,9 +74,15 @@ def train(config, data, label, outdir):
     ------
     score : Evaluation scores.
     """
+    # normalization
+    stddev = np.std(data)
+    mean = np.mean(data)
+    data = (data - mean) / stddev
     # split into train and eval
     train_data, eval_data = np.split(data, [data.shape[0]*9//10])
     train_label, eval_label = np.split(label, [data.shape[0]*9//10])
+    print(train_data.shape)
+    print(eval_data.shape)
     # graph
     tf.reset_default_graph()
     if FLAGS.config == 'offense':
@@ -91,10 +92,18 @@ def train(config, data, label, outdir):
     else:
         raise ValueError('{} is not an available config'.format(FLAGS.config))
     # model = config.model(config)
+    message = 'Graph contains {} trainable variables.'
+    tf.logging.info(message.format(tools.count_weights()))
     saver = utility.define_saver()
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
+    # summary writter
+    train_writter = tf.summary.FileWriter(os.path.join(
+        config.logdir, 'train'), tf.get_default_graph())
+    # summary writter
+    eval_writter = tf.summary.FileWriter(os.path.join(
+        config.logdir, 'eval'), tf.get_default_graph())
     with tf.Session(config=sess_config) as sess:
         if FLAGS.debug:
             sess = tf_debug.LocalCLIDebugWrapperSession(
@@ -102,8 +111,11 @@ def train(config, data, label, outdir):
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
         for epoch_idx in range(config.num_epochs):
-            training(sess, model, train_data, train_label, config)
-            evaluating(sess, model, eval_data, eval_label, config)
+            tf.logging.info('Number of epochs: {}'.format(epoch_idx))
+            training(sess, model, train_data,
+                     train_label, config, train_writter)
+            evaluating(sess, model, eval_data,
+                       eval_label, config, eval_writter)
             # testing(sess, model, eval_data, outdir)
 
 
