@@ -10,7 +10,7 @@ from __future__ import print_function
 
 import datetime
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 import numpy as np
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
@@ -117,6 +117,10 @@ def train(config, data, label, outdir):
             evaluating(sess, model, eval_data,
                        eval_label, config, eval_writter)
             # testing(sess, model, eval_data, outdir)
+            if (epoch_idx + 1) % config.checkpoint_every == 0:
+                tf.gfile.MakeDirs(config.logdir)
+                filename = os.path.join(config.logdir, 'model.ckpt')
+                saver.save(sess, filename, (epoch_idx + 1) * config.batch_size)
 
 
 def main(_):

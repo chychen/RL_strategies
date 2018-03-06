@@ -26,8 +26,9 @@ def default():
     # Optimization
     optimizer = tf.train.AdamOptimizer
     learning_rate = 1e-4
-    batch_size = 256
-    num_epochs = int(1e3)
+    batch_size = 512
+    num_epochs = int(1e4)
+    checkpoint_every = 100
     # Loss
     loss_alpha = 0.5
 
