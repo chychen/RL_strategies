@@ -1,4 +1,3 @@
-
 """ use vector (x,y) rather than (power, direction)
 """
 from __future__ import absolute_import
@@ -42,7 +41,6 @@ class BBallEnv(gym.Env):
         # config might be setup by Wrapper
         self.init_mode = None
         self.init_positions = None  # if_init_by_input
-        self.init_ball_handler_idx = None  # if_init_by_input
         self.if_vis_trajectory = False
         self.if_vis_visual_aid = False
         # for render()
@@ -189,9 +187,14 @@ class BBallEnv(gym.Env):
         """
         if self.init_mode == INIT_LOOKUP['INPUT']:
             assert self.init_positions is not None
-            assert self.init_ball_handler_idx is not None
+            ball_pos = self.init_positions[0]
+            off_positions = self.init_positions[1]
+            def_positions = self.init_positions[2]
+            off2ball_vec = off_positions - ball_pos
+            ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
+            self.init_positions[0] = off_positions[ball_handler_idx]
             self.states.reset(
-                self.init_positions, self.init_ball_handler_idx, buffer_size=self.buffer_size)
+                self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET']:
             data = np.load('bball_strategies/data/FrameRate5.npy')
             ep_idx = np.floor(self.np_random_generator.uniform(

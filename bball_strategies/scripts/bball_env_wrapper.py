@@ -12,7 +12,7 @@ from bball_strategies.gym_bball import tools
 
 class BBallWrapper(object):
 
-    def __init__(self, env, if_norm_obs=True, if_norm_act=True, init_mode=1, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, fps=5, time_limit=240):
+    def __init__(self, env, if_clip=True, if_norm_obs=True, if_norm_act=True, init_mode=1, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, fps=5, time_limit=240):
         """
         Args
         ----
@@ -29,11 +29,11 @@ class BBallWrapper(object):
         self._env.if_vis_trajectory = if_vis_trajectory
         self._env.if_vis_visual_aid = if_vis_visual_aid
         self._env.init_positions = init_positions
-        self._env.init_ball_handler_idx = init_ball_handler_idx
         self._env.FPS = fps
         self._env.time_limit = time_limit
 
-        self._env = ClipAction(self._env)
+        if if_clip:
+            self._env = ClipAction(self._env)
         self._env = RangeNormalize(
             self._env, observ=if_norm_obs, action=if_norm_act)
         self._env = ConvertTo32Bit(self._env)

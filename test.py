@@ -9,7 +9,6 @@ import numpy as np
 
 def no_op():
     action = tuple((
-        # np.array([1, 0]),
         np.array(2),
         np.array([0, 0]),
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),

@@ -10,13 +10,16 @@ from __future__ import print_function
 
 import datetime
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 import numpy as np
+import gym
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
 from agents import tools
 from agents.scripts import utility
+from bball_strategies.gym_bball.envs.bball_pretrain_env import BBallPretrainEnv
+from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
 from bball_strategies.pretrain import configs
 from bball_strategies.pretrain import models
 
@@ -57,12 +60,6 @@ def evaluating(sess, model, data, label, config, writter):
     # tf.logging.info('Evaluating Mean Loss {}.'.format(total_loss/num_batch))
 
 
-def testing(sess, model, data, outdir):
-    """ vis data
-    """
-    pass
-
-
 def train(config, data, label, outdir):
     """ Training and evaluation entry point yielding scores.
 
@@ -75,9 +72,10 @@ def train(config, data, label, outdir):
     score : Evaluation scores.
     """
     # normalization
-    stddev = np.std(data)
-    mean = np.mean(data)
-    data = (data - mean) / stddev
+    env = BBallPretrainEnv()
+    min_ = env.observation_space.low
+    max_ = env.observation_space.high
+    data = 2 * (data - min_) / (max_ - min_) - 1
     # split into train and eval
     train_data, eval_data = np.split(data, [data.shape[0]*9//10])
     train_label, eval_label = np.split(label, [data.shape[0]*9//10])
@@ -116,7 +114,6 @@ def train(config, data, label, outdir):
                      train_label, config, train_writter)
             evaluating(sess, model, eval_data,
                        eval_label, config, eval_writter)
-            # testing(sess, model, eval_data, outdir)
             if (epoch_idx + 1) % config.checkpoint_every == 0:
                 tf.gfile.MakeDirs(config.logdir)
                 filename = os.path.join(config.logdir, 'model.ckpt')
@@ -134,7 +131,6 @@ def main(_):
         label = np.load('bball_strategies/pretrain/data/def_actions.npy')
     else:
         raise ValueError('{} is not an available config'.format(FLAGS.config))
-
     utility.set_up_logging()
     if not FLAGS.resume:
         logdir = FLAGS.logdir and os.path.expanduser(os.path.join(
