@@ -10,3 +10,8 @@ register(
     id='bball-v0',
     entry_point='bball_strategies.gym_bball.envs:BBallEnv',
 )
+
+register(
+    id='bball-pretrain-v0',
+    entry_point='bball_strategies.gym_bball.envs:BBallPretrainEnv',
+)

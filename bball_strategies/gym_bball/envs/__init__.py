@@ -3,3 +3,4 @@ from __future__ import division
 from __future__ import print_function
 
 from .bball_env import BBallEnv
+from .bball_pretrain_env import BBallPretrainEnv
