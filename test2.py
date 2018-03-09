@@ -1,3 +1,31 @@
+class WrapperEnv(object):
+
+    def __init__(self, env):
+        self._env = env
+
+    @property
+    def my_attr(self):
+        return 'changed'
+
+    def show(self):
+        print(self._env.my_attr)
+        # print(self.my_attr)
+
+class Env(object):
+
+    def __init__(self):
+        pass
+
+    @property
+    def my_attr(self):
+        return 'my_attr'
+
+env = Env()
+print(env.my_attr)
+env = WrapperEnv(env)
+print(env.my_attr)
+env.show()
+
 
 # import tensorflow as tf
 # import numpy as np
