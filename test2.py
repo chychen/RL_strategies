@@ -26,6 +26,13 @@ env = WrapperEnv(env)
 print(env.my_attr)
 env.show()
 
+#########################################################
+# gather：根據一個list來取用目標
+# python 使用+=很可能會有不明錯誤！！！儘量避免
+# numpy 有outer機制，計算cross-op可避免使用迴圈
+# np.op.outer(), i.e. np.subtract.outer()
+# np.inner, can broadcast itsef
+#########################################################
 
 # import tensorflow as tf
 # import numpy as np

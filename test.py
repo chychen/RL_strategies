@@ -121,7 +121,7 @@ def maxspeed():
             np.array(2),
             np.array([0, 0]),
             np.array([[0, 0], [0, 0], [-5, 0], [0, 0], [0, 0]]),
-            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])            
+            np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
         _, _, done, _ = env.step(action)
         env.render()
@@ -173,14 +173,13 @@ def ball_stealing():
     for _ in range(10):
         no_op()
     env.close()
-    
 
 
 def move_offense_right():
     for _ in range(25):
         action = tuple((
             np.array(2),
-            np.array(0),
+            np.array([0, 0]),
             np.array([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
@@ -191,7 +190,7 @@ def move_offense_right():
             env.render()
         action = tuple((
             np.array(2),
-            np.array(0),
+            np.array([0, 0]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
@@ -284,7 +283,7 @@ def main():
     # ball_looping()
     # moving_around()
     # maxspeed()
-    # move_offense_right()
+    move_offense_right()
     # random_dancing()
 
     env.close()
@@ -294,11 +293,3 @@ if __name__ == '__main__':
     main()
     # rewards()
     # ball_stealing()
-    
-
-
-# gather：根據一個list來取用目標
-# python 使用+=很可能會有不明錯誤！！！儘量避免
-# numpy 有outer機制，計算cross-op可避免使用迴圈
-# np.op.outer(), i.e. np.subtract.outer()
-# np.inner, can broadcast itsef

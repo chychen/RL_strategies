@@ -13,7 +13,6 @@ import matplotlib.animation as animation
 from matplotlib.patches import Circle, Rectangle, Arc
 
 
-
 def update_all(frame_id, player_circles, ball_circle, annotations, data):
     """ 
     Inputs
@@ -113,19 +112,22 @@ def test():
     """
     plot real data
     """
-    target_data = np.zeros(shape=[100,23])
-    off_data = np.load('data/def_obs.npy')
-    target_data[:,0:2] = off_data[:100, 0, -1, 0:1, :].reshape([100,2])
-    target_data[:,3:23] = off_data[:100, 0, -1, 1:11, :].reshape([100,20])
-    plot_data(target_data, length=100,
-                file_path=opt.save_path + 'play_def.mp4', if_save=opt.save)
-
-    # train_data = np.load(opt.data_path)
-    # print(train_data.shape)
-    # target_data = np.concatenate([train_data[0,:,0:1,:3].reshape([100,3]),train_data[0,:,1:,:2].reshape([100,20])], axis=-1)
-    # print(target_data.shape)
+    # target_data = np.zeros(shape=[100,23])
+    # off_data = np.load('data/def_obs.npy')
+    # target_data[:,0:2] = off_data[:100, 0, -1, 0:1, :].reshape([100,2])
+    # target_data[:,3:23] = off_data[:100, 0, -1, 1:11, :].reshape([100,20])
     # plot_data(target_data, length=100,
-    #             file_path=opt.save_path + 'play.mp4', if_save=opt.save)
+    #             file_path=opt.save_path + 'play_def.mp4', if_save=opt.save)
+
+    train_data = np.load(opt.data_path)
+    train_data_len = np.load('../data/FPS5Length.npy')
+    print(train_data.shape)
+    print(train_data_len.shape)
+    target_data = np.concatenate([train_data[:, :, 0:1, :3].reshape(
+        [train_data.shape[0], 235, 3]), train_data[:, :, 1:, :2].reshape([train_data.shape[0], 235, 20])], axis=-1)
+    for i in range(100):
+        plot_data(target_data[i], length=train_data_len[i],
+                  file_path=opt.save_path + 'play_{}.mp4'.format(i), if_save=opt.save)
 
     print('opt.save', opt.save)
     print('opt.amount', opt.amount)
@@ -145,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_path', type=str, default='../data/',
                         help='string, path to save event animation')
     parser.add_argument('--data_path', type=str,
-                        default='../data/FrameRate5.npy', help='string, path of target data')
+                        default='../data/FPS5.npy', help='string, path of target data')
 
     opt = parser.parse_args()
     if not os.path.exists(opt.save_path):
