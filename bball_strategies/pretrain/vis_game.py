@@ -120,7 +120,7 @@ def test():
     #             file_path=opt.save_path + 'play_def.mp4', if_save=opt.save)
 
     train_data = np.load(opt.data_path)
-    train_data_len = np.load('../data/FPS5Length.npy')
+    train_data_len = np.load('../data/FixedFPS5Length.npy')
     print(train_data.shape)
     print(train_data_len.shape)
     target_data = np.concatenate([train_data[:, :, 0:1, :3].reshape(
@@ -130,7 +130,8 @@ def test():
     #               file_path=opt.save_path + 'play_{}.mp4'.format(i), if_save=opt.save)
     transition_idx = 0
     for i in range(100):
-        transition_idx += train_data_len[i]
+        # discard both the head and tail while transform real positions to transitions
+        transition_idx += (train_data_len[i]-2)
         plot_data(target_data[i], length=train_data_len[i],
                   file_path=opt.save_path + 'play_tran_{}_epi_{}.mp4'.format(transition_idx, i), if_save=opt.save)
 
@@ -152,7 +153,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_path', type=str, default='../data/',
                         help='string, path to save event animation')
     parser.add_argument('--data_path', type=str,
-                        default='../data/FPS5.npy', help='string, path of target data')
+                        default='../data/FixedFPS5.npy', help='string, path of target data')
 
     opt = parser.parse_args()
     if not os.path.exists(opt.save_path):

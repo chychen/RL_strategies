@@ -70,12 +70,13 @@ def get_ball_status(last_ball_pos, ball_pos, next_ball_pos, last_off_pos, off_po
         ball2basket_vec = RIGHT_BASKET_POS - ball_pos[0]
         dot_value = np.dot(ball_vel, ball2basket_vec)
         if_angle_small = np.arccos(
-            dot_value / (length(ball_vel, axis=0) * length(ball2basket_vec, axis=0) + 1e-8)) < np.pi * 3.0 / 180.0 # prevent from dividing 0
+            dot_value / (length(ball_vel, axis=0) * length(ball2basket_vec, axis=0) + 1e-8)) < np.pi * 3.0 / 180.0  # prevent from dividing 0
         if dot_value > 0 and if_angle_small:
             status = 'SHOT'
         else:
             status = 'PASSED'
-        ball_dir = ball_vel / (length(ball_vel, axis=0) + 1e-8) # prevent from dividing 0
+        # prevent from dividing 0
+        ball_dir = ball_vel / (length(ball_vel, axis=0) + 1e-8)
     elif judge == [True, True, True] or judge == [False, True, True]:
         status = 'DRIBBLED'
         ball_handler_idx = np.argmin(length(ball_pos - off_pos, axis=1))
@@ -115,10 +116,11 @@ def packing_data(data, data_len, mode):
 
     Returns
     -------
-    obs : float, shape=[num_episode, max_length-2, BUFFER_SIZE, 14, 2]
+    num_of_transitions = sum over (num_episode) with (true_length-2)
+    obs : float, shape=[num_of_transitions, BUFFER_SIZE, 14, 2]
     actions : float
-        if mode=='OFFENSE' -> shape=[num_episode, max_length-2, 15]
-        if mode=='DEFENSE' -> shape=[num_episode, max_length-2, 10]
+        if mode=='OFFENSE' -> shape=[num_of_transitions, 15]
+        if mode=='DEFENSE' -> shape=[num_of_transitions, 10]
     """
     assert mode in TEAM_LIST, "mode must be eigther offense or defense"
     obs = np.empty(shape=[data.shape[0], data.shape[1]-2, 5, 14, 2])
@@ -127,7 +129,8 @@ def packing_data(data, data_len, mode):
     actions = np.empty(shape=[data.shape[0], data.shape[1]-2, action_shape])
     actions = []
     for epi_idx in range(data.shape[0]):
-        # print(epi_idx)
+        if epi_idx % 100 == 0:
+            print('{}/{}'.format(epi_idx, data.shape[0]))
         # obs buffer, filled up with 5 first frame
         obs_buffer = np.empty(shape=[BUFFER_SIZE, 14, 2])
         for i in range(BUFFER_SIZE):
@@ -214,38 +217,41 @@ def state_2_action(data, data_len):
 
     Return
     ------
-    off_obs: float, shape=[num_episode*true_length, 5, 14, 2]
+    num_of_transitions = sum over (num_episode) with (true_length-2)
+    off_obs: float, shape=[num_of_transitions, 5, 14, 2]
         timesteps of [off, def] = [t-1, t-1]
         shape is as same as the return value of env.etep()
         5 -> buffer 5 frames
         14 -> [1 ball, 5 offense, 5 defense, 1 basket pos, 2 boundary info]
-    def_obs: float, shape=[num_episode*true_length, 5, 14, 2]
+    def_obs: float, shape=[num_of_transitions, 5, 14, 2]
         timesteps of [off, def] = [t, t-1]
         shape is as same as the return value of env.etep()
         5 -> buffer 5 frames
         14 -> [1 ball, 5 offense, 5 defense, 1 basket pos, 2 boundary info]
-    off_actions : float, shape=[num_episode*true_length, 15]
+    off_actions : float, shape=[num_of_transitions, 15]
         shape is as same as the output value of the offense pretrain network
         15 -> [3 one hot decision, 2 ball, 5*2 offense]
-    def_actions : float, shape=[num_episode*true_length, 10]
+    def_actions : float, shape=[num_of_transitions, 10]
         shape is as same as the output value of the defense pretrain network
         10 -> [5*2 defense]
     """
     # packing offense training data
     off_obs, off_actions = packing_data(data, data_len, mode='OFFENSE')
+    print('OFFENSE is ready')
 
     # packing defense training data
     # in the obs of defense, offense always one step lead than defense
     data[:, :-1, 1:6] = data[:, 1:, 1:6]
     def_obs, def_actions = packing_data(data, data_len, mode='DEFENSE')
+    print('DEFENSE is ready')
 
     return off_obs, def_obs, off_actions, def_actions
 
 
 def main():
     # 1. data IO
-    data = np.load('../../data/FPS5.npy')
-    data_len = np.load('../../data/FPS5Length.npy')
+    data = np.load('../../data/FixedFPS5.npy')
+    data_len = np.load('../../data/FixedFPS5Length.npy')
     print(data.shape)
     print(data_len.shape)
     # 2. state_2_action : shoot, pass, dash
