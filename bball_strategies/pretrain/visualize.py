@@ -71,29 +71,29 @@ def vis_data(off_data, off_label, def_data, def_label, outdir, start_idx=0):
     env = gym.wrappers.Monitor(
         env, outdir, lambda unused_episode_number: True, force=False, resume=True)
     obs = env.reset()
-    env.render()
 
     while True:
-        # offense
+        # prevent from modification
+        temp_off_label = np.array(off_label[idx_, 0])
+        temp_def_label = np.array(def_label[idx_, 0])
         if idx_ == start_idx:
             # the env's velocity is zero, so we add the last velocity after env reset.
             last_vel = off_data[idx_, 0, -1, 1:6, :] - \
                 off_data[idx_, 0, -2, 1:6, :]
-            off_label[idx_, 0, 5:] += last_vel.reshape([10, ])
+            temp_off_label[5:] += last_vel.reshape([10, ])
             last_vel = def_data[idx_, 0, -1, 6:11, :] - \
                 def_data[idx_, 0, -2, 6:11, :]
-            def_label[idx_, 0] += last_vel.reshape([10, ])
+            temp_def_label += last_vel.reshape([10, ])
+        # offense
         action = pack_action(
-            [off_label[idx_, 0, :3], off_label[idx_, 0, 3:]], team='offense')
+            [temp_off_label[:3], temp_off_label[3:]], team='offense')
         obs, _, done, _ = env.step(action)
-        env.render()
         if done:
             env.close()
             break
         # deffense
-        action = pack_action(def_label[idx_, 0], team='defense')
+        action = pack_action(temp_def_label, team='defense')
         obs, _, done, _ = env.step(action)
-        env.render()
         if done:
             env.close()
             break
@@ -121,17 +121,19 @@ def vis_result(sess, model, off_data, off_label, def_data, def_label, outdir, nu
         env = gym.wrappers.Monitor(
             env, outdir, lambda unused_episode_number: True, force=False, resume=True)
         obs = env.reset()
-        env.render()
 
         while True:
+            # prevent from modification
+            temp_off_label = np.array(off_label[idx_, 0])
+            temp_def_label = np.array(def_label[idx_, 0])
             if idx_ == start_idx:
                 # the env's velocity is zero, so we add the last velocity after env reset.
                 last_vel = off_data[idx_, 0, -1, 1:6, :] - \
                     off_data[idx_, 0, -2, 1:6, :]
-                off_label[idx_, 0, 5:] += last_vel.reshape([10, ])
+                temp_off_label[5:] += last_vel.reshape([10, ])
                 last_vel = def_data[idx_, 0, -1, 6:11, :] - \
                     def_data[idx_, 0, -2, 6:11, :]
-                def_label[idx_, 0] += last_vel.reshape([10, ])
+                temp_def_label += last_vel.reshape([10, ])
             if FLAGS.config == 'offense':
                 # offense turn
                 obs = norm_obs(env, obs)
@@ -139,23 +141,20 @@ def vis_result(sess, model, off_data, off_label, def_data, def_label, outdir, nu
                 actions = pack_action(
                     [logits[0, 0], actions[0, 0]], FLAGS.config)
                 obs, _, done, _ = env.step(actions)
-                env.render()
                 if done:
                     env.close()
                     break
                 # defense turn
-                actions = pack_action(def_label[idx_, 0], team='defense')
+                actions = pack_action(temp_def_label, team='defense')
                 obs, _, done, _ = env.step(actions)
-                env.render()
                 if done:
                     env.close()
                     break
             elif FLAGS.config == 'defense':
                 # offense turn
                 actions = pack_action(
-                    [off_label[idx_, 0, :3], off_label[idx_, 0, 3:]], team='offense')
+                    [temp_off_label[:3], temp_off_label[3:]], team='offense')
                 obs, _, done, _ = env.step(actions)
-                env.render()
                 if done:
                     env.close()
                     break
@@ -164,7 +163,6 @@ def vis_result(sess, model, off_data, off_label, def_data, def_label, outdir, nu
                 actions = model.perform(sess, obs[None, None])
                 actions = pack_action(actions, FLAGS.config)
                 obs, _, done, _ = env.step(actions)
-                env.render()
                 if done:
                     env.close()
                     break

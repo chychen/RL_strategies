@@ -70,14 +70,12 @@ def get_ball_status(last_ball_pos, ball_pos, next_ball_pos, last_off_pos, off_po
         ball2basket_vec = RIGHT_BASKET_POS - ball_pos[0]
         dot_value = np.dot(ball_vel, ball2basket_vec)
         if_angle_small = np.arccos(
-            dot_value / (length(ball_vel, axis=0) * length(ball2basket_vec, axis=0))) < np.pi * 3.0 / 180.0
+            dot_value / (length(ball_vel, axis=0) * length(ball2basket_vec, axis=0) + 1e-8)) < np.pi * 3.0 / 180.0 # prevent from dividing 0
         if dot_value > 0 and if_angle_small:
             status = 'SHOT'
         else:
             status = 'PASSED'
-        ball_dir = ball_vel / length(ball_vel, axis=0)
-        # input(status)
-        # print(ball_dir)
+        ball_dir = ball_vel / (length(ball_vel, axis=0) + 1e-8) # prevent from dividing 0
     elif judge == [True, True, True] or judge == [False, True, True]:
         status = 'DRIBBLED'
         ball_handler_idx = np.argmin(length(ball_pos - off_pos, axis=1))
@@ -90,6 +88,7 @@ def get_ball_status(last_ball_pos, ball_pos, next_ball_pos, last_off_pos, off_po
     elif judge == [True, False, True]:
         status = 'CAUGHT'
         ball_handler_idx = np.argmin(length(ball_pos - off_pos, axis=1))
+    # NOTE not 100% sure
     elif judge == [False, True, False]:
         status = 'FLYING'
     else:
@@ -103,28 +102,32 @@ def get_ball_status(last_ball_pos, ball_pos, next_ball_pos, last_off_pos, off_po
     return status, ball_dir, ball_handler_idx
 
 
-def packing_data(data, mode):
+def packing_data(data, data_len, mode):
     """
     Inputs
     ------
-    data : float, shape=[?, 100, 11, 4]
+    data : float, shape=[num_episode, max_length, 11, 4]
         11 -> [ball, 5 offense, 5 defense]
         4 -> [x, y, z, player position]
+    data_len : int, shape=[num_episode,]
+        true length of each episode
     mode : str, 'OFFENSE' or 'DEFENSE'
 
     Returns
     -------
-    obs : float, shape=[?, 100-2, BUFFER_SIZE, 14, 2]
+    obs : float, shape=[num_episode, max_length-2, BUFFER_SIZE, 14, 2]
     actions : float
-        if mode=='OFFENSE' -> shape=[?, 100-2, 15]
-        if mode=='DEFENSE' -> shape=[?, 100-2, 10]
+        if mode=='OFFENSE' -> shape=[num_episode, max_length-2, 15]
+        if mode=='DEFENSE' -> shape=[num_episode, max_length-2, 10]
     """
     assert mode in TEAM_LIST, "mode must be eigther offense or defense"
     obs = np.empty(shape=[data.shape[0], data.shape[1]-2, 5, 14, 2])
+    obs = []
     action_shape = 15 if mode == 'OFFENSE' else 10
     actions = np.empty(shape=[data.shape[0], data.shape[1]-2, action_shape])
+    actions = []
     for epi_idx in range(data.shape[0]):
-        print(epi_idx)
+        # print(epi_idx)
         # obs buffer, filled up with 5 first frame
         obs_buffer = np.empty(shape=[BUFFER_SIZE, 14, 2])
         for i in range(BUFFER_SIZE):
@@ -136,7 +139,7 @@ def packing_data(data, mode):
             ], axis=0)
 
         # make sure their exist last and next value
-        for len_idx in range(1, data.shape[1]-1):
+        for len_idx in range(1, data_len[epi_idx]-1):
             # last
             last_ball_pos = data[epi_idx, len_idx-1, 0:1, :2]
             last_off_pos = data[epi_idx, len_idx-1, 1:6, :2]
@@ -163,27 +166,27 @@ def packing_data(data, mode):
 
             ret_len_idx = len_idx-1
             if mode == 'OFFENSE':
+                temp_act = np.empty([15, ])
                 # check ball status, [dribbled or passed, shot]
                 ball_status, ball_dir, ball_handler_idx = get_ball_status(
                     last_ball_pos, ball_pos, next_ball_pos, last_off_pos, off_pos, next_off_pos)
                 assert ball_status in STATUS_LIST
                 # action's decision, (one hot vec)
                 for _, value in DECISION_LOOKUP.items():
-                    actions[epi_idx, ret_len_idx, value] = float(
+                    temp_act[value] = float(
                         STATUS_LOOKUP[ball_status] == value)
                 # ball's direction
-                actions[epi_idx, ret_len_idx, 3:5] = ball_dir
+                temp_act[3:5] = ball_dir
                 # if 'DRIBBLED' or 'CAUGHT', assign the ball handler position to ball position
                 if ball_status == 'DRIBBLED' or ball_status == 'CAUGHT':
                     assert ball_handler_idx is not None
                     ball_pos = off_pos[ball_handler_idx]
                 # action's dash
-                actions[epi_idx, ret_len_idx, 5:] = copy.deepcopy(
-                    np.reshape(off_acc, [10]))
+                temp_act[5:] = np.reshape(off_acc, [10])
+                actions.append(copy.deepcopy(temp_act))
             elif mode == 'DEFENSE':
                 # action's dash
-                actions[epi_idx, ret_len_idx, :] = copy.deepcopy(
-                    np.reshape(def_acc, [10]))
+                actions.append(copy.deepcopy(np.reshape(off_acc, [10])))
             # pack the return data
             obs_buffer[:BUFFER_SIZE-1] = copy.deepcopy(obs_buffer[1:])
             obs_buffer[-1] = np.concatenate([
@@ -192,64 +195,67 @@ def packing_data(data, mode):
                 np.expand_dims([COURT_LENGTH / 2, 0], axis=0),
                 np.expand_dims([COURT_LENGTH, COURT_WIDTH], axis=0)
             ], axis=0)
-            obs[epi_idx, ret_len_idx] = copy.deepcopy(obs_buffer)
+            obs.append(copy.deepcopy(obs_buffer))
 
+    obs = np.stack(obs, axis=0)
+    actions = np.stack(actions, axis=0)
     return obs, actions
 
 
-def state_2_action(data):
+def state_2_action(data, data_len):
     """ 
     Inputs
     ------
-    data : float, shape=[?, 100, 11, 4]
+    data : float, shape=[num_episode, max_length, 11, 4]
         11 -> [ball, 5 offense, 5 defense]
         4 -> [x, y, z, player position]
+    data_len : int, shape=[num_episode,]
+        true length of each episode
 
     Return
     ------
-    off_obs: float, shape=[?, 100, 5, 14, 2]
+    off_obs: float, shape=[num_episode*true_length, 5, 14, 2]
         timesteps of [off, def] = [t-1, t-1]
         shape is as same as the return value of env.etep()
         5 -> buffer 5 frames
         14 -> [1 ball, 5 offense, 5 defense, 1 basket pos, 2 boundary info]
-    def_obs: float, shape=[?, 100, 5, 14, 2]
+    def_obs: float, shape=[num_episode*true_length, 5, 14, 2]
         timesteps of [off, def] = [t, t-1]
         shape is as same as the return value of env.etep()
         5 -> buffer 5 frames
         14 -> [1 ball, 5 offense, 5 defense, 1 basket pos, 2 boundary info]
-    off_actions : float, shape=[?, 100, 15]
+    off_actions : float, shape=[num_episode*true_length, 15]
         shape is as same as the output value of the offense pretrain network
         15 -> [3 one hot decision, 2 ball, 5*2 offense]
-    def_actions : float, shape=[?, 100, 10]
+    def_actions : float, shape=[num_episode*true_length, 10]
         shape is as same as the output value of the defense pretrain network
         10 -> [5*2 defense]
     """
     # packing offense training data
-    off_obs, off_actions = packing_data(data, mode='OFFENSE')
+    off_obs, off_actions = packing_data(data, data_len, mode='OFFENSE')
 
     # packing defense training data
     # in the obs of defense, offense always one step lead than defense
     data[:, :-1, 1:6] = data[:, 1:, 1:6]
-    def_obs, def_actions = packing_data(data, mode='DEFENSE')
+    def_obs, def_actions = packing_data(data, data_len, mode='DEFENSE')
 
     return off_obs, def_obs, off_actions, def_actions
 
 
 def main():
     # 1. data IO
-    data = np.load('../../data/FrameRate5.npy')
+    data = np.load('../../data/FPS5.npy')
+    data_len = np.load('../../data/FPS5Length.npy')
     print(data.shape)
+    print(data_len.shape)
     # 2. state_2_action : shoot, pass, dash
-    off_obs, def_obs, off_actions, def_actions = state_2_action(data)
+    off_obs, def_obs, off_actions, def_actions = state_2_action(data, data_len)
     # 3. save as numpy
-    np.save('off_obs.npy', np.reshape(
-        off_obs, [off_obs.shape[0] * off_obs.shape[1], 1, 5, 14, 2]))
-    np.save('def_obs.npy', np.reshape(
-        def_obs, [def_obs.shape[0] * def_obs.shape[1], 1, 5, 14, 2]))
-    np.save('off_actions.npy', np.reshape(
-        off_actions, [off_actions.shape[0] * off_actions.shape[1], 1, 15]))
-    np.save('def_actions.npy', np.reshape(
-        def_actions, [def_actions.shape[0] * def_actions.shape[1], 1, 10]))
+    np.save('off_obs.npy', off_obs[:, None])
+    np.save('def_obs.npy', def_obs[:, None])
+    np.save('off_actions.npy', off_actions[:, None])
+    np.save('def_actions.npy', def_actions[:, None])
+    print('saved complete!!')
 
 
 if __name__ == '__main__':

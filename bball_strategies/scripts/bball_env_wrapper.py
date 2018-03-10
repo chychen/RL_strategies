@@ -44,6 +44,7 @@ class BBallWrapper(object):
     def reset(self):
         return self._env.reset()
 
+
 class ClipAction(object):
     """Clip out of range actions to the action space of the environment."""
 

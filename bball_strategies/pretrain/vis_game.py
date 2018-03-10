@@ -125,9 +125,14 @@ def test():
     print(train_data_len.shape)
     target_data = np.concatenate([train_data[:, :, 0:1, :3].reshape(
         [train_data.shape[0], 235, 3]), train_data[:, :, 1:, :2].reshape([train_data.shape[0], 235, 20])], axis=-1)
+    # for i in range(100):
+    #     plot_data(target_data[i], length=train_data_len[i],
+    #               file_path=opt.save_path + 'play_{}.mp4'.format(i), if_save=opt.save)
+    transition_idx = 0
     for i in range(100):
+        transition_idx += train_data_len[i]
         plot_data(target_data[i], length=train_data_len[i],
-                  file_path=opt.save_path + 'play_{}.mp4'.format(i), if_save=opt.save)
+                  file_path=opt.save_path + 'play_tran_{}_epi_{}.mp4'.format(transition_idx, i), if_save=opt.save)
 
     print('opt.save', opt.save)
     print('opt.amount', opt.amount)
