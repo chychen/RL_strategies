@@ -6,6 +6,7 @@ logdir/
 *.html
 *.htm
 *.yaml
+*.mp4
 test/
 DEMO/
 # vscode
