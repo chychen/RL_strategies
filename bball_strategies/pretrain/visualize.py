@@ -107,8 +107,13 @@ def vis_result(sess, model, off_data, off_label, def_data, def_label, outdir, nu
     ----
     """
 
+    data_len = np.load('bball_strategies/data/FixedFPS5Length.npy')
+    accumulator = 0
+    for i, v in enumerate(data_len):
+        data_len[i] += accumulator
+        accumulator += v
     for i in range(num_video):
-        start_idx = i * 50
+        start_idx = data_len[i]
         idx_ = start_idx
         init_pos = [
             np.array(off_data[idx_, 0, -1, 0, :]),
@@ -251,7 +256,7 @@ def main(_):
         raise KeyError('You must specify a configuration.')
     config = tools.AttrDict(getattr(configs, FLAGS.config)())
     config = utility.save_config(config, logdir)
-    
+
     vis_data(off_data, off_label, def_data, def_label, outdir, start_idx=0)
     testing(config, off_data, off_label, def_data, def_label, outdir)
 

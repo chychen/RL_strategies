@@ -80,7 +80,10 @@ def train(config, data, label, outdir):
     train_data, eval_data = np.split(data, [data.shape[0]*9//10])
     train_label, eval_label = np.split(label, [data.shape[0]*9//10])
     print(train_data.shape)
+    print(train_label.shape)
     print(eval_data.shape)
+    print(eval_label.shape)
+
     # graph
     tf.reset_default_graph()
     if FLAGS.config == 'offense':
