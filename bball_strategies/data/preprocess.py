@@ -150,6 +150,7 @@ def main():
     data_len = data_len[remain_indices]
     np.save('FixedFPS5.npy', data)
     np.save('FixedFPS5Length.npy', data_len)
+    print('Remains {} tranisions'.format(np.sum(data_len)))
 
 
 if __name__ == '__main__':

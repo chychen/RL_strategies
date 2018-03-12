@@ -25,7 +25,7 @@ def default():
     init_output_factor = 0.1
     # Optimization
     optimizer = tf.train.AdamOptimizer
-    learning_rate = 1e-4
+    learning_rate = 1e-3
     batch_size = 512
     num_epochs = int(1e4)
     checkpoint_every = 100
