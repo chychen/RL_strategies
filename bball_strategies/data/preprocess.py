@@ -1,5 +1,7 @@
 # coding=utf-8
 """ Translate real sequencial data to state-action dataset for policy supervised pretraining.
+    1. 刪測資：判斷罰球(看一開始佔位)，出界發球(看一開始球位置)，episode太短
+    2. 截短：球出界，出手後球到籃框，跳frame(影片不連續)
 """
 
 from __future__ import division
@@ -12,12 +14,6 @@ from sklearn.metrics import mean_squared_error
 
 def dist_squared(p0, p1):
     return (p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2
-
-
-"""
-1. 刪測資：判斷罰球(看一開始佔位)，出界發球(看一開始球位置)，episode太短
-2. 截短：球出界，出手後球到籃框，跳frame(影片不連續)
-"""
 
 
 def main():
@@ -124,18 +120,27 @@ def main():
                     ball_outside_arr.append(data_idx)
 
                 # ball has been shot / ball is on the top of rim
-                # TODO: has not check output video to see whether it's right
                 elif dist_squared([94.0 - 5.25, 50 / 2], [ball_x, ball_y]) <= 0.75 ** 2 and ball_z > 10.0:
                     cut_flag = True
                     ball_shot_arr.append(data_idx)
 
                 if cut_flag:
-                    # TODO: has not check output video to see whether it's right
                     prev_data_len = data_len[data_idx]
                     data_len[data_idx] = frame_idx
                     for i in range(frame_idx, prev_data_len):
                         data[data_idx][i].fill(0)
                     break
+
+    # print preprocessed data id
+    print("Data removed:")
+    print("frame discontinuous: {}", frame_discontinuous_arr)
+    print("start_outside: {}", start_outside_arr)
+    print("start_free_throw: {}", start_free_throw_arr)
+    print("episode_too_short: {}", episode_too_short_arr)
+    print("")
+    print("Cut data frames:")
+    print("ball_outside: {}", ball_outside_arr)
+    print("ball_shot: {}", ball_shot_arr)
 
     # save
     indices = range(len(data))
