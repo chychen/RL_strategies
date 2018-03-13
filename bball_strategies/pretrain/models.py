@@ -115,6 +115,8 @@ class PretrainDefense(object):
         # action
         loss = tf.losses.mean_squared_error(
             self._label, self._def_action_mean)
+        # loss = tf.losses.absolute_difference(
+        #     self._label, self._def_action_mean)
         summary = tf.summary.scalar('loss', loss)
         return loss, summary
 
