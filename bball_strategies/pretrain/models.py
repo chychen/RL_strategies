@@ -46,7 +46,9 @@ class PretrainOffense(object):
         decision_loss = tf.losses.softmax_cross_entropy(
             self._label_decision[:, 0], self._logits[:, 0])
         # action
-        action_loss = tf.losses.mean_squared_error(
+        # action_loss = tf.losses.mean_squared_error(
+        #     self._label_action, self._off_action_mean)
+        action_loss = tf.losses.absolute_difference(
             self._label_action, self._off_action_mean)
         # weighted sum
         with tf.control_dependencies([tf.assert_less(self._config.loss_alpha, 1.0)]):
@@ -113,10 +115,10 @@ class PretrainDefense(object):
         """
         """
         # action
-        loss = tf.losses.mean_squared_error(
-            self._label, self._def_action_mean)
-        # loss = tf.losses.absolute_difference(
+        # loss = tf.losses.mean_squared_error(
         #     self._label, self._def_action_mean)
+        loss = tf.losses.absolute_difference(
+            self._label, self._def_action_mean)
         summary = tf.summary.scalar('loss', loss)
         return loss, summary
 

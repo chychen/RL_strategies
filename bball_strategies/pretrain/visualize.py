@@ -242,20 +242,14 @@ def main(_):
     utility.set_up_logging()
 
     logdir = FLAGS.logdir
-    outdir = os.path.expanduser(os.path.join(
-        FLAGS.logdir, 'vis-{}-{}'.format(FLAGS.timestamp, FLAGS.config)))
-    # config = utility.load_config(logdir)
-    # try:
-    #     config = utility.load_config(logdir)
-    # except IOError:
-    #     if not FLAGS.config:
-    #         raise KeyError('You must specify a configuration.')
-    #     config = tools.AttrDict(getattr(configs, FLAGS.config)())
-    #     config = utility.save_config(config, logdir)
-    if not FLAGS.config:
-        raise KeyError('You must specify a configuration.')
-    config = tools.AttrDict(getattr(configs, FLAGS.config)())
-    config = utility.save_config(config, logdir)
+    try:
+        config = utility.load_config(logdir)
+    except IOError:
+        if not FLAGS.config:
+            raise KeyError('You must specify a configuration.')
+        config = tools.AttrDict(getattr(configs, FLAGS.config)())
+        config = utility.save_config(config, logdir)
+    outdir = os.path.expanduser(os.path.join(FLAGS.logdir, 'vis'))
 
     vis_data(off_data, off_label, def_data, def_label, outdir, start_idx=0)
     testing(config, off_data, off_label, def_data, def_label, outdir)

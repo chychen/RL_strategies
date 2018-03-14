@@ -120,6 +120,32 @@ def define_saver(exclude=None):
     return saver
 
 
+def define_saver_with_prefix(exclude=None, prefix='network/'):
+    """Create a saver for the variables we want to checkpoint.
+
+    Args:
+      exclude: List of regexes to match variable names to exclude.
+
+    Returns:
+      Saver object.
+    """
+    variables = {}
+    exclude = exclude or []
+    exclude = [re.compile(regex) for regex in exclude]
+    for variable in tf.global_variables():
+        if any(regex.match(variable.name) for regex in exclude):
+            continue
+        else:
+            if variable.name.startswith(prefix):
+                pretrained_name = variable.name[len(prefix):]
+                if pretrained_name[-2:] == ':0':  # remove the special postfix
+                    pretrained_name = pretrained_name[:-2]
+                variables[pretrained_name] = variable
+    saver = tf.train.Saver(variables, keep_checkpoint_every_n_hours=5)
+    input(variables)
+    return saver
+
+
 def initialize_variables(sess, saver, logdir, checkpoint=None, resume=None):
     """Initialize or restore variables from a checkpoint if available.
 
@@ -150,6 +176,26 @@ def initialize_variables(sess, saver, logdir, checkpoint=None, resume=None):
             raise RuntimeError(message)
         if checkpoint:
             saver.restore(sess, checkpoint)
+
+
+def initialize_pretrained_variables(sess, off_saver, off_ckpt, def_saver, def_ckpt):
+    """Initialize or restore variables from a checkpoint if available.
+
+    Args:
+      sess: Session to initialize variables in.
+      off_saver: Saver to restore pretrained offense variables.
+      off_ckpt: Specify what checkpoint name to use for offense;
+      def_saver: Saver to restore pretrained defense variables.
+      def_ckpt: Specify what checkpoint name to use for defense;
+
+    Raises:
+      ValueError: If resume expected but no log directory specified.
+    """
+    sess.run(tf.group(
+        tf.local_variables_initializer(),
+        tf.global_variables_initializer()))
+    off_saver.restore(sess, off_ckpt)
+    def_saver.restore(sess, def_ckpt)
 
 
 def save_config(config, logdir=None):
