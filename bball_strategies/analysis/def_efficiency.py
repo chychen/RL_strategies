@@ -34,6 +34,15 @@ def amin_length(fr_def, fr_ball):
 
 
 def statistic_len(ball, defense, mode=MODE_LOOKUP['NORMAL'], length=None):
+    """ statistic with three mode on defense
+
+    Args
+    ----
+    ball : 
+    defense : 
+    mode : 
+    """
+
     if mode == MODE_LOOKUP['NORMAL']:
         print('MODE: NORMAL')
     elif mode == MODE_LOOKUP['3POINT']:
