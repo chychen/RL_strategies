@@ -27,7 +27,7 @@ offense_idx = range(1, 6)
 defense_idx = range(6, 11)
 x_idx, y_idx, z_idx, player_pos_idx = range(0, 4)
 
-mse_threshold = 15
+mse_threshold = 10
 
 
 def dist_squared(p0, p1):

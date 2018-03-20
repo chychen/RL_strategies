@@ -16,6 +16,7 @@ import os
 import numpy as np
 import plotly.offline as py
 import plotly.graph_objs as go
+import vis_game
 
 RIGHT_BASKET = [94 - 5.25, 25]
 WINGSPAN_RADIUS = 3.5 + 0.5  # to judge who handle the ball
@@ -87,7 +88,13 @@ def evalute_defense(data, length, vis_aid=False):
             if_inside_paint[indices[0], indices[1], off_idx] = -3
 
         # the distance to the closest defender
-        dist[:, :, off_idx] = np.amin(get_length(offender, defense), axis=-1)
+        off2defs = defense - offender
+        off2basket = RIGHT_BASKET - offender
+        dotvalue = off2defs[:, :, :, 0] * off2basket[:, :, :,
+                                                     0] + off2defs[:, :, :, 1] * off2basket[:, :, :, 1]
+        off2defs_len = get_length(offender, defense)
+        off2defs_len[dotvalue <= 0] = np.inf
+        dist[:, :, off_idx] = np.amin(off2defs_len, axis=-1)
 
     # clean up unused length
     for i in range(data.shape[0]):
@@ -118,15 +125,16 @@ def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_
     length : float, shape=[100,]
         length for each episode
     """
-    if not os.path.exists('plot'):
-        os.makedirs('plot')
+    file_name = 'evaluate_user_study_def_plot_dot'
+    if not os.path.exists(file_name):
+        os.makedirs(file_name)
     for epi_idx in range(handler_idx.shape[0]):
         data = []
         epi_len = length[epi_idx]
         for off_idx in range(5):
             # has ball marker
             trace = go.Scatter(
-                x=np.arange(epi_len),
+                x=np.arange(epi_len)/6.25,
                 y=handler_idx[epi_idx, :epi_len, off_idx],
                 name='has_ball_'+str(off_idx+1),
                 xaxis='x',
@@ -138,7 +146,7 @@ def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_
             data.append(trace)
             # whether the offender inside the 3pt line
             trace = go.Scatter(
-                x=np.arange(epi_len),
+                x=np.arange(epi_len)/6.25,
                 y=if_inside_3pt[epi_idx, :epi_len, off_idx],
                 name='3pt_'+str(off_idx+1),
                 xaxis='x',
@@ -150,7 +158,7 @@ def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_
             data.append(trace)
             # whether the offender inside the paint area
             trace = go.Scatter(
-                x=np.arange(epi_len),
+                x=np.arange(epi_len)/6.25,
                 y=if_inside_paint[epi_idx, :epi_len, off_idx],
                 name='paint_'+str(off_idx+1),
                 xaxis='x',
@@ -161,40 +169,43 @@ def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_
             )
             data.append(trace)
             # real
-            trace = go.Scatter(
-                x=np.arange(epi_len),
-                y=real_dist[epi_idx, :epi_len, off_idx],
-                name='real_'+str(off_idx+1),
-                xaxis='x',
-                yaxis='y'+str(off_idx+1),
-                line=dict(
-                    color=('rgb(222, 222, 222)'))
-            )
-            data.append(trace)
+            if real_dist is not None:
+                trace = go.Scatter(
+                    x=np.arange(epi_len)/6.25,
+                    y=real_dist[epi_idx, :epi_len, off_idx],
+                    name='real_'+str(off_idx+1),
+                    xaxis='x',
+                    yaxis='y'+str(off_idx+1),
+                    line=dict(
+                        color=('rgb(222, 222, 222)'))
+                )
+                data.append(trace)
             # fake_wo
-            trace = go.Scatter(
-                x=np.arange(epi_len),
-                y=fake_wo_dist[epi_idx, :epi_len, off_idx],
-                name='fake_wo_'+str(off_idx+1),
-                xaxis='x',
-                yaxis='y'+str(off_idx+1),
-                line=dict(
-                    color=('rgb(12, 205, 24)'))
-            )
-            data.append(trace)
+            if fake_wo_dist is not None:
+                trace = go.Scatter(
+                    x=np.arange(epi_len)/6.25,
+                    y=fake_wo_dist[epi_idx, :epi_len, off_idx],
+                    name='fake_wo_'+str(off_idx+1),
+                    xaxis='x',
+                    yaxis='y'+str(off_idx+1),
+                    line=dict(
+                        color=('rgb(12, 205, 24)'))
+                )
+                data.append(trace)
             # fake_wi
-            trace = go.Scatter(
-                x=np.arange(epi_len),
-                y=fake_wi_dist[epi_idx, :epi_len, off_idx],
-                name='fake_wi_'+str(off_idx+1),
-                xaxis='x',
-                yaxis='y'+str(off_idx+1),
-                line=dict(
-                    color=('rgb(24, 12, 205)'))
-            )
-            data.append(trace)
+            if fake_wi_dist is not None:
+                trace = go.Scatter(
+                    x=np.arange(epi_len)/6.25,
+                    y=fake_wi_dist[epi_idx, :epi_len, off_idx],
+                    name='fake_wi_'+str(off_idx+1),
+                    xaxis='x',
+                    yaxis='y'+str(off_idx+1),
+                    line=dict(
+                        color=('rgb(24, 12, 205)'))
+                )
+                data.append(trace)
         layout = go.Layout(
-            xaxis=dict(title='time (frame)'),
+            xaxis=dict(title='time (sec)'),
             yaxis1=dict(
                 title='player_1\'s distance (feet)',
                 domain=[0.0, 0.15]
@@ -217,7 +228,49 @@ def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_
             )
         )
         fig = go.Figure(data=data, layout=layout)
-        py.plot(fig, filename='plot/epi_{}.html'.format(epi_idx), auto_open=False)
+        py.plot(fig, filename=file_name +
+                '/epi_{}.html'.format(epi_idx), auto_open=False)
+
+def vis_user_study():
+    I_ID = [34, 12, 67, 31, 22, 6, 43, 17, 8]
+    C_ID = [333, 878, 453, 265, 1081, 750, 383, 1088, 108]
+    N_ID = [23, 66, 74, 47, 92, 43, 9, 92, 5]
+    real_data = np.load('../data/WGAN/user_study/results_A_real_B.npy')
+    real_data = real_data[C_ID]
+
+    fake_wo_dist = None
+    fake_wi_data = np.load(
+        '../data/WGAN/user_study/results_A_fake_B.npy')
+    fake_wi_data = fake_wi_data[N_ID, C_ID]
+
+    target_length = np.load('../data/WGAN/FULL-LEN.npy')
+    target_length = target_length[:len(real_data)]
+    target_length[:] = 100
+    print(real_data.shape)
+    print(fake_wi_data.shape)
+    print(target_length.shape)
+
+    # analysis
+    real_dist = evalute_defense(real_data, target_length)
+    fake_wi_dist, handler_idx, if_inside_3pt, if_inside_paint = evalute_defense(
+        fake_wi_data, target_length, vis_aid=True)
+    # plot
+    plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_wo_dist,
+                   fake_wi_dist, target_length)
+    # vis game
+    save_path = 'evaluate_user_study_def_plot_dot/real'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    for i in range(len(real_data)):
+        vis_game.plot_data(real_data[i], length=100,
+                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+    save_path = 'evaluate_user_study_def_plot_dot/fake'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    for i in range(len(fake_wi_data)):
+        vis_game.plot_data(fake_wi_data[i], length=100,
+                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+
 
 
 def main():
@@ -235,10 +288,12 @@ def main():
                 [real_data.shape[0], real_data.shape[1], 5 * 2])
         ], axis=-1
     )
+
     fake_wo_data = np.load(
         '../data/WGAN/results_A_fake_B_wo.npy')[0]
     fake_wi_data = np.load(
         '../data/WGAN/results_A_fake_B.npy')[0]
+
     target_length = np.load('../data/WGAN/FULL-LEN.npy')
     print(real_data.shape)
     print(fake_wo_data.shape)
@@ -256,4 +311,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    vis_user_study()

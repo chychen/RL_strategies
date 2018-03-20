@@ -112,6 +112,51 @@ def test():
     """
     plot real data
     """
+
+    # cmd e.g. python game_visualizer.py --data_path='../../data/collect/mode_6/results_A_fake_B.npy' --save_path='../../data/collect/try/' --amount=10
+    results_data = np.load('../data/WGAN/FULL.npy')
+    results_len = np.load('../data/WGAN/FULL-LEN.npy')
+    results_data = np.concatenate(
+        [
+            # ball
+            results_data[:, :, 0, :3].reshape(
+                [results_data.shape[0], results_data.shape[1], 1 * 3]),
+            # team A players
+            results_data[:, :, 1:6, :2].reshape(
+                [results_data.shape[0], results_data.shape[1], 5 * 2]),
+            # team B players
+            results_data[:, :, 6:11, :2].reshape(
+                [results_data.shape[0], results_data.shape[1], 5 * 2])
+        ], axis=-1
+    )
+    print(results_data.shape)
+    save_path = '../data/WGAN/real'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    for i in range(100):
+        plot_data(results_data[i], length=results_len[i],
+                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+
+    results_data = np.load('../data/WGAN/results_A_fake_B_wo.npy')
+    print(results_data.shape)
+    save_path = '../data/WGAN/fake_wo'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    for i in range(100):
+        plot_data(results_data[0,i], length=results_len[i],
+                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+
+    results_data = np.load('../data/WGAN/results_A_fake_B.npy')
+    print(results_data.shape)
+    save_path = '../data/WGAN/fake_wi'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    for i in range(100):
+        plot_data(results_data[0,i], length=results_len[i],
+                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+
+    exit()
+
     # target_data = np.zeros(shape=[100,23])
     # off_data = np.load('data/def_obs.npy')
     # target_data[:,0:2] = off_data[:100, 0, -1, 0:1, :].reshape([100,2])
