@@ -15,3 +15,8 @@ register(
     id='bball-pretrain-v0',
     entry_point='bball_strategies.gym_bball.envs:BBallPretrainEnv',
 )
+
+register(
+    id='bball-ndef-v0',
+    entry_point='bball_strategies.gym_bball.envs:BBallNDefEnv',
+)
