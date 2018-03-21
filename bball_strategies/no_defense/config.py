@@ -13,23 +13,22 @@ from bball_strategies import networks
 
 FPS = 5
 
+
 def default():
     """Default configuration for PPO."""
     # tensorflow
     log_device_placement = False
     # General
-    algorithm = algorithms.TWO_TRUNK_PPO
+    algorithm = algorithms.NDEF_PPO
     num_agents = 20
     eval_episodes = 10
     use_gpu = True
     # Environment
 #   normalize_ranges = True
     # Network
-    network = networks.two_trunk_gaussian
+    network = networks.ndef_gaussian
     weight_summaries = dict(
         all=r'.*', policy=r'.*/policy/.*', value=r'.*/value/.*')
-#   policy_layers = 200, 100
-#   value_layers = 200, 100
     init_output_factor = 0.1
     init_std = 0.35
     # Optimization
@@ -48,50 +47,10 @@ def default():
 #   gae_lambda = None
     entropy_regularization = None
     # Environment
-    env = 'bball-v0'
+    env = 'bball-ndef-v0'
     max_length = 24 * FPS * 2
     steps = 1e6  # 1M
 
     return locals()
 
 
-def example():
-    locals().update(default())
-    return locals()
-
-
-def v2():
-    """
-    - larger batch size
-    - no repeat epoch
-    - smaller max length (smaller buffer)
-    """
-    locals().update(default())
-    update_every = 500
-    update_epochs = 1
-    max_length = 10 * FPS * 2
-    steps = 1e10  # 1M
-    return locals()
-
-
-def v3():
-    """
-    - no repeat epoch
-    - smaller max length (smaller buffer)
-    """
-    locals().update(default())
-    update_epochs = 1
-    max_length = 10 * FPS * 2
-    steps = 1e10  # 1M
-    return locals()
-
-
-def v4():
-    """
-    - smaller max length (smaller buffer)
-    """
-    locals().update(default())
-    update_epochs = 25
-    max_length = 10 * FPS * 2
-    steps = 1e10  # 1M
-    return locals()

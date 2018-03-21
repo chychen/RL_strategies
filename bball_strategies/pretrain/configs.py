@@ -9,7 +9,7 @@ import tensorflow as tf
 
 # from agents import algorithms
 from bball_strategies import algorithms
-from bball_strategies.scripts import networks
+from bball_strategies import networks
 from bball_strategies.pretrain import models
 
 FPS = 5

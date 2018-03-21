@@ -206,6 +206,32 @@ def defense_pretrain(config, observations):
     return def_action_mean
 
 
+def ndef_gaussian(config, action_space, observations, unused_length, state=None):
+    logits, off_action_mean, off_value, _, _ = net(
+        observations, config)
+        
+    with tf.variable_scope('ndef_gaussian'):
+        # config
+        before_softplus_std_initializer = tf.constant_initializer(
+            np.log(np.exp(config.init_std) - 1))
+        off_actions_std = tf.nn.softplus(tf.get_variable(  # TODO
+            'off_before_softplus_std', off_action_mean.shape[2:], tf.float32,
+            before_softplus_std_initializer))
+        off_actions_std = tf.tile(
+            off_actions_std[None, None],
+            [tf.shape(observations)[0], tf.shape(observations)[1], 1])
+        off_action_mean = tf.check_numerics(
+            off_action_mean, 'off_action_mean')
+        off_actions_std = tf.check_numerics(
+            off_actions_std, 'off_actions_std')
+        off_actions = CustomKLDiagNormal(
+            off_action_mean, off_actions_std)
+
+        off_decision = tfd.Categorical(logits)
+        off_policy = [off_decision, off_actions]
+
+    return agents.tools.AttrDict(state=state, policy=off_policy, value=off_value)
+
 def two_trunk_gaussian(config, action_space, observations, unused_length, state=None):
     """
     ### Structure
