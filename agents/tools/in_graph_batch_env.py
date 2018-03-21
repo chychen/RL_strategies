@@ -185,6 +185,8 @@ class InGraphBatchEnv(object):
         # Extended
         if isinstance(space, tools.ActTuple):
             return space.shape
+        if isinstance(space, tools.NDefActTuple):
+            return space.shape
         raise NotImplementedError()
 
     def _parse_dtype(self, space):
@@ -205,5 +207,7 @@ class InGraphBatchEnv(object):
             return tf.float32
         # Extended
         if isinstance(space, tools.ActTuple):
+            return space.dtype
+        if isinstance(space, tools.NDefActTuple):
             return space.dtype
         raise NotImplementedError()

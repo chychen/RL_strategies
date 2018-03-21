@@ -20,7 +20,7 @@ def default():
     log_device_placement = False
     # General
     algorithm = algorithms.NDEF_PPO
-    num_agents = 1
+    num_agents = 20
     eval_episodes = 10
     use_gpu = True
     # Environment
@@ -48,7 +48,7 @@ def default():
     entropy_regularization = None
     # Environment
     env = 'bball-ndef-v0'
-    max_length = 24 * FPS * 2
+    max_length = 24 * FPS
     steps = 1e6  # 1M
 
     return locals()

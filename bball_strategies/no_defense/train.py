@@ -20,7 +20,7 @@ from tensorflow.python import debug as tf_debug
 from agents import tools
 from agents.scripts import utility
 from bball_strategies import gym_bball
-from bball_strategies.scripts import configs
+from bball_strategies.no_defense import configs
 from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
 
 

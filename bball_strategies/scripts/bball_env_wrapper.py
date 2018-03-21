@@ -104,18 +104,29 @@ class RangeNormalize(object):
         space = self._env.action_space
         if not self._should_normalize_action:
             return space
-        return tools.ActTuple((
-            spaces.Discrete(3),  # offensive decision
-            # ball theta
-            spaces.Box(-np.ones(space[1].shape),
-                       np.ones(space[1].shape), dtype=np.float32),
-            # offense player DASH(power, direction)
-            spaces.Box(-np.ones(space[2].shape),
-                       np.ones(space[2].shape), dtype=np.float32),
-            # defense player DASH(power, direction)
-            spaces.Box(-np.ones(space[3].shape),
-                       np.ones(space[3].shape), dtype=np.float32)
-        ))
+        if isinstance(space, tools.ActTuple):
+            return tools.ActTuple((
+                spaces.Discrete(3),  # offensive decision
+                # ball theta
+                spaces.Box(-np.ones(space[1].shape),
+                        np.ones(space[1].shape), dtype=np.float32),
+                # offense player DASH(power, direction)
+                spaces.Box(-np.ones(space[2].shape),
+                        np.ones(space[2].shape), dtype=np.float32),
+                # defense player DASH(power, direction)
+                spaces.Box(-np.ones(space[3].shape),
+                        np.ones(space[3].shape), dtype=np.float32)
+            ))
+        elif isinstance(space, tools.NDefActTuple):
+            return tools.NDefActTuple((
+                spaces.Discrete(3),  # offensive decision
+                # ball theta
+                spaces.Box(-np.ones(space[1].shape),
+                        np.ones(space[1].shape), dtype=np.float32),
+                # offense player DASH(power, direction)
+                spaces.Box(-np.ones(space[2].shape),
+                        np.ones(space[2].shape), dtype=np.float32)
+            ))
 
     def step(self, action):
         if self._should_normalize_action:

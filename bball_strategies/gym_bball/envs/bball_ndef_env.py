@@ -153,7 +153,7 @@ class BBallNDefEnv(gym.Env):
         # update env information
         self.states.end_step()
 
-        return self._get_obs(), reward, self.states.done, None
+        return self._get_obs(), reward, self.states.done, dict(turn=0)
 
     def _get_obs(self):
         """

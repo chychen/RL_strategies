@@ -579,15 +579,13 @@ class NDEF_PPO(object):
                 tf.summary.histogram('off_dash_grad', tf.reduce_mean(
                     self._mask(off_dash_grad, length), 1)),
                 tf.summary.histogram('policy_gradient', tf.reduce_mean(
-                    self._mask(off_policy_gradient, length), 1)),
+                    self._mask(policy_gradient, length), 1)),
                 # kl
                 tf.summary.histogram('kl', kl),
                 tf.summary.histogram('off_deci_kl', tf.reduce_mean(
                     self._mask(off_deci_kl, length), 1)),
                 tf.summary.histogram('off_dash_kl', tf.reduce_mean(
                     self._mask(off_dash_kl, length), 1)),
-                tf.summary.histogram('kl', tf.reduce_mean(
-                    self._mask(off_kl, length), 1)),
                 tf.summary.histogram('kl_penalty', kl_penalty),
                 tf.summary.histogram('kl_cutoff', kl_cutoff),
                 tf.summary.histogram('kl_penalty_combined',
