@@ -20,7 +20,7 @@ def default():
     log_device_placement = False
     # General
     algorithm = algorithms.NDEF_PPO
-    num_agents = 20
+    num_agents = 1
     eval_episodes = 10
     use_gpu = True
     # Environment

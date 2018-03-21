@@ -133,7 +133,7 @@ class RangeNormalize(object):
 
     def _denormalize_action(self, action):
         # skip discrete item (self._env.action_space[0])
-        for i in [1, 2, 3]:
+        for i in range(1, len(action)):
             min_ = self._env.action_space[i].low
             max_ = self._env.action_space[i].high
             action[i] = (action[i] + 1) / 2 * (max_ - min_) + min_
@@ -152,7 +152,7 @@ class RangeNormalize(object):
             ) and np.isfinite(space.high).all()
         else:  # action is ActTuple
             check = check and space[0].dtype == np.int64  # Discrete
-            for i in [1, 2, 3]:
+            for i in range(1, space.len):
                 check = check and np.isfinite(space[i].low).all(
                 ) and np.isfinite(space[i].high).all()  # Box
         return check

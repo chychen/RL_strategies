@@ -61,30 +61,33 @@ class ActTuple(Space):
     def dtype(self):
         return tf.float32
 
+    @property
+    def len(self):
+        return 3
 
-def back_to_act_tuple(inputs):
-    """
-    Args
-    ----
-    inputs : shape=[num_agents, 23]
-        - off_action_space shape=(13)  # decision(1) + ball_dir(2) + player_dash(5, 2)
-        - def_action_space shape=(10)  # player_dash(5, 2)
+    def back_to_act_tuple(self, inputs):
+        """
+        Args
+        ----
+        inputs : shape=[num_agents, 23]
+            - off_action_space shape=(13)  # decision(1) + ball_dir(2) + player_dash(5, 2)
+            - def_action_space shape=(10)  # player_dash(5, 2)
 
-    Returns
-    -------
-    [num_agents, [Discrete(3), Box(2), Box(5, 2), Box(5, 2)]]
-    """
-    transformed = []
-    for input_ in inputs:
-        transformed.append(
-            [
-                int(round(input_[0])),  # Discrete(3) must be int
-                input_[1:3],  # Box(2,)
-                np.reshape(input_[3:13], [5,2]),  # Box(5, 2)
-                np.reshape(input_[13:23], [5,2])  # Box(5, 2)
-            ]
-        )
-    return transformed
+        Returns
+        -------
+        [num_agents, [Discrete(3), Box(2), Box(5, 2), Box(5, 2)]]
+        """
+        transformed = []
+        for input_ in inputs:
+            transformed.append(
+                [
+                    int(round(input_[0])),  # Discrete(3) must be int
+                    input_[1:3],  # Box(2,)
+                    np.reshape(input_[3:13], [5, 2]),  # Box(5, 2)
+                    np.reshape(input_[13:23], [5, 2])  # Box(5, 2)
+                ]
+            )
+        return transformed
 
 
 class NDefActTuple(Space):
@@ -144,26 +147,28 @@ class NDefActTuple(Space):
     def dtype(self):
         return tf.float32
 
+    @property
+    def len(self):
+        return 2
 
-def back_to_act_tuple(inputs):
-    """
-    Args
-    ----
-    inputs : shape=[num_agents, 23]
-        - off_action_space shape=(13)  # decision(1) + ball_dir(2) + player_dash(5, 2)
-        - def_action_space shape=(10)  # player_dash(5, 2)
+    def back_to_act_tuple(self, inputs):
+        """
+        Args
+        ----
+        inputs : shape=[num_agents, 13]
+            - off_action_space shape=(13)  # decision(1) + ball_dir(2) + player_dash(5, 2)
 
-    Returns
-    -------
-    [num_agents, [Discrete(3), Box(2), Box(5, 2), Box(5, 2)]]
-    """
-    transformed = []
-    for input_ in inputs:
-        transformed.append(
-            [
-                int(round(input_[0])),  # Discrete(3) must be int
-                input_[1:3],  # Box(2,)
-                np.reshape(input_[3:13], [5,2]) # Box(5, 2)
-            ]
-        )
-    return transformed
+        Returns
+        -------
+        [num_agents, [Discrete(3), Box(2), Box(5, 2)]]
+        """
+        transformed = []
+        for input_ in inputs:
+            transformed.append(
+                [
+                    int(round(input_[0])),  # Discrete(3) must be int
+                    input_[1:3],  # Box(2,)
+                    np.reshape(input_[3:13], [5, 2])  # Box(5, 2)
+                ]
+            )
+        return transformed

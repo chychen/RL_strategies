@@ -276,7 +276,7 @@ class NDEF_PPO(object):
                 x, 0, len(self._batch_env))
 
         policy_params = []
-        for i in range(3):
+        for i in range(2):
             policy_params.append(tools.nested.filter(
                 is_tensor, output.policy[i].parameters))
             tools.nested.map(set_batch_dim, policy_params[i])
@@ -617,7 +617,7 @@ class NDEF_PPO(object):
           Summary tensor.
         """
         old_policy = []
-        for i in range(3):
+        for i in range(2):
             old_policy.append(self._policy_type[i](**(old_policy_params[i])))
         with tf.name_scope('adjust_penalty'):
             network = self._network(observ, length)
