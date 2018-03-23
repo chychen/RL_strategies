@@ -21,6 +21,7 @@ import vis_game
 RIGHT_BASKET = [94 - 5.25, 25]
 WINGSPAN_RADIUS = 3.5 + 0.5  # to judge who handle the ball
 LEN_3PT_BASKET = 23.75 + 5
+WEIGHT = 10
 
 
 def get_length(a, b, axis=-1):
@@ -53,6 +54,10 @@ def evalute_defense(data, length, vis_aid=False):
     # shape=[100,600,5,2]
     offense = np.reshape(data[:, :, 3:13], [
         data.shape[0], data.shape[1], 5, 2])
+    pad_next = np.pad(offense[:, 1:], [(0, 0), (0, 1),
+                                       (0, 0), (0, 0)], mode='constant', constant_values=1)
+    offense_speed = get_length(offense, pad_next)
+    offense_speed[:, -1] = None
     # shape=[100,600,5,2]
     defense = np.reshape(data[:, :, 13:23], [
         data.shape[0], data.shape[1], 5, 2])
@@ -87,14 +92,37 @@ def evalute_defense(data, length, vis_aid=False):
             indices = np.where(judge_paint)
             if_inside_paint[indices[0], indices[1], off_idx] = -3
 
-        # the distance to the closest defender
+        # # the distance to the closest defender
+        # off2defs = defense - offender
+        # off2basket = RIGHT_BASKET - offender
+        # dotvalue = off2defs[:, :, :, 0] * off2basket[:, :, :,
+        #                                              0] + off2defs[:, :, :, 1] * off2basket[:, :, :, 1]
+        # off2defs_len = get_length(offender, defense)
+        # off2defs_len[dotvalue <= 0] = np.inf
+        # dist[:, :, off_idx] = np.amin(off2defs_len, axis=-1)
+
+        # # the lowest score = (1-cos) + distance
+        # off2defs = defense - offender
+        # off2basket = RIGHT_BASKET - offender
+        # dotvalue = off2defs[:, :, :, 0] * off2basket[:, :, :,
+        #                                              0] + off2defs[:, :, :, 1] * off2basket[:, :, :, 1]
+        # off2defs_len = get_length(offender, defense)
+        # off2defs_len = WEIGHT * (1-dotvalue/(get_length(defense, offender) *
+        #                             get_length(RIGHT_BASKET, offender)+1e-8)) + off2defs_len
+        # off2defs_len[dotvalue <= 0] = np.inf
+        # dist[:, :, off_idx] = np.amin(off2defs_len, axis=-1)
+
+        # the lowest score = (theta+1) * (distance+1) / offense_speed
         off2defs = defense - offender
         off2basket = RIGHT_BASKET - offender
         dotvalue = off2defs[:, :, :, 0] * off2basket[:, :, :,
                                                      0] + off2defs[:, :, :, 1] * off2basket[:, :, :, 1]
         off2defs_len = get_length(offender, defense)
+        off2defs_len = (np.arccos(dotvalue/(get_length(defense, offender)
+                                            * get_length(RIGHT_BASKET, offender)+1e-8))+1.0)*(off2defs_len+1.0)
         off2defs_len[dotvalue <= 0] = np.inf
         dist[:, :, off_idx] = np.amin(off2defs_len, axis=-1)
+        dist[:, :, off_idx] = dist[:, :, off_idx]/(offense_speed[:, :, off_idx]+1e-8)
 
     # clean up unused length
     for i in range(data.shape[0]):
@@ -105,12 +133,12 @@ def evalute_defense(data, length, vis_aid=False):
             if_inside_paint[i, length[i]:, :] = None
 
     if vis_aid:
-        return dist, handler_idx, if_inside_3pt, if_inside_paint
+        return dist, handler_idx, if_inside_3pt, if_inside_paint, offense_speed
     else:
         return dist
 
 
-def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_wo_dist, fake_wi_dist, length):
+def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_wo_dist, fake_wi_dist, length, offense_speed):
     """ plot
 
     Args
@@ -125,7 +153,7 @@ def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_
     length : float, shape=[100,]
         length for each episode
     """
-    file_name = 'evaluate_user_study_def_plot_dot'
+    file_name = 'evaluate_user_study_def_plot_(len+1.0)(theta+1.0)'
     if not os.path.exists(file_name):
         os.makedirs(file_name)
     for epi_idx in range(handler_idx.shape[0]):
@@ -168,6 +196,18 @@ def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_
                     width=10)
             )
             data.append(trace)
+            # offense_speed
+            if real_dist is not None:
+                trace = go.Scatter(
+                    x=np.arange(epi_len)/6.25,
+                    y=offense_speed[epi_idx, :epi_len, off_idx],
+                    name='offense_speed_'+str(off_idx+1),
+                    xaxis='x',
+                    yaxis='y'+str(off_idx+1),
+                    line=dict(
+                        color=('rgb(0, 0, 0)'))
+                )
+                data.append(trace)
             # real
             if real_dist is not None:
                 trace = go.Scatter(
@@ -231,6 +271,7 @@ def plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_
         py.plot(fig, filename=file_name +
                 '/epi_{}.html'.format(epi_idx), auto_open=False)
 
+
 def vis_user_study():
     I_ID = [34, 12, 67, 31, 22, 6, 43, 17, 8]
     C_ID = [333, 878, 453, 265, 1081, 750, 383, 1088, 108]
@@ -252,25 +293,24 @@ def vis_user_study():
 
     # analysis
     real_dist = evalute_defense(real_data, target_length)
-    fake_wi_dist, handler_idx, if_inside_3pt, if_inside_paint = evalute_defense(
+    fake_wi_dist, handler_idx, if_inside_3pt, if_inside_paint, offense_speed = evalute_defense(
         fake_wi_data, target_length, vis_aid=True)
     # plot
     plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_wo_dist,
-                   fake_wi_dist, target_length)
+                   fake_wi_dist, target_length, offense_speed)
     # vis game
     save_path = 'evaluate_user_study_def_plot_dot/real'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(len(real_data)):
         vis_game.plot_data(real_data[i], length=100,
-                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+                           file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
     save_path = 'evaluate_user_study_def_plot_dot/fake'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(len(fake_wi_data)):
         vis_game.plot_data(fake_wi_data[i], length=100,
-                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
-
+                           file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
 
 
 def main():
@@ -303,11 +343,11 @@ def main():
     # analysis
     real_dist = evalute_defense(real_data, target_length)
     fake_wo_dist = evalute_defense(fake_wo_data, target_length)
-    fake_wi_dist, handler_idx, if_inside_3pt, if_inside_paint = evalute_defense(
+    fake_wi_dist, handler_idx, if_inside_3pt, if_inside_paint, offense_speed = evalute_defense(
         fake_wi_data, target_length, vis_aid=True)
     # plot
     plot_by_frames(handler_idx, if_inside_3pt, if_inside_paint, real_dist, fake_wo_dist,
-                   fake_wi_dist, target_length)
+                   fake_wi_dist, target_length, offense_speed)
 
 
 if __name__ == '__main__':
