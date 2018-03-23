@@ -49,7 +49,7 @@ def default():
     # Environment
     env = 'bball-ndef-v0'
     max_length = 24 * FPS
-    steps = 1e6  # 1M
+    steps = 1e10  # 1M
 
     return locals()
 

@@ -68,6 +68,7 @@ class BBallPretrainEnv(gym.Env):
         # reward
         self.len2pi_weight = np.pi / 8  # 1 feet <-> 45 degrees
         self.max_reward = 100.0
+        self.eff_def_radius = self.screen_radius + 0.5
 
         # Env information
         self.states = States()
@@ -483,45 +484,45 @@ class BBallPretrainEnv(gym.Env):
         # opp_positions = self.states.positions[opp_idx]
         for pl_idx, (pl_pos, next_pl_pos, pl_vel) in enumerate(zip(self.states.positions[state_idx], self.states.positions[state_idx] + pl_vels, pl_vels)):
             # zone_idx, mode = self._find_zone_idx(
-        #         next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius)
-        # # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
-        #     if zone_idx is not None and mode != MODE_LOOKUP['PASS-OUT']:
-        #         logger.debug(
-        #             '[COLLISION] mode {}, {}-{} colide into {}-{}'.format(mode, state_idx, pl_idx, opp_idx, zone_idx))
-        #         if mode == MODE_LOOKUP['IN'] or mode == MODE_LOOKUP['IN-THEN-OUT']:
-        #             # if 'IN' or 'IN-THEN-OUT', use collision_speed
-        #             collision_speed = self.pl_collision_speed
-        #             collision_speed = collision_speed if pl_speed[
-        #                 pl_idx] >= collision_speed else pl_speed[pl_idx]
-        #             pl_collision_vel = collision_speed * \
-        #                 pl_vels_dir_vec[pl_idx]
-        #         elif mode == MODE_LOOKUP['COME-THEN-IN']:
-        #             # if 'COME-THEN-IN', combine player speed when 'COME' and collision_speed when 'IN'
-        #             # a. length between player and opponent
-        #             pl2zone_vec = opp_positions[zone_idx] - pl_pos
-        #             pl2zone_length = length(pl2zone_vec, axis=0)
-        #             # b. length between player and opponent on velocity direction = a dot dir
-        #             pl2zone_ondir_length = np.dot(
-        #                 pl2zone_vec, pl_vels_dir_vec[pl_idx])
-        #             # c. legnth from player to circle edge = b - sqrt(rr-(aa-bb))
-        #             # zone to end pos
-        #             temp = pl2zone_length**2 - pl2zone_ondir_length**2
-        #             # edge to end pos
-        #             temp2 = self.screen_radius**2 - temp
-        #             if temp < 1e-5:
-        #                 pl2edge_length = abs(
-        #                     pl2zone_length - self.screen_radius)
-        #             else:
-        #                 pl2edge_length = pl2zone_ondir_length - np.sqrt(temp2)
-        #             # d. final velocity = c * direction + sqrt(rr-(aa-bb)) * collision_speed * direction
-        #             collision_speed = self.pl_collision_speed if pl_speed[
-        #                 pl_idx] >= self.pl_collision_speed else pl_speed[pl_idx]
-        #             pl_collision_vel = pl2edge_length * pl_vels_dir_vec[pl_idx] + \
-        #                 (1 - pl2edge_length / pl_speed[pl_idx]) * \
-        #                 collision_speed * pl_vels_dir_vec[pl_idx]
-        #         next_pl_pos = pl_pos + pl_collision_vel
-        #         pl_vel = 0.0  # if collision, velocity = 0
-        # 4. if none collisions, update with velocity
+            #         next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius)
+            # # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
+            #     if zone_idx is not None and mode != MODE_LOOKUP['PASS-OUT']:
+            #         logger.debug(
+            #             '[COLLISION] mode {}, {}-{} colide into {}-{}'.format(mode, state_idx, pl_idx, opp_idx, zone_idx))
+            #         if mode == MODE_LOOKUP['IN'] or mode == MODE_LOOKUP['IN-THEN-OUT']:
+            #             # if 'IN' or 'IN-THEN-OUT', use collision_speed
+            #             collision_speed = self.pl_collision_speed
+            #             collision_speed = collision_speed if pl_speed[
+            #                 pl_idx] >= collision_speed else pl_speed[pl_idx]
+            #             pl_collision_vel = collision_speed * \
+            #                 pl_vels_dir_vec[pl_idx]
+            #         elif mode == MODE_LOOKUP['COME-THEN-IN']:
+            #             # if 'COME-THEN-IN', combine player speed when 'COME' and collision_speed when 'IN'
+            #             # a. length between player and opponent
+            #             pl2zone_vec = opp_positions[zone_idx] - pl_pos
+            #             pl2zone_length = length(pl2zone_vec, axis=0)
+            #             # b. length between player and opponent on velocity direction = a dot dir
+            #             pl2zone_ondir_length = np.dot(
+            #                 pl2zone_vec, pl_vels_dir_vec[pl_idx])
+            #             # c. legnth from player to circle edge = b - sqrt(rr-(aa-bb))
+            #             # zone to end pos
+            #             temp = pl2zone_length**2 - pl2zone_ondir_length**2
+            #             # edge to end pos
+            #             temp2 = self.screen_radius**2 - temp
+            #             if temp < 1e-5:
+            #                 pl2edge_length = abs(
+            #                     pl2zone_length - self.screen_radius)
+            #             else:
+            #                 pl2edge_length = pl2zone_ondir_length - np.sqrt(temp2)
+            #             # d. final velocity = c * direction + sqrt(rr-(aa-bb)) * collision_speed * direction
+            #             collision_speed = self.pl_collision_speed if pl_speed[
+            #                 pl_idx] >= self.pl_collision_speed else pl_speed[pl_idx]
+            #             pl_collision_vel = pl2edge_length * pl_vels_dir_vec[pl_idx] + \
+            #                 (1 - pl2edge_length / pl_speed[pl_idx]) * \
+            #                 collision_speed * pl_vels_dir_vec[pl_idx]
+            #         next_pl_pos = pl_pos + pl_collision_vel
+            #         pl_vel = 0.0  # if collision, velocity = 0
+            # 4. if none collisions, update with velocity
             self.states.update_player(state_idx, pl_idx, next_pl_pos, pl_vel)
 
     def _find_zone_idx(self, next_pos, pos, vel, zone_positions, zone_radius, if_off_ball=False):
@@ -681,43 +682,46 @@ class BBallPretrainEnv(gym.Env):
         # 1. find distances between all defenders to ball handler
         def2ball_vecs = self.states.ball_position - self.states.defense_positions
         def2ball_lens = length(def2ball_vecs, axis=1)
-        # NOTE if too close, get -1
-        def2ball_lens[np.where(def2ball_lens < 10.0)] = -1
+        # TODO if too close, get -1
+        def2ball_lens[np.where(def2ball_lens < self.eff_def_radius)] = -1
 
-        # 2. update distance to max if any offensive player in between
-        off2ball_vecs = self.states.ball_position - self.states.offense_positions
-        for i, (def2ball_vec, _) in enumerate(zip(def2ball_vecs, def2ball_lens)):
-            off2def_vecs = self.states.defense_positions[i] - \
-                self.states.offense_positions
-            off_dot_def = np.inner(off2ball_vecs, def2ball_vec)
-            off_dot_ball = np.inner(off2def_vecs, -1 * def2ball_vec)
-            if_inbetween = np.logical_and(off_dot_def > 0, off_dot_ball > 0)
-            indices = np.argwhere(if_inbetween)[:, 0]
-            off2vec_lens = np.sqrt(abs(
-                length(off2ball_vecs[indices], axis=1)**2 - (off_dot_def[indices] / length(def2ball_vec, axis=0))**2))
-            screen_indices = np.argwhere(off2vec_lens < self.screen_radius)
-            if len(screen_indices) > 0:
-                def2ball_lens[i] = self.max_reward
+        # # TODO 2. update distance to max if any offensive player in between
+        # off2ball_vecs = self.states.ball_position - self.states.offense_positions
+        # for i, (def2ball_vec, _) in enumerate(zip(def2ball_vecs, def2ball_lens)):
+        #     off2def_vecs = self.states.defense_positions[i] - \
+        #         self.states.offense_positions
+        #     off_dot_def = np.inner(off2ball_vecs, def2ball_vec)
+        #     off_dot_ball = np.inner(off2def_vecs, -1 * def2ball_vec)
+        #     if_inbetween = np.logical_and(off_dot_def > 0, off_dot_ball > 0)
+        #     indices = np.argwhere(if_inbetween)[:, 0]
+        #     off2vec_lens = np.sqrt(abs(
+        #         length(off2ball_vecs[indices], axis=1)**2 - (off_dot_def[indices] / length(def2ball_vec, axis=0))**2))
+        #     screen_indices = np.argwhere(off2vec_lens < self.screen_radius)
+        #     if len(screen_indices) > 0:
+        #         def2ball_lens[i] = self.max_reward
+
         # 3. calculate the weighted sum of length and angle value
         ball2cloesetdef_vecs = self.states.defense_positions - \
             self.states.ball_position
         ball2basket_vec = self.right_basket_pos - self.states.ball_position
         ball2basket_len = length(ball2basket_vec, axis=0)
         ball_dot_defs = np.inner(ball2cloesetdef_vecs, ball2basket_vec)
-        def2ball_lens[np.argwhere(ball_dot_defs <= 0)] = self.max_reward
         # avoid divide zero
         angle_values = np.empty(shape=(5,), dtype=np.float32)
         len_temp = length(ball2cloesetdef_vecs, axis=1) * \
             length(ball2basket_vec, axis=0)
-        for i in range(5):
-            if len_temp[i] == 0.0:
-                angle_values[i] = 0.0
-            else:
-                angle_values[i] = np.arccos(ball_dot_defs[i] / len_temp[i])
+        angle_values = np.arccos(ball_dot_defs / (len_temp+1e-8))
+        # TODO 1-cos
+        # angle_values = 1.0-ball_dot_defs / (len_temp+1e-8)
+
         penalty = (self.three_point_distance -
-                   ball2basket_len) if ball2basket_len > self.three_point_distance else 0.0
-        rewards = self.len2pi_weight * def2ball_lens + \
-            angle_values + self.len2pi_weight * penalty
+                   ball2basket_len) if ball2basket_len < self.three_point_distance else 0.0
+        # rewards = def2ball_lens + \
+        #     angle_values + self.len2pi_weight * penalty
+        # TODO
+        rewards = (def2ball_lens+1.0) * (angle_values+1.0) * penalty
+        rewards[np.argwhere(ball_dot_defs <= 0)] += 1
+
         # 4. find the best defender to ball handler
         reward = np.amin(rewards)
 

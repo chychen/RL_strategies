@@ -136,6 +136,7 @@ def train(config, env_processes, outdir):
                     sess, ui_type=FLAGS.ui_type)
             utility.initialize_variables(
                 sess, saver, config.logdir, resume=FLAGS.resume)
+            print(total_steps)
             for score in loop.run(sess, saver, total_steps):
                 yield score
     batch_env.close()
