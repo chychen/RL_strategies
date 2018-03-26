@@ -336,7 +336,38 @@ class EvaluationMatrix(object):
         save_path = os.path.join(file_name, 'histogram')
         if not os.path.exists(save_path):
             os.makedirs(save_path)
+        # speed
         all_trace_speed = []
+        speed_msg = 'Speed\n'
+        for key, data in self._all_data_dict.items():
+            defense = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            speed = self.__get_length(defense[:, 1:], defense[:, :-1])
+            # clean up unused length
+            valid_speed = []
+            for i in range(data.shape[0]):
+                valid_speed.append(
+                    speed[i, :self._length[i]-1].reshape([-1, ]))
+            valid_speed = np.concatenate(valid_speed, axis=0)
+            trace_speed = go.Histogram(
+                name=key,
+                x=valid_speed,
+                opacity=0.5
+            )
+            all_trace_speed.append(trace_speed)
+            speed_msg += '{} dataset: mean={}, stddev={}\n'.format(key, np.mean(valid_speed), np.std(valid_speed))
+        layout_speed = go.Layout(
+            title='Speed',
+            barmode='overlay',
+            xaxis=dict(title='speed (feet/sec)'),
+            yaxis=dict(title='counts')
+        )
+        fig_speed = go.Figure(data=all_trace_speed, layout=layout_speed)
+        py.plot(fig_speed, filename=os.path.join(save_path,'speed_histogram.html'), auto_open=False)
+        print(speed_msg)
+
+        # acc
+        acc_msg = 'Acceleration\n'
         all_trace_acc = []
         for key, data in self._all_data_dict.items():
             defense = np.reshape(data[:, :, 13:23], [
@@ -344,41 +375,26 @@ class EvaluationMatrix(object):
             speed = self.__get_length(defense[:, 1:], defense[:, :-1])
             acc = self.__get_length(speed[:, 1:], speed[:, :-1])
             # clean up unused length
-            valid_speed = []
             valid_acc = []
             for i in range(data.shape[0]):
-                valid_speed.append(
-                    speed[i, :self._length[i]-1].reshape([-1, ]))
                 valid_acc.append(acc[i, :self._length[i]-2].reshape([-1, ]))
-            trace_speed = go.Histogram(
-                name=key,
-                x=np.concatenate(valid_speed, axis=0),
-                opacity=0.5
-            )
-            all_trace_speed.append(trace_speed)
+            valid_acc = np.concatenate(valid_acc, axis=0)
             trace_acc = go.Histogram(
                 name=key,
-                x=np.concatenate(valid_acc, axis=0),
+                x=valid_acc,
                 opacity=0.5
             )
             all_trace_acc.append(trace_acc)
-
-        layout_speed = go.Layout(
-            title='Speed',
-            barmode='overlay',
-            xaxis=dict(title='speed (feet/sec)'),
-            yaxis=dict(title='counts')
-        )
+            acc_msg += '{} dataset: mean={}, stddev={}\n'.format(key, np.mean(valid_acc), np.std(valid_acc))
         layout_acc = go.Layout(
             title='Acceleration',
             barmode='overlay',
             xaxis=dict(title='acceleration (feet/sec^2)'),
             yaxis=dict(title='counts')
         )
-        fig_speed = go.Figure(data=all_trace_speed, layout=layout_speed)
         fig_acc = go.Figure(data=all_trace_acc, layout=layout_acc)
-        py.plot(fig_speed, filename=os.path.join(save_path,'speed_histogram.html'), auto_open=False)
         py.plot(fig_acc, filename=os.path.join(save_path,'acc_histogram.html'), auto_open=False)
+        print(acc_msg)
 
 
 def main():
