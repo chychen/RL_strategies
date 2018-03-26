@@ -60,12 +60,32 @@ class EvaluationMatrix(object):
         self._length = length
         self._num_episodes = self._length.shape[0]
 
-    def show_mean_distance(self):
+    def show_overlap_freq(self, OVERLAP_RADIUS=1.0):
+        """ Overlap frequency (judged by threshold = OVERLAP_RADIUS)
+        """
+        print('Overlap Frequency')
+        for key, data in self._all_data_dict.items():
+            offense = np.reshape(data[:, :, 3:13], [
+                data.shape[0], data.shape[1], 5, 2])
+            defense = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            total_frames = data.shape[0]*data.shape[1]
+            counter = 0
+            for off_idx in range(5):
+                temp_len = self.__get_length(
+                    defense, offense[:, :, off_idx:off_idx+1])
+                counter += np.count_nonzero(temp_len <= OVERLAP_RADIUS)
+            # show
+            show_msg = '\'{}\' dataset\n'.format(
+                key) + '-- frequency={}\n'.format(counter/total_frames)
+            print(show_msg)
+
+    def show_mean_distance(self, mode='THETA'):
         """ Mean/Stddev of distance between offense (wi/wo ball) and defense
         """
         print('Compare Distance with/without ball')
         for key, data in self._all_data_dict.items():
-            dist = self.__evalute_distance(data, mode='DISTANCE')
+            dist = self.__evalute_distance(data, mode=mode)
             ball = np.reshape(data[:, :, 0:2], [
                 data.shape[0], data.shape[1], 1, 2])
             offense = np.reshape(data[:, :, 3:13], [
@@ -84,7 +104,7 @@ class EvaluationMatrix(object):
                 indices[i, self._length[i]:] = False
             wo_mean = np.mean(dist[indices])
             wo_std = np.std(dist[indices])
-
+            # show
             show_msg = '\'{}\' dataset\n'.format(key) + '-- wi ball: mean={}, stddev={}\n'.format(
                 wi_mean, wi_std) + '-- wo ball: mean={}, stddev={}\n'.format(wo_mean, wo_std)
             print(show_msg)
@@ -119,11 +139,12 @@ class EvaluationMatrix(object):
             # mark frames when driible
             indices = np.where(self.__get_length(
                 offender[:, :, 0], ball[:, :, 0]) < self.WINGSPAN_RADIUS)
-            handler_idx[indices[0], indices[1], off_idx] = -10
+            handler_idx[indices[0], indices[1], off_idx] = -2  # dummy constant
             # check position whether inside the 3pt line
             indices = np.where(self.__get_length(
                 offender[:, :, 0], self.RIGHT_BASKET) < self.LEN_3PT_BASKET)
-            if_inside_3pt[indices[0], indices[1], off_idx] = -20
+            if_inside_3pt[indices[0], indices[1],
+                          off_idx] = -4  # dummy constant
             # check position whether inside the paint area
             judge_paint = np.logical_and(
                 offender[:, :, 0, 0] < 94, offender[:, :, 0, 0] >= 75)
@@ -132,7 +153,8 @@ class EvaluationMatrix(object):
             judge_paint = np.logical_and(
                 judge_paint, offender[:, :, 0, 1] >= 17)
             indices = np.where(judge_paint)
-            if_inside_paint[indices[0], indices[1], off_idx] = -30
+            if_inside_paint[indices[0], indices[1],
+                            off_idx] = -6  # dummy constant
 
         # clean up unused length
         for i in range(data.shape[0]):
@@ -184,6 +206,7 @@ class EvaluationMatrix(object):
                 dotvalue = off2defs[:, :, :, 0] * off2basket[:, :, :,
                                                              0] + off2defs[:, :, :, 1] * off2basket[:, :, :, 1]
                 off2defs_len = self.__get_length(offender, defense)
+                # find best defense according to defense_scores
                 defense_scores = np.array(off2defs_len)
                 defense_scores[dotvalue <= 0] = np.inf
                 best_defense_idx = np.argmin(defense_scores, axis=-1)
@@ -198,6 +221,7 @@ class EvaluationMatrix(object):
                 dotvalue = off2defs[:, :, :, 0] * off2basket[:, :, :,
                                                              0] + off2defs[:, :, :, 1] * off2basket[:, :, :, 1]
                 off2defs_len = self.__get_length(offender, defense)
+                # find best defense according to defense_scores
                 defense_scores = (np.arccos(dotvalue/(self.__get_length(defense, offender)
                                                       * self.__get_length(self.RIGHT_BASKET, offender)+1e-8))+1.0)*(off2defs_len+1.0)
                 defense_scores[dotvalue <= 0] = np.inf
@@ -213,7 +237,7 @@ class EvaluationMatrix(object):
 
         return dist
 
-    def lineplot_distance_by_frames(self, file_name='default'):
+    def lineplot_distance_by_frames(self, file_name='default', mode='THETA'):
         """ Vis dot distance of each offense to closest defense frame by frame 
         (with indicators: inside 3pt line, ball handler, paint area)
 
@@ -227,18 +251,19 @@ class EvaluationMatrix(object):
         # caculate the matrix
         all_dist_dict = {}
         for key, data in self._all_data_dict.items():
-            all_dist_dict[key] = self.__evalute_distance(data)
+            all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
         all_marker_dict = self.__get_visual_aid(
             self._all_data_dict['real_data'])
         # mkdir
-        if not os.path.exists(file_name):
-            os.makedirs(file_name)
+        if not os.path.exists(file_name+'_'+mode):
+            os.makedirs(file_name+'_'+mode)
         # color
-        N = 5
-        HSV_tuples = [(x/float(N), 0.8, 0.8) for x in range(N)]
+        HSV_tuples = [((x % 10)/float(10), 0.8, 0.8)
+                      for x in range(0, 3*10, 3)]
         RGB_tuples = list(map(lambda x: colorsys.hsv_to_rgb(*x), HSV_tuples))
         # vis
         for epi_idx in range(self._num_episodes):
+            color_count = 0
             all_trace = []
             epi_len = self._length[epi_idx]
             for i, [key, data] in enumerate(all_dist_dict.items()):
@@ -251,10 +276,11 @@ class EvaluationMatrix(object):
                         xaxis='x',
                         yaxis='y'+str(off_idx+1),
                         line=dict(
-                            color=('rgb'+str(RGB_tuples[i]))
+                            color=('rgb'+str(RGB_tuples[color_count]))
                         )
                     )
                     all_trace.append(trace)
+                color_count += 1
             for i, [key, data] in enumerate(all_marker_dict.items()):
                 for off_idx in range(5):
                     # markers
@@ -265,10 +291,11 @@ class EvaluationMatrix(object):
                         xaxis='x',
                         yaxis='y'+str(off_idx+1),
                         line=dict(
-                            color=('rgb'+str(RGB_tuples[i])),
+                            color=('rgb'+str(RGB_tuples[color_count])),
                             width=3)
                     )
                     all_trace.append(trace)
+                color_count += 1
             layout = go.Layout(
                 xaxis=dict(title='time (sec)'),
                 yaxis1=dict(
@@ -303,8 +330,9 @@ def main():
     length = np.load('../data/WGAN/len.npy')
     evaluator = EvaluationMatrix(
         length=length, real_data=real_data, fake_data=fake_data)
-    # evaluator.lineplot_distance_by_frames()
-    evaluator.show_mean_distance()
+    evaluator.lineplot_distance_by_frames(file_name='default', mode='THETA')
+    evaluator.show_mean_distance(mode='THETA')
+    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
 
 
 if __name__ == '__main__':
