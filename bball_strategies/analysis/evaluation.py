@@ -4,7 +4,8 @@ EvaluationMatrix:
     Mean/Stddev of distance between offense (wi/wo ball) and defense
 - show_overlap_freq()
     Overlap frequency (judged by threshold = radius 1 ft)
-- Histogram of velocity, acceleration. (mean,stddev)
+- plot_histogram_vel_acc()
+    Histogram of DEFENSE's velocity and acceleration. (mean,stddev)
 - Vis Heat map (frequency) of positions
 - Best match between real and defense’s position difference.(mean,stddev)
 - Compare to formula (defense sync with offense movement)
@@ -259,8 +260,9 @@ class EvaluationMatrix(object):
         all_marker_dict = self.__get_visual_aid(
             self._all_data_dict['real_data'])
         # mkdir
-        if not os.path.exists(file_name+'_'+mode):
-            os.makedirs(file_name+'_'+mode)
+        save_path = os.path.join(file_name, 'linechart_'+mode)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
         # color
         HSV_tuples = [((x % 10)/float(10), 0.8, 0.8)
                       for x in range(0, 3*10, 3)]
@@ -324,13 +326,59 @@ class EvaluationMatrix(object):
                 )
             )
             fig = go.Figure(data=all_trace, layout=layout)
-            py.plot(fig, filename=file_name +
-                    '/epi_{}.html'.format(epi_idx), auto_open=False)
+            py.plot(fig, filename=os.path.join(
+                save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
 
-    def plot_histogram_vel_acc(self):
-        """ Histogram of velocity, acceleration. (mean,stddev)
+    def plot_histogram_vel_acc(self, file_name='default'):
+        """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
         """
-        pass
+        # mkdir
+        save_path = os.path.join(file_name, 'histogram')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        all_trace_speed = []
+        all_trace_acc = []
+        for key, data in self._all_data_dict.items():
+            defense = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            speed = self.__get_length(defense[:, 1:], defense[:, :-1])
+            acc = self.__get_length(speed[:, 1:], speed[:, :-1])
+            # clean up unused length
+            valid_speed = []
+            valid_acc = []
+            for i in range(data.shape[0]):
+                valid_speed.append(
+                    speed[i, :self._length[i]-1].reshape([-1, ]))
+                valid_acc.append(acc[i, :self._length[i]-2].reshape([-1, ]))
+            trace_speed = go.Histogram(
+                name=key,
+                x=np.concatenate(valid_speed, axis=0),
+                opacity=0.5
+            )
+            all_trace_speed.append(trace_speed)
+            trace_acc = go.Histogram(
+                name=key,
+                x=np.concatenate(valid_acc, axis=0),
+                opacity=0.5
+            )
+            all_trace_acc.append(trace_acc)
+
+        layout_speed = go.Layout(
+            title='Speed',
+            barmode='overlay',
+            xaxis=dict(title='speed (feet/sec)'),
+            yaxis=dict(title='counts')
+        )
+        layout_acc = go.Layout(
+            title='Acceleration',
+            barmode='overlay',
+            xaxis=dict(title='acceleration (feet/sec^2)'),
+            yaxis=dict(title='counts')
+        )
+        fig_speed = go.Figure(data=all_trace_speed, layout=layout_speed)
+        fig_acc = go.Figure(data=all_trace_acc, layout=layout_acc)
+        py.plot(fig_speed, filename=os.path.join(save_path,'speed_histogram.html'), auto_open=False)
+        py.plot(fig_acc, filename=os.path.join(save_path,'acc_histogram.html'), auto_open=False)
 
 
 def main():
@@ -341,7 +389,8 @@ def main():
         length=length, real_data=real_data, fake_data=fake_data)
     # evaluator.plot_linechart_distance_by_frames(file_name='default', mode='THETA')
     # evaluator.show_mean_distance(mode='THETA')
-    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+    evaluator.plot_histogram_vel_acc()
 
 
 if __name__ == '__main__':
