@@ -2,12 +2,13 @@
 EvaluationMatrix:
 - show_mean_distance()
     Mean/Stddev of distance between offense (wi/wo ball) and defense
-- Overlap frequency (judged by threshold = radius 1 ft)
+- show_overlap_freq()
+    Overlap frequency (judged by threshold = radius 1 ft)
 - Histogram of velocity, acceleration. (mean,stddev)
 - Vis Heat map (frequency) of positions
 - Best match between real and defense’s position difference.(mean,stddev)
 - Compare to formula (defense sync with offense movement)
-- lineplot_distance_by_frames():
+- plot_linechart_distance_by_frames():
     Vis dot distance of each offense to closest defense frame by frame 
     (with indicators: inside 3pt line, ball handler, paint area)
 """
@@ -74,6 +75,9 @@ class EvaluationMatrix(object):
             for off_idx in range(5):
                 temp_len = self.__get_length(
                     defense, offense[:, :, off_idx:off_idx+1])
+                # clean up unused length
+                for i in range(data.shape[0]):
+                    temp_len[i, self._length[i]:] = np.inf
                 counter += np.count_nonzero(temp_len <= OVERLAP_RADIUS)
             # show
             show_msg = '\'{}\' dataset\n'.format(
@@ -237,7 +241,7 @@ class EvaluationMatrix(object):
 
         return dist
 
-    def lineplot_distance_by_frames(self, file_name='default', mode='THETA'):
+    def plot_linechart_distance_by_frames(self, file_name='default', mode='THETA'):
         """ Vis dot distance of each offense to closest defense frame by frame 
         (with indicators: inside 3pt line, ball handler, paint area)
 
@@ -323,6 +327,11 @@ class EvaluationMatrix(object):
             py.plot(fig, filename=file_name +
                     '/epi_{}.html'.format(epi_idx), auto_open=False)
 
+    def plot_histogram_vel_acc(self):
+        """ Histogram of velocity, acceleration. (mean,stddev)
+        """
+        pass
+
 
 def main():
     fake_data = np.load('../data/WGAN/A_fake_B.npy')
@@ -330,8 +339,8 @@ def main():
     length = np.load('../data/WGAN/len.npy')
     evaluator = EvaluationMatrix(
         length=length, real_data=real_data, fake_data=fake_data)
-    evaluator.lineplot_distance_by_frames(file_name='default', mode='THETA')
-    evaluator.show_mean_distance(mode='THETA')
+    # evaluator.plot_linechart_distance_by_frames(file_name='default', mode='THETA')
+    # evaluator.show_mean_distance(mode='THETA')
     evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
 
 
