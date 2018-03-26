@@ -21,6 +21,8 @@ from evaluation import EvaluationMatrix
 
 
 def vis_user_study(if_vis_game=False):
+    """ vis_user_study by line chart analysis and optional plot into vedios
+    """
     I_ID = [34, 12, 67, 31, 22, 6, 43, 17, 8]
     C_ID = [333, 878, 453, 265, 1081, 750, 383, 1088, 108]
     N_ID = [23, 66, 74, 47, 92, 43, 9, 92, 5]
