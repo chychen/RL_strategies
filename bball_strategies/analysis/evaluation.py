@@ -9,7 +9,8 @@ EvaluationMatrix:
 - Vis Heat map (frequency) of positions
 - show_best_match()
     Best match between real and defense’s position difference.(mean,stddev)
-- Compare to formula (defense sync with offense movement)
+- show_freq_cmp_to_formula()
+    Compare to formula (defense sync with offense movement)
 - plot_linechart_distance_by_frames():
     Vis dot distance of each offense to closest defense frame by frame 
     (with indicators: inside 3pt line, ball handler, paint area)
@@ -67,7 +68,7 @@ class EvaluationMatrix(object):
     def show_overlap_freq(self, OVERLAP_RADIUS=1.0):
         """ Overlap frequency (judged by threshold = OVERLAP_RADIUS)
         """
-        print('### show_overlap_freq ###')
+        print('### show_overlap_freq\n ###')
         for key, data in self._all_data_dict.items():
             offense = np.reshape(data[:, :, 3:13], [
                 data.shape[0], data.shape[1], 5, 2])
@@ -90,7 +91,7 @@ class EvaluationMatrix(object):
     def show_mean_distance(self, mode='THETA'):
         """ Mean/Stddev of distance between offense (wi/wo ball) and defense
         """
-        print('### show_mean_distance ###')
+        print('### show_mean_distance\n ###')
         for key, data in self._all_data_dict.items():
             dist = self.__evalute_distance(data, mode=mode)
             ball = np.reshape(data[:, :, 0:2], [
@@ -255,7 +256,7 @@ class EvaluationMatrix(object):
         if_inside_3pt : 
         if_inside_paint : 
         """
-        print('### plot_linechart_distance_by_frames ###')
+        print('### plot_linechart_distance_by_frames\n ###')
         # caculate the matrix
         all_dist_dict = {}
         for key, data in self._all_data_dict.items():
@@ -335,7 +336,7 @@ class EvaluationMatrix(object):
     def plot_histogram_vel_acc(self, file_name='default'):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
         """
-        print('### plot_histogram_vel_acc ###')
+        print('### plot_histogram_vel_acc\n ###')
         # mkdir
         save_path = os.path.join(file_name, 'histogram')
         if not os.path.exists(save_path):
@@ -407,7 +408,7 @@ class EvaluationMatrix(object):
     def show_best_match(self):
         """ Best match between real and defense’s position difference.(mean,stddev)
         """
-        print('### show_best_match ###')
+        print('### show_best_match\n ###')
         real_data = self._all_data_dict['real_data']
         real_defense = np.reshape(real_data[:, :, 13:23], [
             real_data.shape[0], real_data.shape[1], 5, 2])
@@ -434,8 +435,13 @@ class EvaluationMatrix(object):
                     temp_sum += greedy_table[:, :, j, idx]
                 permu_list[:, :, i] = temp_sum
             permu_list = np.amin(permu_list, axis=-1)
-            mean = np.mean(permu_list)
-            stddev = np.std(permu_list)
+            # clean up unused length
+            valid_match = []
+            for i in range(data.shape[0]):
+                valid_match.append(permu_list[i, self._length[i]:].reshape([-1]))
+            valid_match = np.concatenate(valid_match, axis=0)
+            mean = np.mean(valid_match)
+            stddev = np.std(valid_match)
 
             # show
             show_msg = '\'{}\' dataset compared to \'real\' dataset\n'.format(
