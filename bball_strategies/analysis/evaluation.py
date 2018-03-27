@@ -68,7 +68,7 @@ class EvaluationMatrix(object):
     def show_overlap_freq(self, OVERLAP_RADIUS=1.0):
         """ Overlap frequency (judged by threshold = OVERLAP_RADIUS)
         """
-        print('### show_overlap_freq\n ###')
+        print('### show_overlap_freq ###\n')
         for key, data in self._all_data_dict.items():
             offense = np.reshape(data[:, :, 3:13], [
                 data.shape[0], data.shape[1], 5, 2])
@@ -91,7 +91,7 @@ class EvaluationMatrix(object):
     def show_mean_distance(self, mode='THETA'):
         """ Mean/Stddev of distance between offense (wi/wo ball) and defense
         """
-        print('### show_mean_distance\n ###')
+        print('### show_mean_distance ###\n')
         for key, data in self._all_data_dict.items():
             dist = self.__evalute_distance(data, mode=mode)
             ball = np.reshape(data[:, :, 0:2], [
@@ -256,7 +256,7 @@ class EvaluationMatrix(object):
         if_inside_3pt : 
         if_inside_paint : 
         """
-        print('### plot_linechart_distance_by_frames\n ###')
+        print('### plot_linechart_distance_by_frames ###\n')
         # caculate the matrix
         all_dist_dict = {}
         for key, data in self._all_data_dict.items():
@@ -336,7 +336,7 @@ class EvaluationMatrix(object):
     def plot_histogram_vel_acc(self, file_name='default'):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
         """
-        print('### plot_histogram_vel_acc\n ###')
+        print('### plot_histogram_vel_acc ###\n')
         # mkdir
         save_path = os.path.join(file_name, 'histogram')
         if not os.path.exists(save_path):
@@ -408,7 +408,7 @@ class EvaluationMatrix(object):
     def show_best_match(self):
         """ Best match between real and defense’s position difference.(mean,stddev)
         """
-        print('### show_best_match\n ###')
+        print('### show_best_match ###\n')
         real_data = self._all_data_dict['real_data']
         real_defense = np.reshape(real_data[:, :, 13:23], [
             real_data.shape[0], real_data.shape[1], 5, 2])
@@ -448,6 +448,17 @@ class EvaluationMatrix(object):
                 key) + '-- mean={}, stddev={}\n'.format(mean, stddev)
             print(show_msg)
 
+    def show_freq_cmp_to_formula(self):
+        """ Compare to formula (defense sync with offense movement)
+        """
+        print('### show_freq_cmp_to_formula ###\n')
+        real_data = self._all_data_dict['real_data']
+        real_offense = np.reshape(real_data[:, :, 3:13], [
+            real_data.shape[0], real_data.shape[1], 5, 2])
+        real_defense = np.reshape(real_data[:, :, 13:23], [
+            real_data.shape[0], real_data.shape[1], 5, 2])
+        first_vec = real_defense[:,0] - real_offense[:,0]
+
 
 def main():
     fake_data = np.load('../data/WGAN/A_fake_B.npy')
@@ -459,7 +470,8 @@ def main():
     # evaluator.show_mean_distance(mode='THETA')
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
     # evaluator.plot_histogram_vel_acc()
-    evaluator.show_best_match()
+    # evaluator.show_best_match()
+    evaluator.show_freq_cmp_to_formula()
 
 
 if __name__ == '__main__':
