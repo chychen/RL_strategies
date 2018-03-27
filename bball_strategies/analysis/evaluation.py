@@ -32,12 +32,12 @@ class EvaluationMatrix(object):
     """ EvaluationMatrix
     """
 
-    def __init__(self, length=None, **kwargs):
+    def __init__(self, length=None, FORMULA_RADIUS=None, **kwargs):
         """ all data in keargs must have the shape=(num_episode, length, 23)
 
         Args
         ----
-        kwargs : all items' values should have the same shape as real_data.shape
+        kwargs : datasets, all items' values should have the same shape as real_data.shape
             key = dataset name
             value = dataset value
 
@@ -64,6 +64,9 @@ class EvaluationMatrix(object):
         self._all_data_dict = kwargs
         self._length = length
         self._num_episodes = self._length.shape[0]
+
+        if FORMULA_RADIUS is not None:
+            self.create_formula_defense(RADIUS=FORMULA_RADIUS)
 
     def show_overlap_freq(self, OVERLAP_RADIUS=1.0):
         """ Overlap frequency (judged by threshold = OVERLAP_RADIUS)
@@ -433,7 +436,7 @@ class EvaluationMatrix(object):
                 temp_sum = 0.0
                 for j, idx in enumerate(combination):
                     temp_sum += greedy_table[:, :, j, idx]
-                permu_list[:, :, i] = temp_sum / 5.0 # mean
+                permu_list[:, :, i] = temp_sum / 5.0  # mean
             permu_list = np.amin(permu_list, axis=-1)
             # clean up unused length
             valid_match = []
@@ -464,12 +467,11 @@ class EvaluationMatrix(object):
             first_vec = self.RIGHT_BASKET - real_offense[:, 0:1]
             formula_defense = real_offense + first_vec*RADIUS / \
                 (self.__get_length(self.RIGHT_BASKET,
-                                real_offense[:, 0:1])[:, :, :, None]+1e-8)
+                                   real_offense[:, 0:1])[:, :, :, None]+1e-8)
             formula_data = np.concatenate([real_ball, real_offense.reshape(
                 [real_data.shape[0], real_data.shape[1], 10]), formula_defense.reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
             # back to dataset format
             self._all_data_dict['formula_data'] = formula_data
-        
 
     def show_freq_of_valid_defense(self, RADIUS=10.0, THETA=10.0):
         """ validate defense by RADIUS and +-THETA
@@ -512,8 +514,7 @@ def main():
     real_data = np.load('../data/WGAN/A_real_B.npy')
     length = np.load('../data/WGAN/len.npy')
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, fake_data=fake_data, real_real=real_data)
-    # evaluator.create_formula_defense(RADIUS=10.0)
+        length=length, real_data=real_data, real_dummy=real_data, fake_data=fake_data,  FORMULA_RADIUS=10.0)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.plot_linechart_distance_by_frames(file_name='default', mode='THETA')
     # evaluator.show_mean_distance(mode='THETA')
