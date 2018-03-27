@@ -9,7 +9,7 @@ EvaluationMatrix:
 - Vis Heat map (frequency) of positions
 - show_best_match()
     Best match between real and defense’s position difference.(mean,stddev)
-- show_freq_cmp_to_formula()
+- show_freq_of_valid_defense()
     Compare to formula (defense sync with offense movement)
 - plot_linechart_distance_by_frames():
     Vis dot distance of each offense to closest defense frame by frame 
@@ -448,25 +448,33 @@ class EvaluationMatrix(object):
                 key) + '-- mean={}, stddev={}\n'.format(mean, stddev)
             print(show_msg)
 
-    def show_freq_cmp_to_formula(self, RADIUS=10.0, THETA=10.0):
-        """ Compare to formula (defense sync with offense movement) TODO todebug
+    def create_formula_defense(self, RADIUS=10.0):
+        """ formula (defense sync with offense movement)
+        """
+        if 'formula_data' in self._all_data_dict:
+            return
+        else:
+            print('### create_formula_defense ###\n')
+            real_data = self._all_data_dict['real_data']
+            real_ball = real_data[:, :, 0:3]
+            real_offense = np.reshape(real_data[:, :, 3:13], [
+                real_data.shape[0], real_data.shape[1], 5, 2])
+            real_defense = np.reshape(real_data[:, :, 13:23], [
+                real_data.shape[0], real_data.shape[1], 5, 2])
+            first_vec = self.RIGHT_BASKET - real_offense[:, 0:1]
+            formula_defense = real_offense + first_vec*RADIUS / \
+                (self.__get_length(self.RIGHT_BASKET,
+                                real_offense[:, 0:1])[:, :, :, None]+1e-8)
+            formula_data = np.concatenate([real_ball, real_offense.reshape(
+                [real_data.shape[0], real_data.shape[1], 10]), formula_defense.reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
+            # back to dataset format
+            self._all_data_dict['formula_data'] = formula_data
+        
+
+    def show_freq_of_valid_defense(self, RADIUS=10.0, THETA=10.0):
+        """ validate defense by RADIUS and +-THETA
         """
         print('### show_freq_cmp_to_formula ###\n')
-        real_data = self._all_data_dict['real_data']
-        real_ball = real_data[:, :, 0:3]
-        real_offense = np.reshape(real_data[:, :, 3:13], [
-            real_data.shape[0], real_data.shape[1], 5, 2])
-        real_defense = np.reshape(real_data[:, :, 13:23], [
-            real_data.shape[0], real_data.shape[1], 5, 2])
-        first_vec = self.RIGHT_BASKET - real_offense[:, 0:1]
-        formula_defense = real_offense + first_vec*RADIUS / \
-            (self.__get_length(self.RIGHT_BASKET,
-                               real_offense[:, 0:1])[:, :, :, None]+1e-8)
-        formula_data = np.concatenate([real_ball, real_offense.reshape(
-            [real_data.shape[0], real_data.shape[1], 10]), formula_defense.reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
-        # back to dataset format
-        self._all_data_dict['formula_data'] = formula_data
-        # compare datasets' defense to formula_defense
         for key, data in self._all_data_dict.items():
             ball = np.reshape(data[:, :, 0:2], [
                 data.shape[0], data.shape[1], 1, 2])
@@ -505,7 +513,8 @@ def main():
     length = np.load('../data/WGAN/len.npy')
     evaluator = EvaluationMatrix(
         length=length, real_data=real_data, fake_data=fake_data, real_real=real_data)
-    # evaluator.show_freq_cmp_to_formula()
+    # evaluator.create_formula_defense(RADIUS=10.0)
+    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.plot_linechart_distance_by_frames(file_name='default', mode='THETA')
     # evaluator.show_mean_distance(mode='THETA')
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
