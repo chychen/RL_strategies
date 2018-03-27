@@ -7,7 +7,8 @@ EvaluationMatrix:
 - plot_histogram_vel_acc()
     Histogram of DEFENSE's velocity and acceleration. (mean,stddev)
 - Vis Heat map (frequency) of positions
-- Best match between real and defense’s position difference.(mean,stddev)
+- show_best_match()
+    Best match between real and defense’s position difference.(mean,stddev)
 - Compare to formula (defense sync with offense movement)
 - plot_linechart_distance_by_frames():
     Vis dot distance of each offense to closest defense frame by frame 
@@ -23,6 +24,7 @@ import numpy as np
 import plotly.offline as py
 import plotly.graph_objs as go
 import colorsys
+import itertools
 
 
 class EvaluationMatrix(object):
@@ -65,7 +67,7 @@ class EvaluationMatrix(object):
     def show_overlap_freq(self, OVERLAP_RADIUS=1.0):
         """ Overlap frequency (judged by threshold = OVERLAP_RADIUS)
         """
-        print('Overlap Frequency')
+        print('### show_overlap_freq ###')
         for key, data in self._all_data_dict.items():
             offense = np.reshape(data[:, :, 3:13], [
                 data.shape[0], data.shape[1], 5, 2])
@@ -88,7 +90,7 @@ class EvaluationMatrix(object):
     def show_mean_distance(self, mode='THETA'):
         """ Mean/Stddev of distance between offense (wi/wo ball) and defense
         """
-        print('Compare Distance with/without ball')
+        print('### show_mean_distance ###')
         for key, data in self._all_data_dict.items():
             dist = self.__evalute_distance(data, mode=mode)
             ball = np.reshape(data[:, :, 0:2], [
@@ -253,6 +255,7 @@ class EvaluationMatrix(object):
         if_inside_3pt : 
         if_inside_paint : 
         """
+        print('### plot_linechart_distance_by_frames ###')
         # caculate the matrix
         all_dist_dict = {}
         for key, data in self._all_data_dict.items():
@@ -332,6 +335,7 @@ class EvaluationMatrix(object):
     def plot_histogram_vel_acc(self, file_name='default'):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
         """
+        print('### plot_histogram_vel_acc ###')
         # mkdir
         save_path = os.path.join(file_name, 'histogram')
         if not os.path.exists(save_path):
@@ -355,7 +359,8 @@ class EvaluationMatrix(object):
                 opacity=0.5
             )
             all_trace_speed.append(trace_speed)
-            speed_msg += '{} dataset: mean={}, stddev={}\n'.format(key, np.mean(valid_speed), np.std(valid_speed))
+            speed_msg += '{} dataset: mean={}, stddev={}\n'.format(
+                key, np.mean(valid_speed), np.std(valid_speed))
         layout_speed = go.Layout(
             title='Speed',
             barmode='overlay',
@@ -363,7 +368,8 @@ class EvaluationMatrix(object):
             yaxis=dict(title='counts')
         )
         fig_speed = go.Figure(data=all_trace_speed, layout=layout_speed)
-        py.plot(fig_speed, filename=os.path.join(save_path,'speed_histogram.html'), auto_open=False)
+        py.plot(fig_speed, filename=os.path.join(
+            save_path, 'speed_histogram.html'), auto_open=False)
         print(speed_msg)
 
         # acc
@@ -385,7 +391,8 @@ class EvaluationMatrix(object):
                 opacity=0.5
             )
             all_trace_acc.append(trace_acc)
-            acc_msg += '{} dataset: mean={}, stddev={}\n'.format(key, np.mean(valid_acc), np.std(valid_acc))
+            acc_msg += '{} dataset: mean={}, stddev={}\n'.format(
+                key, np.mean(valid_acc), np.std(valid_acc))
         layout_acc = go.Layout(
             title='Acceleration',
             barmode='overlay',
@@ -393,8 +400,47 @@ class EvaluationMatrix(object):
             yaxis=dict(title='counts')
         )
         fig_acc = go.Figure(data=all_trace_acc, layout=layout_acc)
-        py.plot(fig_acc, filename=os.path.join(save_path,'acc_histogram.html'), auto_open=False)
+        py.plot(fig_acc, filename=os.path.join(
+            save_path, 'acc_histogram.html'), auto_open=False)
         print(acc_msg)
+
+    def show_best_match(self):
+        """ Best match between real and defense’s position difference.(mean,stddev)
+        """
+        print('### show_best_match ###')
+        real_data = self._all_data_dict['real_data']
+        real_defense = np.reshape(real_data[:, :, 13:23], [
+            real_data.shape[0], real_data.shape[1], 5, 2])
+        for key, data in self._all_data_dict.items():
+            if key == 'real_data':
+                continue
+            fake_defense = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            # greedy find all combinations
+            greedy_table = np.empty(
+                shape=[real_data.shape[0], real_data.shape[1], 5, 5])
+            for real_idx in range(5):
+                for fake_idx in range(5):
+                    greedy_table[:, :, real_idx, fake_idx] = self.__get_length(
+                        real_defense[:, :, real_idx], fake_defense[:, :, fake_idx])
+            # Permutation = 5! = 120
+            permu_list = np.empty(
+                shape=[real_data.shape[0], real_data.shape[1], 5*4*3*2*1])
+            permu_idx_list = list(itertools.permutations(range(5)))
+            # find best match
+            for i, combination in enumerate(permu_idx_list):
+                temp_sum = 0.0
+                for j, idx in enumerate(combination):
+                    temp_sum += greedy_table[:, :, j, idx]
+                permu_list[:, :, i] = temp_sum
+            permu_list = np.amin(permu_list, axis=-1)
+            mean = np.mean(permu_list)
+            stddev = np.std(permu_list)
+
+            # show
+            show_msg = '\'{}\' dataset compared to \'real\' dataset\n'.format(
+                key) + '-- mean={}, stddev={}\n'.format(mean, stddev)
+            print(show_msg)
 
 
 def main():
@@ -402,11 +448,12 @@ def main():
     real_data = np.load('../data/WGAN/A_real_B.npy')
     length = np.load('../data/WGAN/len.npy')
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, fake_data=fake_data)
+        length=length, real_data=real_data, fake_data=fake_data, real_real=real_data)
     # evaluator.plot_linechart_distance_by_frames(file_name='default', mode='THETA')
     # evaluator.show_mean_distance(mode='THETA')
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
-    evaluator.plot_histogram_vel_acc()
+    # evaluator.plot_histogram_vel_acc()
+    evaluator.show_best_match()
 
 
 if __name__ == '__main__':
