@@ -14,6 +14,8 @@ EvaluationMatrix:
 - plot_linechart_distance_by_frames():
     Vis dot distance of each offense to closest defense frame by frame 
     (with indicators: inside 3pt line, ball handler, paint area)
+- show_freq_heatmap():
+    Vis generated defense player position by heatmap of frequency
 """
 
 from __future__ import absolute_import
@@ -498,6 +500,43 @@ class EvaluationMatrix(object):
                 key) + '-- frequency={}\n'.format(counter/total_frames)
             print(show_msg)
 
+    def show_freq_heatmap(self):
+        data_real = self._all_data_dict["real_data"]
+        data_fake = self._all_data_dict["fake_data"]
+        data_len = self._length
+        off_x_idx = [3, 5, 7, 9, 11]
+        off_y_idx = [4, 6, 8, 10, 12]
+        def_x_idx = [13, 15, 17, 19, 21]
+        def_y_idx = [14, 16, 18, 20, 22]
+
+        fake_off_x = []
+        fake_off_y = []
+        fake_def_x = []
+        fake_def_y = []
+        real_off_x = []
+        real_off_y = []
+        real_def_x = []
+        real_def_y = []
+
+        for epi_idx in range(data_fake.shape[0]):
+            fake_off_x = np.append(fake_off_x, data_fake[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
+            fake_off_y = np.append(fake_off_y, data_fake[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
+            fake_def_x = np.append(fake_def_x, data_fake[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
+            fake_def_y = np.append(fake_def_y, data_fake[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
+            real_off_x = np.append(real_off_x, data_real[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
+            real_off_y = np.append(real_off_y, data_real[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
+            real_def_x = np.append(real_def_x, data_real[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
+            real_def_y = np.append(real_def_y, data_real[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
+
+        import matplotlib.pyplot as plt
+        plt.gca().set_aspect('equal', adjustable='box')
+        (h, xedges, yedges, image) = plt.hist2d(fake_def_x, fake_def_y,
+                                                bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
+        plt.colorbar()
+        plt.show()
+        return h
+
+
 
 def main():
     fake_data = np.load('../data/WGAN/A_fake_B.npy')
@@ -511,6 +550,7 @@ def main():
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
+    # evaluator.show_freq_heatmap()
 
 
 if __name__ == '__main__':
