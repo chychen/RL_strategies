@@ -433,13 +433,13 @@ class EvaluationMatrix(object):
                 temp_sum = 0.0
                 for j, idx in enumerate(combination):
                     temp_sum += greedy_table[:, :, j, idx]
-                permu_list[:, :, i] = temp_sum
+                permu_list[:, :, i] = temp_sum / 5.0 # mean
             permu_list = np.amin(permu_list, axis=-1)
             # clean up unused length
             valid_match = []
             for i in range(data.shape[0]):
                 valid_match.append(
-                    permu_list[i, self._length[i]:].reshape([-1]))
+                    permu_list[i, :self._length[i]].reshape([-1]))
             valid_match = np.concatenate(valid_match, axis=0)
             mean = np.mean(valid_match)
             stddev = np.std(valid_match)
@@ -448,7 +448,7 @@ class EvaluationMatrix(object):
                 key) + '-- mean={}, stddev={}\n'.format(mean, stddev)
             print(show_msg)
 
-    def show_freq_cmp_to_formula(self, RADIUS=5.0, THETA=5.0):
+    def show_freq_cmp_to_formula(self, RADIUS=10.0, THETA=10.0):
         """ Compare to formula (defense sync with offense movement) TODO todebug
         """
         print('### show_freq_cmp_to_formula ###\n')
@@ -483,23 +483,20 @@ class EvaluationMatrix(object):
             # find best defense by defense_theta
             defense_theta = np.arccos(dotvalue/(self.__get_length(
                 defense, ball) * self.__get_length(self.RIGHT_BASKET, ball)+1e-3))
+            defense_theta[ball2defs_len >= RADIUS] = np.inf
             best_defense_theta = np.amin(defense_theta, axis=-1)
             # clean up unused length
             valid_theta = []
             for i in range(data.shape[0]):
                 valid_theta.append(
-                    best_defense_theta[i, self._length[i]:].reshape([-1]))
+                    best_defense_theta[i, :self._length[i]].reshape([-1]))
             valid_theta = np.concatenate(valid_theta, axis=0)
-            counter = np.count_nonzero(valid_theta <= THETA)
+            counter = np.count_nonzero(valid_theta <= THETA*np.pi/180.0)
             # show
             total_frames = data.shape[0] * data.shape[1]
             show_msg = '\'{}\' dataset\n'.format(
                 key) + '-- frequency={}\n'.format(counter/total_frames)
             print(show_msg)
-
-        # NOTE optional to compare by other matrix
-        # self.show_mean_distance()
-        # self.show_best_match()
 
 
 def main():
@@ -508,12 +505,12 @@ def main():
     length = np.load('../data/WGAN/len.npy')
     evaluator = EvaluationMatrix(
         length=length, real_data=real_data, fake_data=fake_data, real_real=real_data)
+    # evaluator.show_freq_cmp_to_formula()
     # evaluator.plot_linechart_distance_by_frames(file_name='default', mode='THETA')
     # evaluator.show_mean_distance(mode='THETA')
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
-    evaluator.show_freq_cmp_to_formula()
 
 
 if __name__ == '__main__':
