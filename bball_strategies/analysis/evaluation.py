@@ -16,6 +16,12 @@ EvaluationMatrix:
     (with indicators: inside 3pt line, ball handler, paint area)
 - show_freq_heatmap():
     Vis generated defense player position by heatmap of frequency
+TODO:
+- formula 2 collision
+- prepare animation, prepare new best dataset
+- histogram bug
+- heat map bug
+- frame by frame distance histogram (wi/wo ball)
 """
 
 from __future__ import absolute_import
@@ -34,7 +40,7 @@ class EvaluationMatrix(object):
     """ EvaluationMatrix
     """
 
-    def __init__(self, length=None, FORMULA_RADIUS=None, **kwargs):
+    def __init__(self, length=None, FORMULA_RADIUS=None, FPS=5, **kwargs):
         """ all data in keargs must have the shape=(num_episode, length, 23)
 
         Args
@@ -61,7 +67,7 @@ class EvaluationMatrix(object):
         self.RIGHT_BASKET = [94 - 5.25, 25]
         self.WINGSPAN_RADIUS = 3.5 + 0.5  # to judge who handle the ball
         self.LEN_3PT_BASKET = 23.75 + 5
-        self.WEIGHT = 10
+        self.FPS = FPS
 
         self._all_data_dict = kwargs
         self._length = length
@@ -137,7 +143,7 @@ class EvaluationMatrix(object):
             data.shape[0], data.shape[1], 5, 2])
         pad_next = np.pad(offense[:, 1:], [(0, 0), (0, 1),
                                            (0, 0), (0, 0)], mode='constant', constant_values=1)
-        offense_speed = self.__get_length(offense, pad_next)
+        offense_speed = self.__get_length(offense, pad_next) * self.FPS
         offense_speed[:, -1] = None
 
         handler_idx = np.empty(
@@ -202,7 +208,7 @@ class EvaluationMatrix(object):
             data.shape[0], data.shape[1], 5, 2])
         pad_next = np.pad(offense[:, 1:], [(0, 0), (0, 1),
                                            (0, 0), (0, 0)], mode='constant', constant_values=1)
-        offense_speed = self.__get_length(offense, pad_next)
+        offense_speed = self.__get_length(offense, pad_next) * self.FPS
         offense_speed[:, -1] = None
         defense = np.reshape(data[:, :, 13:23], [
             data.shape[0], data.shape[1], 5, 2])
@@ -352,7 +358,8 @@ class EvaluationMatrix(object):
         for key, data in self._all_data_dict.items():
             defense = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
-            speed = self.__get_length(defense[:, 1:], defense[:, :-1])
+            speed = self.__get_length(
+                defense[:, 1:], defense[:, :-1]) * self.FPS
             # clean up unused length
             valid_speed = []
             for i in range(data.shape[0]):
@@ -384,7 +391,8 @@ class EvaluationMatrix(object):
         for key, data in self._all_data_dict.items():
             defense = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
-            speed = self.__get_length(defense[:, 1:], defense[:, :-1])
+            speed = self.__get_length(
+                defense[:, 1:], defense[:, :-1]) * self.FPS
             acc = self.__get_length(speed[:, 1:], speed[:, :-1])
             # clean up unused length
             valid_acc = []
@@ -529,14 +537,22 @@ class EvaluationMatrix(object):
         real_def_y = []
 
         for epi_idx in range(data_fake.shape[0]):
-            fake_off_x = np.append(fake_off_x, data_fake[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
-            fake_off_y = np.append(fake_off_y, data_fake[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
-            fake_def_x = np.append(fake_def_x, data_fake[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
-            fake_def_y = np.append(fake_def_y, data_fake[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
-            real_off_x = np.append(real_off_x, data_real[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
-            real_off_y = np.append(real_off_y, data_real[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
-            real_def_x = np.append(real_def_x, data_real[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
-            real_def_y = np.append(real_def_y, data_real[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
+            fake_off_x = np.append(
+                fake_off_x, data_fake[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
+            fake_off_y = np.append(
+                fake_off_y, data_fake[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
+            fake_def_x = np.append(
+                fake_def_x, data_fake[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
+            fake_def_y = np.append(
+                fake_def_y, data_fake[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
+            real_off_x = np.append(
+                real_off_x, data_real[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
+            real_off_y = np.append(
+                real_off_y, data_real[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
+            real_def_x = np.append(
+                real_def_x, data_real[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
+            real_def_y = np.append(
+                real_def_y, data_real[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
 
         import matplotlib.pyplot as plt
         plt.gca().set_aspect('equal', adjustable='box')
@@ -544,24 +560,54 @@ class EvaluationMatrix(object):
                                                 bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
         plt.colorbar()
         plt.show()
+        plt.gca().set_aspect('equal', adjustable='box')
+        (h, xedges, yedges, image) = plt.hist2d(real_def_x, real_def_y,
+                                                bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
+        plt.colorbar()
+        plt.show()
+        plt.gca().set_aspect('equal', adjustable='box')
+        (h, xedges, yedges, image) = plt.hist2d(real_off_x, real_off_y,
+                                                bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
+        plt.colorbar()
+        plt.show()
         return h
 
 
-
-def main():
-    fake_data = np.load('../data/WGAN/A_fake_B.npy')
-    real_data = np.load('../data/WGAN/A_real_B.npy')
-    length = np.load('../data/WGAN/len.npy')
+def evaluate_old_data():
+    real_data = np.load('../data/WGAN/A_real_B.npy')[0:1]
+    fake_data = np.load('../data/WGAN/A_fake_B.npy')[0:1]
+    length = np.load('../data/WGAN/len.npy')[0:1]
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, real_dummy=real_data, fake_data=fake_data,  FORMULA_RADIUS=10.0)
-    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    # evaluator.plot_linechart_distance_by_frames(file_name='default', mode='THETA')
-    # evaluator.show_mean_distance(mode='THETA')
-    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
-    # evaluator.plot_histogram_vel_acc()
-    # evaluator.show_best_match()
-    # evaluator.show_freq_heatmap()
+        length=length, real_data=real_data, FPS=6.25, real_dummy=real_data, fake_data=fake_data, FORMULA_RADIUS=10.0)
+    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    evaluator.plot_linechart_distance_by_frames(
+        file_name='default', mode='THETA')
+    evaluator.show_mean_distance(mode='THETA')
+    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+    evaluator.plot_histogram_vel_acc()
+    evaluator.show_best_match()
+    evaluator.show_freq_heatmap()
+
+
+def evaluate_new_data():
+    # real_data = np.load('../data/WGAN/cnn_wi/A_real_B.npy')#TODO wrong data
+    real_data = np.load('../data/WGAN/cnn_wi/FixedFPS5.npy')[:10000:100]
+    real_data = np.concatenate([real_data[:, :, 0, :3], real_data[:, :, 1:6, :2].reshape(
+        [real_data.shape[0], real_data.shape[1], 10]), real_data[:, :, 6:11, :2].reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
+    fake_data = np.load('../data/WGAN/cnn_wi/A_fake_B_N100.npy')[0]
+    length = np.load('../data/WGAN/cnn_wi/FixedFPS5Length.npy')[:10000:100]
+    evaluator = EvaluationMatrix(
+        length=length, real_data=real_data, FPS=5, real_dummy=real_data, fake_data=fake_data, FORMULA_RADIUS=10.0)
+    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    evaluator.plot_linechart_distance_by_frames(
+        file_name='default', mode='THETA')
+    evaluator.show_mean_distance(mode='THETA')
+    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+    evaluator.plot_histogram_vel_acc()
+    evaluator.show_best_match()
+    evaluator.show_freq_heatmap()
 
 
 if __name__ == '__main__':
-    main()
+    # evaluate_old_data()
+    evaluate_new_data()
