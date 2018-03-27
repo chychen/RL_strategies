@@ -438,26 +438,68 @@ class EvaluationMatrix(object):
             # clean up unused length
             valid_match = []
             for i in range(data.shape[0]):
-                valid_match.append(permu_list[i, self._length[i]:].reshape([-1]))
+                valid_match.append(
+                    permu_list[i, self._length[i]:].reshape([-1]))
             valid_match = np.concatenate(valid_match, axis=0)
             mean = np.mean(valid_match)
             stddev = np.std(valid_match)
-
             # show
             show_msg = '\'{}\' dataset compared to \'real\' dataset\n'.format(
                 key) + '-- mean={}, stddev={}\n'.format(mean, stddev)
             print(show_msg)
 
-    def show_freq_cmp_to_formula(self):
-        """ Compare to formula (defense sync with offense movement)
+    def show_freq_cmp_to_formula(self, RADIUS=5.0, THETA=5.0):
+        """ Compare to formula (defense sync with offense movement) TODO todebug
         """
         print('### show_freq_cmp_to_formula ###\n')
         real_data = self._all_data_dict['real_data']
+        real_ball = real_data[:, :, 0:3]
         real_offense = np.reshape(real_data[:, :, 3:13], [
             real_data.shape[0], real_data.shape[1], 5, 2])
         real_defense = np.reshape(real_data[:, :, 13:23], [
             real_data.shape[0], real_data.shape[1], 5, 2])
-        first_vec = real_defense[:,0] - real_offense[:,0]
+        first_vec = self.RIGHT_BASKET - real_offense[:, 0:1]
+        formula_defense = real_offense + first_vec*RADIUS / \
+            (self.__get_length(self.RIGHT_BASKET,
+                               real_offense[:, 0:1])[:, :, :, None]+1e-8)
+        formula_data = np.concatenate([real_ball, real_offense.reshape(
+            [real_data.shape[0], real_data.shape[1], 10]), formula_defense.reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
+        # back to dataset format
+        self._all_data_dict['formula_data'] = formula_data
+        # compare datasets' defense to formula_defense
+        for key, data in self._all_data_dict.items():
+            ball = np.reshape(data[:, :, 0:2], [
+                data.shape[0], data.shape[1], 1, 2])
+            offense = np.reshape(data[:, :, 3:13], [
+                data.shape[0], data.shape[1], 5, 2])
+            defense = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+
+            ball2defs = defense - ball
+            ball2basket = self.RIGHT_BASKET - ball
+            dotvalue = ball2defs[:, :, :, 0] * ball2basket[:, :, :,
+                                                           0] + ball2defs[:, :, :, 1] * ball2basket[:, :, :, 1]
+            ball2defs_len = self.__get_length(ball, defense)
+            # find best defense by defense_theta
+            defense_theta = np.arccos(dotvalue/(self.__get_length(
+                defense, ball) * self.__get_length(self.RIGHT_BASKET, ball)+1e-3))
+            best_defense_theta = np.amin(defense_theta, axis=-1)
+            # clean up unused length
+            valid_theta = []
+            for i in range(data.shape[0]):
+                valid_theta.append(
+                    best_defense_theta[i, self._length[i]:].reshape([-1]))
+            valid_theta = np.concatenate(valid_theta, axis=0)
+            counter = np.count_nonzero(valid_theta <= THETA)
+            # show
+            total_frames = data.shape[0] * data.shape[1]
+            show_msg = '\'{}\' dataset\n'.format(
+                key) + '-- frequency={}\n'.format(counter/total_frames)
+            print(show_msg)
+
+        # NOTE optional to compare by other matrix
+        # self.show_mean_distance()
+        # self.show_best_match()
 
 
 def main():
