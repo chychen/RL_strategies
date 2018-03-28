@@ -78,13 +78,14 @@ class EvaluationMatrix(object):
             self.create_formula_1_defense(RADIUS=FORMULA_RADIUS)
             self.create_formula_2_defense(RADIUS=FORMULA_RADIUS)
 
-    def show_overlap_freq(self, OVERLAP_RADIUS=1.0):
+    def show_overlap_freq(self, OVERLAP_RADIUS=1.0, interp_flag=True):
         """ Overlap frequency (judged by threshold = OVERLAP_RADIUS)
         """
         print('### show_overlap_freq ###\n')
         for key, data in self._all_data_dict.items():
             interp_frame = 10
-            data = self.__interp_frame(data, interp_frame=interp_frame)
+            if interp_flag:
+                data = self.__interp_frame(data, interp_frame=interp_frame)
             offense = np.reshape(data[:, :, 3:13], [
                 data.shape[0], data.shape[1], 5, 2])
             defense = np.reshape(data[:, :, 13:23], [
@@ -97,7 +98,10 @@ class EvaluationMatrix(object):
                     defense, offense[:, :, off_idx:off_idx+1])
                 # clean up unused length
                 for i in range(data.shape[0]):
-                    temp_len[i, (self._length[i] - 1) * interp_frame:] = np.inf
+                    if interp_flag:
+                        temp_len[i, (self._length[i] - 1) * interp_frame:] = np.inf
+                    else:
+                        temp_len[i, self._length[i]:] = np.inf
                 counter += np.count_nonzero(temp_len <= OVERLAP_RADIUS)
             # show
             show_msg = '\'{0}\' dataset\n'.format(
@@ -896,7 +900,7 @@ def evaluate_new_data():
     cnn_wo_data = np.load('../data/WGAN/cnn_wo_368k/A_fake_B_N100.npy')[0]
     length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, FPS=5, FORMULA_RADIUS=5.0)
+        length=length, real_data=real_data, FPS=5, cnn_wi_data=cnn_wi_data, cnn_wo_data=cnn_wo_data, FORMULA_RADIUS=5.0)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.plot_linechart_distance_by_frames(
     #     file_name='default', mode='THETA')
