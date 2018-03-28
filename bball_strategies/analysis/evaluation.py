@@ -19,8 +19,6 @@ EvaluationMatrix:
 TODO:
 - formula 2 collision
 - prepare animation, prepare new best dataset
-- histogram bug
-- heat map bug
 - frame by frame distance histogram (wi/wo ball)
 """
 
@@ -74,7 +72,8 @@ class EvaluationMatrix(object):
         self._num_episodes = self._length.shape[0]
 
         if FORMULA_RADIUS is not None:
-            self.create_formula_defense(RADIUS=FORMULA_RADIUS)
+            self.create_formula_1_defense(RADIUS=FORMULA_RADIUS)
+            self.create_formula_2_defense(RADIUS=FORMULA_RADIUS)
 
     def show_overlap_freq(self, OVERLAP_RADIUS=1.0):
         """ Overlap frequency (judged by threshold = OVERLAP_RADIUS)
@@ -369,9 +368,10 @@ class EvaluationMatrix(object):
             trace_speed = go.Histogram(
                 name=key,
                 x=valid_speed,
+                autobinx=False,
                 xbins=dict(
                     start=0.0,
-                    end=30.0,
+                    end=1000.0,
                     size=0.5
                 ),
                 opacity=0.5
@@ -407,6 +407,12 @@ class EvaluationMatrix(object):
             trace_acc = go.Histogram(
                 name=key,
                 x=valid_acc,
+                autobinx=False,
+                xbins=dict(
+                    start=0.0,
+                    end=1000.0,
+                    size=0.5
+                ),
                 opacity=0.5
             )
             all_trace_acc.append(trace_acc)
@@ -466,19 +472,19 @@ class EvaluationMatrix(object):
                 key) + '-- mean={}, stddev={}\n'.format(mean, stddev)
             print(show_msg)
 
-    def create_formula_defense(self, RADIUS=10.0):
+    def create_formula_1_defense(self, RADIUS):
         """ formula (defense sync with offense movement)
         """
-        if 'formula_data' in self._all_data_dict:
+        if 'formula_1_data' in self._all_data_dict:
             return
         else:
-            print('### create_formula_defense ###\n')
+            print('### create_formula_1_defense ###\n')
             real_data = self._all_data_dict['real_data']
             real_ball = real_data[:, :, 0:3]
             real_offense = np.reshape(real_data[:, :, 3:13], [
                 real_data.shape[0], real_data.shape[1], 5, 2])
-            real_defense = np.reshape(real_data[:, :, 13:23], [
-                real_data.shape[0], real_data.shape[1], 5, 2])
+            # real_defense = np.reshape(real_data[:, :, 13:23], [
+            #     real_data.shape[0], real_data.shape[1], 5, 2])
             first_vec = self.RIGHT_BASKET - real_offense[:, 0:1]
             formula_defense = real_offense + first_vec*RADIUS / \
                 (self.__get_length(self.RIGHT_BASKET,
@@ -486,7 +492,28 @@ class EvaluationMatrix(object):
             formula_data = np.concatenate([real_ball, real_offense.reshape(
                 [real_data.shape[0], real_data.shape[1], 10]), formula_defense.reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
             # back to dataset format
-            self._all_data_dict['formula_data'] = formula_data
+            self._all_data_dict['formula_1_data'] = formula_data
+
+    def create_formula_2_defense(self, RADIUS):
+        """ formula (defense sync with offense movement)
+        """
+        if 'formula_2_data' in self._all_data_dict:
+            return
+        else:
+            print('### create_formula_2_defense ###\n')
+            real_data = self._all_data_dict['real_data']
+            real_ball = real_data[:, :, 0:3]
+            real_offense = np.reshape(real_data[:, :, 3:13], [
+                real_data.shape[0], real_data.shape[1], 5, 2])
+            # real_defense = np.reshape(real_data[:, :, 13:23], [
+            #     real_data.shape[0], real_data.shape[1], 5, 2])
+            off2basket = self.RIGHT_BASKET - real_offense
+            formula_defense = real_offense + off2basket*RADIUS / \
+                (self.__get_length(self.RIGHT_BASKET, real_offense)[:, :, :, None]+1e-8)
+            formula_data = np.concatenate([real_ball, real_offense.reshape(
+                [real_data.shape[0], real_data.shape[1], 10]), formula_defense.reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
+            # back to dataset format
+            self._all_data_dict['formula_2_data'] = formula_data
 
     def show_freq_of_valid_defense(self, RADIUS=10.0, THETA=10.0):
         """ validate defense by RADIUS and +-THETA
@@ -523,94 +550,70 @@ class EvaluationMatrix(object):
                 key) + '-- frequency={}\n'.format(counter/total_frames)
             print(show_msg)
 
-    def show_freq_heatmap(self):
-        data_real = self._all_data_dict["real_data"]
-        data_fake = self._all_data_dict["fake_data"]
-        data_len = self._length
-        off_x_idx = [3, 5, 7, 9, 11]
-        off_y_idx = [4, 6, 8, 10, 12]
-        def_x_idx = [13, 15, 17, 19, 21]
-        def_y_idx = [14, 16, 18, 20, 22]
-
-        fake_off_x = []
-        fake_off_y = []
-        fake_def_x = []
-        fake_def_y = []
-        real_off_x = []
-        real_off_y = []
-        real_def_x = []
-        real_def_y = []
-
-        for epi_idx in range(data_fake.shape[0]):
-            fake_off_x = np.append(
-                fake_off_x, data_fake[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
-            fake_off_y = np.append(
-                fake_off_y, data_fake[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
-            fake_def_x = np.append(
-                fake_def_x, data_fake[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
-            fake_def_y = np.append(
-                fake_def_y, data_fake[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
-            real_off_x = np.append(
-                real_off_x, data_real[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
-            real_off_y = np.append(
-                real_off_y, data_real[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
-            real_def_x = np.append(
-                real_def_x, data_real[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
-            real_def_y = np.append(
-                real_def_y, data_real[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
-
+    def show_freq_heatmap(self, file_name):
+        # mkdir
+        save_path = os.path.join(file_name, 'heat_map')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
         import matplotlib.pyplot as plt
-        plt.gca().set_aspect('equal', adjustable='box')
-        (h, xedges, yedges, image) = plt.hist2d(fake_def_x, fake_def_y,
-                                                bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
-        plt.colorbar()
-        plt.show()
-        plt.gca().set_aspect('equal', adjustable='box')
-        (h, xedges, yedges, image) = plt.hist2d(real_def_x, real_def_y,
-                                                bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
-        plt.colorbar()
-        plt.show()
-        plt.gca().set_aspect('equal', adjustable='box')
-        (h, xedges, yedges, image) = plt.hist2d(real_off_x, real_off_y,
-                                                bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
-        plt.colorbar()
-        plt.show()
-        return h
+        print('### show_freq_heatmap ###\n')
+        for key, data in self._all_data_dict.items():
+            data_len = self._length
+            off_x_idx = [3, 5, 7, 9, 11]
+            off_y_idx = [4, 6, 8, 10, 12]
+            def_x_idx = [13, 15, 17, 19, 21]
+            def_y_idx = [14, 16, 18, 20, 22]
 
+            off_x = []
+            off_y = []
+            def_x = []
+            def_y = []
 
-def evaluate_old_data():
-    real_data = np.load('../data/WGAN/A_real_B.npy')[0:1]
-    fake_data = np.load('../data/WGAN/A_fake_B.npy')[0:1]
-    length = np.load('../data/WGAN/len.npy')[0:1]
-    evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, FPS=6.25, fake_data=fake_data, FORMULA_RADIUS=10.0)
-    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    # evaluator.plot_linechart_distance_by_frames(
-    #     file_name='default', mode='THETA')
-    # evaluator.show_mean_distance(mode='THETA')
-    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
-    evaluator.plot_histogram_vel_acc()
-    # evaluator.show_best_match()
-    # evaluator.show_freq_heatmap()
+            for epi_idx in range(data.shape[0]):
+                off_x = np.append(
+                    off_x, data[epi_idx, :data_len[epi_idx], off_x_idx].flatten())
+                off_y = np.append(
+                    off_y, data[epi_idx, :data_len[epi_idx], off_y_idx].flatten())
+                def_x = np.append(
+                    def_x, data[epi_idx, :data_len[epi_idx], def_x_idx].flatten())
+                def_y = np.append(
+                    def_y, data[epi_idx, :data_len[epi_idx], def_y_idx].flatten())
 
+            plt.gca().set_aspect('equal', adjustable='box')
+            (h, xedges, yedges, image) = plt.hist2d(def_x, def_y,
+                                                    bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
+            plt.title(key+'_defense')
+            plt.colorbar()
+            plt.savefig(os.path.join(save_path, key+'_defense'))
+            plt.close()
+            if key=='real_data':
+                plt.gca().set_aspect('equal', adjustable='box')
+                (h, xedges, yedges, image) = plt.hist2d(off_x, off_y,
+                                                        bins=[np.arange(46, 95, 1), np.arange(0, 51, 1)])
+                plt.title(key+'_offense')
+                plt.colorbar()
+                plt.savefig(os.path.join(save_path, key+'_offense'))
+                plt.close()
+                
 
 def evaluate_new_data():
     # real_data = np.load('../data/WGAN/cnn_wi/A_real_B.npy')#TODO wrong data
-    real_data = np.load('../data/WGAN/cnn_wi/FixedFPS5.npy')[:10000:100]
+    real_data = np.load('../data/WGAN/FixedFPS5.npy')[:10000:100]
     real_data = np.concatenate([real_data[:, :, 0, :3], real_data[:, :, 1:6, :2].reshape(
         [real_data.shape[0], real_data.shape[1], 10]), real_data[:, :, 6:11, :2].reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
-    fake_data = np.load('../data/WGAN/cnn_wi/A_fake_B_N100.npy')[0]
-    length = np.load('../data/WGAN/cnn_wi/FixedFPS5Length.npy')[:10000:100]
+    cnn_wi_data = np.load('../data/WGAN/cnn_wi_2000k/A_fake_B_N100.npy')[0]
+    cnn_wo_data = np.load('../data/WGAN/cnn_wo_368k/A_fake_B_N100.npy')[0]
+    length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, FPS=5, fake_data=fake_data, FORMULA_RADIUS=10.0)
+        length=length, real_data=real_data, FPS=5, cnn_wi_data=cnn_wi_data, cnn_wo_data=cnn_wo_data, FORMULA_RADIUS=5.0)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.plot_linechart_distance_by_frames(
     #     file_name='default', mode='THETA')
     # evaluator.show_mean_distance(mode='THETA')
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
-    evaluator.plot_histogram_vel_acc()
+    # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
-    # evaluator.show_freq_heatmap()
+    evaluator.show_freq_heatmap(file_name='default')
 
 
 if __name__ == '__main__':
