@@ -23,7 +23,6 @@ EvaluationMatrix:
 TODO:
 - collision
 - prepare animation, given episode index
-- frame by frame distance histogram (wi/wo ball)
 """
 
 from __future__ import absolute_import
@@ -98,8 +97,8 @@ class EvaluationMatrix(object):
                     temp_len[i, self._length[i]:] = np.inf
                 counter += np.count_nonzero(temp_len <= OVERLAP_RADIUS)
             # show
-            show_msg = '\'{}\' dataset\n'.format(
-                key) + '-- frequency={}\n'.format(counter/total_frames)
+            show_msg = '\'{0}\' dataset\n'.format(
+                key) + '-- frequency={0:4.2f}\n'.format(counter/total_frames)
             print(show_msg)
 
     def show_mean_distance(self, mode='THETA'):
@@ -127,8 +126,8 @@ class EvaluationMatrix(object):
             wo_mean = np.mean(dist[indices])
             wo_std = np.std(dist[indices])
             # show
-            show_msg = '\'{}\' dataset\n'.format(key) + '-- wi ball: mean={}, stddev={}\n'.format(
-                wi_mean, wi_std) + '-- wo ball: mean={}, stddev={}\n'.format(wo_mean, wo_std)
+            show_msg = '\'{0}\' dataset\n'.format(key) + '-- wi ball:\tmean={0},\tstddev={1:4.2f}\n'.format(
+                wi_mean, wi_std) + '-- wo ball:\tmean={0:4.2f},\tstddev={1:4.2f}\n'.format(wo_mean, wo_std)
             print(show_msg)
 
     def __get_length(self, a, b, axis=-1):
@@ -398,29 +397,85 @@ class EvaluationMatrix(object):
         all_trace_speed = []
         speed_msg = 'Speed\n'
         for key, data in self._all_data_dict.items():
-            defense = np.reshape(data[:, :, 13:23], [
+            if key == 'real_data':  # vis offense tooooooo
+                target = np.reshape(data[:, :, 3:13], [
+                    data.shape[0], data.shape[1], 5, 2])
+                speed = self.__get_length(
+                    target[:, 1:], target[:, :-1]) * self.FPS
+                # clean up unused length
+                valid_speed = []
+                for i in range(data.shape[0]):
+                    valid_speed.append(
+                        speed[i, :self._length[i]-1].reshape([-1, ]))
+                valid_speed = np.concatenate(valid_speed, axis=0)
+
+                bin_size = 0.5
+                max_v = np.amax(valid_speed)
+                min_v = np.amin(valid_speed)
+                num_bins = int((max_v-min_v+4)//bin_size)
+                counter = np.zeros(shape=[num_bins,])
+                for v in valid_speed:
+                    counter[int(v//bin_size)] += 1
+
+                trace_speed = go.Scatter(
+                    name=key+'_offense',
+                    x=[i*bin_size for i in range(num_bins)],
+                    y=counter
+                )
+
+                # trace_speed = go.Histogram(
+                #     name=key+'_offense',
+                #     x=valid_speed,
+                #     autobinx=False,
+                #     xbins=dict(
+                #         start=0.0,
+                #         end=1000.0,
+                #         size=0.5
+                #     ),
+                #     opacity=0.5
+                # )
+                all_trace_speed.append(trace_speed)
+                speed_msg += '{0} dataset:\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
+                    key+'_offense', np.mean(valid_speed), np.std(valid_speed))
+
+            target = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
             speed = self.__get_length(
-                defense[:, 1:], defense[:, :-1]) * self.FPS
+                target[:, 1:], target[:, :-1]) * self.FPS
             # clean up unused length
             valid_speed = []
             for i in range(data.shape[0]):
                 valid_speed.append(
                     speed[i, :self._length[i]-1].reshape([-1, ]))
             valid_speed = np.concatenate(valid_speed, axis=0)
-            trace_speed = go.Histogram(
+
+            bin_size = 0.5
+            max_v = np.amax(valid_speed)
+            min_v = np.amin(valid_speed)
+            num_bins = int((max_v-min_v+4)//bin_size)
+            counter = np.zeros(shape=[num_bins,])
+            for v in valid_speed:
+                counter[int(v//bin_size)] += 1
+
+            trace_speed = go.Scatter(
                 name=key,
-                x=valid_speed,
-                autobinx=False,
-                xbins=dict(
-                    start=0.0,
-                    end=1000.0,
-                    size=0.5
-                ),
-                opacity=0.5
+                x=[i*bin_size for i in range(num_bins)],
+                y=counter
             )
+
+            # trace_speed = go.Histogram(
+            #     name=key,
+            #     x=valid_speed,
+            #     autobinx=False,
+            #     xbins=dict(
+            #         start=0.0,
+            #         end=1000.0,
+            #         size=0.5
+            #     ),
+            #     opacity=0.5
+            # )
             all_trace_speed.append(trace_speed)
-            speed_msg += '{} dataset: mean={}, stddev={}\n'.format(
+            speed_msg += '{0} dataset:\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                 key, np.mean(valid_speed), np.std(valid_speed))
         layout_speed = go.Layout(
             title='Speed',
@@ -437,29 +492,86 @@ class EvaluationMatrix(object):
         acc_msg = 'Acceleration\n'
         all_trace_acc = []
         for key, data in self._all_data_dict.items():
-            defense = np.reshape(data[:, :, 13:23], [
+            if key == 'real_data':  # vis offense tooooooo
+                target = np.reshape(data[:, :, 3:13], [
+                    data.shape[0], data.shape[1], 5, 2])
+                speed = self.__get_length(
+                    target[:, 1:], target[:, :-1]) * self.FPS
+                acc = self.__get_length(speed[:, 1:], speed[:, :-1])
+                # clean up unused length
+                valid_acc = []
+                for i in range(data.shape[0]):
+                    valid_acc.append(
+                        acc[i, :self._length[i]-2].reshape([-1, ]))
+                valid_acc = np.concatenate(valid_acc, axis=0)
+
+                bin_size = 0.5
+                max_v = np.amax(valid_acc)
+                min_v = np.amin(valid_acc)
+                num_bins = int((max_v-min_v+4)//bin_size)
+                counter = np.zeros(shape=[num_bins,])
+                for v in valid_acc:
+                    counter[int(v//bin_size)] += 1
+
+                trace_acc = go.Scatter(
+                    name=key+'_offense',
+                    x=[i*bin_size for i in range(num_bins)],
+                    y=counter
+                )
+
+                # trace_acc = go.Histogram(
+                #     name=key+'_offense',
+                #     x=valid_acc,
+                #     autobinx=False,
+                #     xbins=dict(
+                #         start=0.0,
+                #         end=1000.0,
+                #         size=0.5
+                #     ),
+                #     opacity=0.5
+                # )
+                all_trace_acc.append(trace_acc)
+                acc_msg += '{0} dataset:\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
+                    key+'_offense', np.mean(valid_acc), np.std(valid_acc))
+
+            target = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
             speed = self.__get_length(
-                defense[:, 1:], defense[:, :-1]) * self.FPS
+                target[:, 1:], target[:, :-1]) * self.FPS
             acc = self.__get_length(speed[:, 1:], speed[:, :-1])
             # clean up unused length
             valid_acc = []
             for i in range(data.shape[0]):
                 valid_acc.append(acc[i, :self._length[i]-2].reshape([-1, ]))
+            
             valid_acc = np.concatenate(valid_acc, axis=0)
-            trace_acc = go.Histogram(
+            bin_size = 0.5
+            max_v = np.amax(valid_acc)
+            min_v = np.amin(valid_acc)
+            num_bins = int((max_v-min_v+4)//bin_size)
+            counter = np.zeros(shape=[num_bins,])
+            for v in valid_acc:
+                counter[int(v//bin_size)] += 1
+
+            trace_acc = go.Scatter(
                 name=key,
-                x=valid_acc,
-                autobinx=False,
-                xbins=dict(
-                    start=0.0,
-                    end=1000.0,
-                    size=0.5
-                ),
-                opacity=0.5
+                x=[i*bin_size for i in range(num_bins)],
+                y=counter
             )
+
+            # trace_acc = go.Histogram(
+            #     name=key,
+            #     x=valid_acc,
+            #     autobinx=False,
+            #     xbins=dict(
+            #         start=0.0,
+            #         end=1000.0,
+            #         size=0.5
+            #     ),
+            #     opacity=0.5
+            # )
             all_trace_acc.append(trace_acc)
-            acc_msg += '{} dataset: mean={}, stddev={}\n'.format(
+            acc_msg += '{0} dataset:\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                 key, np.mean(valid_acc), np.std(valid_acc))
         layout_acc = go.Layout(
             title='Acceleration',
@@ -511,8 +623,8 @@ class EvaluationMatrix(object):
             mean = np.mean(valid_match)
             stddev = np.std(valid_match)
             # show
-            show_msg = '\'{}\' dataset compared to \'real\' dataset\n'.format(
-                key) + '-- mean={}, stddev={}\n'.format(mean, stddev)
+            show_msg = '\'{0}\' dataset compared to \'real\' dataset\n'.format(
+                key) + '-- mean={0:4.2f},\tstddev={1:4.2f}\n'.format(mean, stddev)
             print(show_msg)
 
     def create_formula_1_defense(self, RADIUS):
@@ -590,8 +702,8 @@ class EvaluationMatrix(object):
             counter = np.count_nonzero(valid_theta <= THETA*np.pi/180.0)
             # show
             total_frames = data.shape[0] * data.shape[1]
-            show_msg = '\'{}\' dataset\n'.format(
-                key) + '-- frequency={}\n'.format(counter/total_frames)
+            show_msg = '\'{0}\' dataset\n'.format(
+                key) + '-- frequency={0:4.2f}\n'.format(counter/total_frames)
             print(show_msg)
 
     def show_freq_heatmap(self, file_name):
@@ -686,33 +798,61 @@ class EvaluationMatrix(object):
             for i in range(data.shape[0]):
                 if_handle_ball[i, self._length[i]:] = False
             woball_dist = dist[if_handle_ball]
-            # trace_wiball_dist
-            trace_wiball_dist = go.Histogram(
+            # # trace_wiball_dist
+            bin_size = 0.5
+            max_v = np.amax(wiball_dist)
+            min_v = np.amin(wiball_dist)
+            num_bins = int((max_v-min_v+4)//bin_size)
+            counter = np.zeros(shape=[num_bins,])
+            for v in wiball_dist:
+                counter[int(v//bin_size)] += 1
+
+            trace_wiball_dist = go.Scatter(
                 name=key+'_wi_ball',
-                x=wiball_dist,
-                autobinx=False,
-                xbins=dict(
-                    start=0.0,
-                    end=1000.0,
-                    size=0.5
-                ),
-                opacity=0.5
+                x=[i*bin_size for i in range(num_bins)],
+                y=counter
             )
+
+            # trace_wiball_dist = go.Histogram(
+            #     name=key+'_wi_ball',
+            #     x=wiball_dist,
+            #     autobinx=False,
+            #     xbins=dict(
+            #         start=0.0,
+            #         end=1000.0,
+            #         size=0.5
+            #     ),
+            #     opacity=0.5
+            # )
             all_trace.append(trace_wiball_dist)
             # trace_woball_dist
-            trace_woball_dist = go.Histogram(
+
+            bin_size = 0.5
+            max_v = np.amax(woball_dist)
+            min_v = np.amin(woball_dist)
+            num_bins = int((max_v-min_v+4)//bin_size)
+            counter = np.zeros(shape=[num_bins,])
+            for v in woball_dist:
+                counter[int(v//bin_size)] += 1
+
+            trace_woball_dist = go.Scatter(
                 name=key+'_wo_ball',
-                x=woball_dist,
-                autobinx=False,
-                xbins=dict(
-                    start=0.0,
-                    end=1000.0,
-                    size=0.5
-                ),
-                opacity=0.5
+                x=[i*bin_size for i in range(num_bins)],
+                y=counter
             )
+            # trace_woball_dist = go.Histogram(
+            #     name=key+'_wo_ball',
+            #     x=woball_dist,
+            #     autobinx=False,
+            #     xbins=dict(
+            #         start=0.0,
+            #         end=1000.0,
+            #         size=0.5
+            #     ),
+            #     opacity=0.5
+            # )
             all_trace.append(trace_woball_dist)
-            msg += '{} dataset:\n\t with ball: mean={}, stddev={}\n\t without ball: mean={}, stddev={}\n'.format(
+            msg += '{0} dataset:\n\twith ball:\tmean={1:4.2f},\tstddev={2:4.2f}\n\twithout ball:\tmean={3:4.2f},\tstddev={4:4.2f}\n'.format(
                 key, np.mean(wiball_dist), np.std(wiball_dist), np.mean(woball_dist), np.std(woball_dist))
         layout = go.Layout(
             title='Distance',
@@ -748,10 +888,10 @@ def evaluate_new_data():
     #     file_name='default', mode='DISTANCE')
     # evaluator.plot_histogram_distance_by_frames(
     #     file_name='default', mode='THETA')
-    # evaluator.plot_histogram_distance_by_frames(
-    #     file_name='default', mode='THETA_MUL_SCORE')
-    # evaluator.plot_histogram_distance_by_frames(
-    #     file_name='default', mode='THETA_ADD_SCORE')
+    evaluator.plot_histogram_distance_by_frames(
+        file_name='default', mode='THETA_MUL_SCORE')
+    evaluator.plot_histogram_distance_by_frames(
+        file_name='default', mode='THETA_ADD_SCORE')
 
 
 if __name__ == '__main__':
