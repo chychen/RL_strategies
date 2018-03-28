@@ -80,18 +80,21 @@ class EvaluationMatrix(object):
         """
         print('### show_overlap_freq ###\n')
         for key, data in self._all_data_dict.items():
+            interp_frame = 10
+            data = self.__interp_frame(data, interp_frame=interp_frame)
             offense = np.reshape(data[:, :, 3:13], [
                 data.shape[0], data.shape[1], 5, 2])
             defense = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
             total_frames = data.shape[0]*data.shape[1]
+
             counter = 0
             for off_idx in range(5):
                 temp_len = self.__get_length(
                     defense, offense[:, :, off_idx:off_idx+1])
                 # clean up unused length
                 for i in range(data.shape[0]):
-                    temp_len[i, self._length[i]:] = np.inf
+                    temp_len[i, (self._length[i] - 1) * interp_frame:] = np.inf
                 counter += np.count_nonzero(temp_len <= OVERLAP_RADIUS)
             # show
             show_msg = '\'{}\' dataset\n'.format(
@@ -126,6 +129,24 @@ class EvaluationMatrix(object):
             show_msg = '\'{}\' dataset\n'.format(key) + '-- wi ball: mean={}, stddev={}\n'.format(
                 wi_mean, wi_std) + '-- wo ball: mean={}, stddev={}\n'.format(wo_mean, wo_std)
             print(show_msg)
+
+    def __interp_frame(self, data, interp_frame=10):
+
+        res = []
+        for epi in data:
+            x = np.arange(0, len(epi) - 1, 1.0 / interp_frame)
+            xp = np.arange(0, len(epi), 1.0)
+            tmp = []
+            for idx in range(23):
+                fp = epi[:, idx]
+                y = np.interp(x, xp, fp)
+                tmp.append(y)
+            res.append(tmp)
+
+        res = np.asarray(res)
+        res = np.einsum('ijk->ikj', res)
+
+        return res
 
     def __get_length(self, a, b, axis=-1):
         """ get distance between a and b by axis
@@ -605,15 +626,15 @@ def evaluate_new_data():
     cnn_wo_data = np.load('../data/WGAN/cnn_wo_368k/A_fake_B_N100.npy')[0]
     length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, FPS=5, cnn_wi_data=cnn_wi_data, cnn_wo_data=cnn_wo_data, FORMULA_RADIUS=5.0)
+        length=length, real_data=real_data, FPS=5, FORMULA_RADIUS=5.0)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.plot_linechart_distance_by_frames(
     #     file_name='default', mode='THETA')
     # evaluator.show_mean_distance(mode='THETA')
-    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
-    evaluator.show_freq_heatmap(file_name='default')
+    # evaluator.show_freq_heatmap(file_name='default')
 
 
 if __name__ == '__main__':
