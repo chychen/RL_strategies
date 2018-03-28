@@ -369,6 +369,11 @@ class EvaluationMatrix(object):
             trace_speed = go.Histogram(
                 name=key,
                 x=valid_speed,
+                xbins=dict(
+                    start=0.0,
+                    end=30.0,
+                    size=0.5
+                ),
                 opacity=0.5
             )
             all_trace_speed.append(trace_speed)
@@ -578,15 +583,15 @@ def evaluate_old_data():
     fake_data = np.load('../data/WGAN/A_fake_B.npy')[0:1]
     length = np.load('../data/WGAN/len.npy')[0:1]
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, FPS=6.25, real_dummy=real_data, fake_data=fake_data, FORMULA_RADIUS=10.0)
-    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    evaluator.plot_linechart_distance_by_frames(
-        file_name='default', mode='THETA')
-    evaluator.show_mean_distance(mode='THETA')
-    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+        length=length, real_data=real_data, FPS=6.25, fake_data=fake_data, FORMULA_RADIUS=10.0)
+    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    # evaluator.plot_linechart_distance_by_frames(
+    #     file_name='default', mode='THETA')
+    # evaluator.show_mean_distance(mode='THETA')
+    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
     evaluator.plot_histogram_vel_acc()
-    evaluator.show_best_match()
-    evaluator.show_freq_heatmap()
+    # evaluator.show_best_match()
+    # evaluator.show_freq_heatmap()
 
 
 def evaluate_new_data():
@@ -597,15 +602,15 @@ def evaluate_new_data():
     fake_data = np.load('../data/WGAN/cnn_wi/A_fake_B_N100.npy')[0]
     length = np.load('../data/WGAN/cnn_wi/FixedFPS5Length.npy')[:10000:100]
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, FPS=5, real_dummy=real_data, fake_data=fake_data, FORMULA_RADIUS=10.0)
-    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    evaluator.plot_linechart_distance_by_frames(
-        file_name='default', mode='THETA')
-    evaluator.show_mean_distance(mode='THETA')
-    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+        length=length, real_data=real_data, FPS=5, fake_data=fake_data, FORMULA_RADIUS=10.0)
+    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    # evaluator.plot_linechart_distance_by_frames(
+    #     file_name='default', mode='THETA')
+    # evaluator.show_mean_distance(mode='THETA')
+    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
     evaluator.plot_histogram_vel_acc()
-    evaluator.show_best_match()
-    evaluator.show_freq_heatmap()
+    # evaluator.show_best_match()
+    # evaluator.show_freq_heatmap()
 
 
 if __name__ == '__main__':
