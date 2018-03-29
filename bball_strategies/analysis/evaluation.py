@@ -704,11 +704,13 @@ class EvaluationMatrix(object):
             permu_argmin = np.argmin(permu_list, axis=-1)
             permu_idx_all = np.zeros(shape=[
                                      real_data.shape[0], real_data.shape[1], 5*4*3*2*1, 5], dtype=int) + np.array(permu_idx_list, dtype=int)
-            best_match_pairs = np.empty(shape=[real_data.shape[0], real_data.shape[1], 5], dtype=int)
+            best_match_pairs = np.empty(
+                shape=[real_data.shape[0], real_data.shape[1], 5], dtype=int)
             for i, v in enumerate(permu_argmin[0]):
                 best_match_pairs[0, i] = permu_idx_all[0, i, v]
             # plot best match as video
-            vis_game.plot_compare_data(real_data[0], data[0], self._length[0], permu_min[0], best_match_pairs[0], file_path=os.path.join(save_path, key+'_compare_best_match.mp4'), if_save=True, fps=self.FPS, vis_ball_height=False, vis_annotation=False)
+            vis_game.plot_compare_data(real_data[0], data[0], self._length[0], permu_min[0], best_match_pairs[0], file_path=os.path.join(
+                save_path, key+'_compare_best_match.mp4'), if_save=True, fps=self.FPS, vis_ball_height=False, vis_annotation=False)
             # clean up unused length
             valid_match = []
             for i in range(data.shape[0]):
@@ -997,7 +999,6 @@ class EvaluationMatrix(object):
         # evaluator.show_mean_distance(mode='THETA')
         # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=True)
         # evaluator.plot_histogram_vel_acc()
-        # evaluator.show_best_match()
         # evaluator.show_freq_heatmap()
         # evaluator.plot_histogram_distance_by_frames(
         #     mode='DISTANCE')
@@ -1014,8 +1015,14 @@ def evaluate_new_data():
     real_data = np.load('../data/WGAN/FixedFPS5.npy')[:10000:100]
     real_data = np.concatenate([real_data[:, :, 0, :3], real_data[:, :, 1:6, :2].reshape(
         [real_data.shape[0], real_data.shape[1], 10]), real_data[:, :, 6:11, :2].reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
-    cnn_wi_data = np.load('../data/WGAN/cnn_wi_2000k/A_fake_B_N100.npy')[0]
-    cnn_wo_data = np.load('../data/WGAN/cnn_wo_368k/A_fake_B_N100.npy')[0]
+    cnn_wi_2000k = np.load('../data/WGAN/cnn_wi_2000k/A_fake_B_N100.npy')[0]
+    cnn_wo_368k = np.load('../data/WGAN/cnn_wo_368k/A_fake_B_N100.npy')[0]
+    cnn_verify_921k = np.load(
+        '../data/WGAN/cnn_verify_921k/A_fake_B_N100.npy')[0]
+    # cnn_wi_2000k_not_denorm = np.load('../data/WGAN/cnn_wi_2000k_not_denorm/A_fake_B_N100.npy')[0]
+    cnn_wi_mul_2000k = np.load(
+        '../data/WGAN/cnn_wi_mul_2000k/A_fake_B_N100.npy')[0]
+    # rnn_1000k = np.load('../data/WGAN/rnn_1000k/A_fake_B_N100.npy')[0]
     length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
 
     file_name = 'default'
@@ -1026,23 +1033,25 @@ def evaluate_new_data():
             shutil.rmtree(file_name)
             print('rm -rf "%s" complete!' % file_name)
     evaluator = EvaluationMatrix(
-        file_name=file_name, length=length, real_data=real_data, FPS=5, cnn_wi_data=cnn_wi_data, cnn_wo_data=cnn_wo_data, FORMULA_RADIUS=5.0)
-    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    # evaluator.plot_linechart_distance_by_frames(
-    #    mode='THETA')
-    # evaluator.show_mean_distance(mode='THETA')
-    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
-    # evaluator.plot_histogram_vel_acc()
-    # evaluator.show_best_match()
-    # evaluator.show_freq_heatmap()
-    # evaluator.plot_histogram_distance_by_frames(
-    #    mode='DISTANCE')
-    # evaluator.plot_histogram_distance_by_frames(
-    #    mode='THETA')
-    # evaluator.plot_histogram_distance_by_frames(
-    #    mode='THETA_MUL_SCORE')
-    # evaluator.plot_histogram_distance_by_frames(
-    #    mode='THETA_ADD_SCORE')
+        file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0,
+        real_data=real_data, cnn_wi_2000k=cnn_wi_2000k, cnn_wo_368k=cnn_wo_368k,
+        cnn_verify_921k=cnn_verify_921k, cnn_wi_mul_2000k=cnn_wi_mul_2000k)
+    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    evaluator.plot_linechart_distance_by_frames(
+       mode='THETA')
+    evaluator.show_mean_distance(mode='THETA')
+    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
+    evaluator.plot_histogram_vel_acc()
+    evaluator.show_best_match()
+    evaluator.show_freq_heatmap()
+    evaluator.plot_histogram_distance_by_frames(
+       mode='DISTANCE')
+    evaluator.plot_histogram_distance_by_frames(
+       mode='THETA')
+    evaluator.plot_histogram_distance_by_frames(
+       mode='THETA_MUL_SCORE')
+    evaluator.plot_histogram_distance_by_frames(
+       mode='THETA_ADD_SCORE')
     evaluator.vis_and_analysis_by_episode(
         episode_idx=10, mode='THETA')
 
