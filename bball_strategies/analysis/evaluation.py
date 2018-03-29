@@ -654,12 +654,66 @@ class EvaluationMatrix(object):
                 for j, idx in enumerate(combination):
                     temp_sum += greedy_table[:, :, j, idx]
                 permu_list[:, :, i] = temp_sum / 5.0  # mean
-            permu_list = np.amin(permu_list, axis=-1)
+            permu_min = np.amin(permu_list, axis=-1)
             # clean up unused length
             valid_match = []
             for i in range(data.shape[0]):
                 valid_match.append(
-                    permu_list[i, :self._length[i]].reshape([-1]))
+                    permu_min[i, :self._length[i]].reshape([-1]))
+            valid_match = np.concatenate(valid_match, axis=0)
+            mean = np.mean(valid_match)
+            stddev = np.std(valid_match)
+            # show
+            show_msg += '\'{0}\' dataset compared to \'real\' dataset\n'.format(
+                key) + '-- mean={0:4.2f},\tstddev={1:4.2f}\n'.format(mean, stddev)
+        print(show_msg)
+        self._report_file.write(show_msg)
+
+    def plot_show_best_match(self, save_path):
+        """ Best match between real and defense’s position difference.(mean,stddev)
+        """
+        show_msg = '\n### plot_show_best_match ###\n'
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        real_data = self._all_data_dict['real_data']
+        real_defense = np.reshape(real_data[:, :, 13:23], [
+            real_data.shape[0], real_data.shape[1], 5, 2])
+        for key, data in self._all_data_dict.items():
+            if key == 'real_data':
+                continue
+            fake_defense = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            # greedy find all combinations
+            greedy_table = np.empty(
+                shape=[real_data.shape[0], real_data.shape[1], 5, 5])
+            for real_idx in range(5):
+                for fake_idx in range(5):
+                    greedy_table[:, :, real_idx, fake_idx] = self.__get_length(
+                        real_defense[:, :, real_idx], fake_defense[:, :, fake_idx])
+            # Permutation = 5! = 120
+            permu_list = np.empty(
+                shape=[real_data.shape[0], real_data.shape[1], 5*4*3*2*1])
+            permu_idx_list = list(itertools.permutations(range(5)))
+            # find best match
+            for i, combination in enumerate(permu_idx_list):
+                temp_sum = 0.0
+                for j, idx in enumerate(combination):
+                    temp_sum += greedy_table[:, :, j, idx]
+                permu_list[:, :, i] = temp_sum / 5.0  # mean
+            permu_min = np.amin(permu_list, axis=-1)
+            permu_argmin = np.argmin(permu_list, axis=-1)
+            permu_idx_all = np.zeros(shape=[
+                                     real_data.shape[0], real_data.shape[1], 5*4*3*2*1, 5], dtype=int) + np.array(permu_idx_list, dtype=int)
+            best_match_pairs = np.empty(shape=[real_data.shape[0], real_data.shape[1], 5], dtype=int)
+            for i, v in enumerate(permu_argmin[0]):
+                best_match_pairs[0, i] = permu_idx_all[0, i, v]
+            # plot best match as video
+            vis_game.plot_compare_data(real_data[0], data[0], self._length[0], permu_min[0], best_match_pairs[0], file_path=os.path.join(save_path, key+'_compare_best_match.mp4'), if_save=True, fps=self.FPS, vis_ball_height=False, vis_annotation=False)
+            # clean up unused length
+            valid_match = []
+            for i in range(data.shape[0]):
+                valid_match.append(
+                    permu_min[i, :self._length[i]].reshape([-1]))
             valid_match = np.concatenate(valid_match, axis=0)
             mean = np.mean(valid_match)
             stddev = np.std(valid_match)
@@ -688,6 +742,9 @@ class EvaluationMatrix(object):
                                    real_offense[:, 0:1])[:, :, :, None]+1e-8)
             formula_data = np.concatenate([real_ball, real_offense.reshape(
                 [real_data.shape[0], real_data.shape[1], 10]), formula_defense.reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
+            # clean up unused length
+            for i in range(formula_data.shape[0]):
+                formula_data[i, self._length[i]:] = 0.0
             # back to dataset format
             self._all_data_dict['formula_1_data'] = formula_data
 
@@ -710,6 +767,9 @@ class EvaluationMatrix(object):
                                    real_offense)[:, :, :, None]+1e-8)
             formula_data = np.concatenate([real_ball, real_offense.reshape(
                 [real_data.shape[0], real_data.shape[1], 10]), formula_defense.reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
+            # clean up unused length
+            for i in range(formula_data.shape[0]):
+                formula_data[i, self._length[i]:] = 0.0
             # back to dataset format
             self._all_data_dict['formula_2_data'] = formula_data
 
@@ -920,32 +980,33 @@ class EvaluationMatrix(object):
         for key, data in self._all_data_dict.items():
             one_episode_data[key] = data[episode_idx:episode_idx+1]
         # vis
-        for key, data in one_episode_data.items():
-            video_save_path = os.path.join(
-                save_path, 'videos_'+str(episode_idx))
-            if not os.path.exists(video_save_path):
-                os.makedirs(video_save_path)
-            vis_game.plot_data(data[0], length=length[0], file_path=os.path.join(
-                video_save_path, key+'.mp4'), if_save=True, fps=self.FPS, vis_ball_height=False, vis_annotation=False)
+        video_save_path = os.path.join(
+            save_path, 'videos_'+str(episode_idx))
+        if not os.path.exists(video_save_path):
+            os.makedirs(video_save_path)
+        # for key, data in one_episode_data.items():
+        #     vis_game.plot_data(data[0], length=length[0], file_path=os.path.join(
+        #         video_save_path, key+'.mp4'), if_save=True, fps=self.FPS, vis_ball_height=False, vis_annotation=False)
         # analysis
         evaluator = EvaluationMatrix(
             file_name=save_path, length=length, **one_episode_data, FPS=5, FORMULA_RADIUS=5.0)
-        evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-        evaluator.plot_linechart_distance_by_frames(
-            mode='THETA')
-        evaluator.show_mean_distance(mode='THETA')
-        evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=True)
-        evaluator.plot_histogram_vel_acc()
-        evaluator.show_best_match()
-        evaluator.show_freq_heatmap()
-        evaluator.plot_histogram_distance_by_frames(
-            mode='DISTANCE')
-        evaluator.plot_histogram_distance_by_frames(
-            mode='THETA')
-        evaluator.plot_histogram_distance_by_frames(
-            mode='THETA_MUL_SCORE')
-        evaluator.plot_histogram_distance_by_frames(
-            mode='THETA_ADD_SCORE')
+        evaluator.plot_show_best_match(save_path=video_save_path)
+        # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+        # evaluator.plot_linechart_distance_by_frames(
+        #     mode='THETA')
+        # evaluator.show_mean_distance(mode='THETA')
+        # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=True)
+        # evaluator.plot_histogram_vel_acc()
+        # evaluator.show_best_match()
+        # evaluator.show_freq_heatmap()
+        # evaluator.plot_histogram_distance_by_frames(
+        #     mode='DISTANCE')
+        # evaluator.plot_histogram_distance_by_frames(
+        #     mode='THETA')
+        # evaluator.plot_histogram_distance_by_frames(
+        #     mode='THETA_MUL_SCORE')
+        # evaluator.plot_histogram_distance_by_frames(
+        #     mode='THETA_ADD_SCORE')
 
 
 def evaluate_new_data():
@@ -964,8 +1025,6 @@ def evaluate_new_data():
             # when not restore, remove follows (old) for new training
             shutil.rmtree(file_name)
             print('rm -rf "%s" complete!' % file_name)
-        else:
-            exit()
     evaluator = EvaluationMatrix(
         file_name=file_name, length=length, real_data=real_data, FPS=5, cnn_wi_data=cnn_wi_data, cnn_wo_data=cnn_wo_data, FORMULA_RADIUS=5.0)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
