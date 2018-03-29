@@ -40,6 +40,9 @@ court size: 94 by 50 (feet)
 (maximum = mean + 3 * stddev)
 FPS = 5
 all analized results are recorded in bball_strategies/analysis/physics_limitation.py
+
+dwight howard shoulder radius = 1.25 feet
+ball radius = 0.4 feet
 """
 from __future__ import absolute_import
 from __future__ import division
