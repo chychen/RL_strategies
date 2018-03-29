@@ -90,23 +90,30 @@ class EvaluationMatrix(object):
             self.create_formula_1_defense(RADIUS=FORMULA_RADIUS)
             self.create_formula_2_defense(RADIUS=FORMULA_RADIUS)
 
-    def show_overlap_freq(self, OVERLAP_RADIUS=1.0):
+    def show_overlap_freq(self, OVERLAP_RADIUS=1.0, interp_flag=True):
         """ Overlap frequency (judged by threshold = OVERLAP_RADIUS)
         """
         show_msg = '\n### show_overlap_freq ###\n'
         for key, data in self._all_data_dict.items():
+            interp_frame = 10
+            if interp_flag:
+                data = self.__interp_frame(data, interp_frame=interp_frame)
             offense = np.reshape(data[:, :, 3:13], [
                 data.shape[0], data.shape[1], 5, 2])
             defense = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
             total_frames = data.shape[0]*data.shape[1]
+
             counter = 0
             for off_idx in range(5):
                 temp_len = self.__get_length(
                     defense, offense[:, :, off_idx:off_idx+1])
                 # clean up unused length
                 for i in range(data.shape[0]):
-                    temp_len[i, self._length[i]:] = np.inf
+                    if interp_flag:
+                        temp_len[i, (self._length[i] - 1) * interp_frame:] = np.inf
+                    else:
+                        temp_len[i, self._length[i]:] = np.inf
                 counter += np.count_nonzero(temp_len <= OVERLAP_RADIUS)
             # show
             show_msg += '\'{0}\' dataset\n'.format(
@@ -143,6 +150,24 @@ class EvaluationMatrix(object):
                 wi_mean, wi_std) + '-- wo ball:\tmean={0:4.2f},\tstddev={1:4.2f}\n'.format(wo_mean, wo_std)
         print(show_msg)
         self._report_file.write(show_msg)
+
+    def __interp_frame(self, data, interp_frame=10):
+
+        res = []
+        for epi in data:
+            x = np.arange(0, len(epi) - 1, 1.0 / interp_frame)
+            xp = np.arange(0, len(epi), 1.0)
+            tmp = []
+            for idx in range(23):
+                fp = epi[:, idx]
+                y = np.interp(x, xp, fp)
+                tmp.append(y)
+            res.append(tmp)
+
+        res = np.asarray(res)
+        res = np.einsum('ijk->ikj', res)
+
+        return res
 
     def __get_length(self, a, b, axis=-1):
         """ get distance between a and b by axis
