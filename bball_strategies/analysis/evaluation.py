@@ -37,6 +37,7 @@ import plotly.graph_objs as go
 import colorsys
 import itertools
 import vis_game
+import shutil
 
 
 class EvaluationMatrix(object):
@@ -111,7 +112,8 @@ class EvaluationMatrix(object):
                 # clean up unused length
                 for i in range(data.shape[0]):
                     if interp_flag:
-                        temp_len[i, (self._length[i] - 1) * interp_frame:] = np.inf
+                        temp_len[i, (self._length[i] - 1) *
+                                 interp_frame:] = np.inf
                     else:
                         temp_len[i, self._length[i]:] = np.inf
                 counter += np.count_nonzero(temp_len <= OVERLAP_RADIUS)
@@ -919,7 +921,8 @@ class EvaluationMatrix(object):
             one_episode_data[key] = data[episode_idx:episode_idx+1]
         # vis
         for key, data in one_episode_data.items():
-            video_save_path = os.path.join(save_path, 'videos_'+str(episode_idx))
+            video_save_path = os.path.join(
+                save_path, 'videos_'+str(episode_idx))
             if not os.path.exists(video_save_path):
                 os.makedirs(video_save_path)
             vis_game.plot_data(data[0], length=length[0], file_path=os.path.join(
@@ -931,8 +934,10 @@ class EvaluationMatrix(object):
         evaluator.plot_linechart_distance_by_frames(
             mode='THETA')
         evaluator.show_mean_distance(mode='THETA')
-        evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+        evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=True)
         evaluator.plot_histogram_vel_acc()
+        evaluator.show_best_match()
+        evaluator.show_freq_heatmap()
         evaluator.plot_histogram_distance_by_frames(
             mode='DISTANCE')
         evaluator.plot_histogram_distance_by_frames(
@@ -951,13 +956,23 @@ def evaluate_new_data():
     cnn_wi_data = np.load('../data/WGAN/cnn_wi_2000k/A_fake_B_N100.npy')[0]
     cnn_wo_data = np.load('../data/WGAN/cnn_wo_368k/A_fake_B_N100.npy')[0]
     length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
+
+    file_name = 'default'
+    if os.path.exists(file_name):
+        ans = input('"%s" will be removed!! are you sure (y/N)? ' % file_name)
+        if ans == 'Y' or ans == 'y':
+            # when not restore, remove follows (old) for new training
+            shutil.rmtree(file_name)
+            print('rm -rf "%s" complete!' % file_name)
+        else:
+            exit()
     evaluator = EvaluationMatrix(
-        length=length, real_data=real_data, FPS=5, cnn_wi_data=cnn_wi_data, cnn_wo_data=cnn_wo_data, FORMULA_RADIUS=5.0)
+        file_name=file_name, length=length, real_data=real_data, FPS=5, cnn_wi_data=cnn_wi_data, cnn_wo_data=cnn_wo_data, FORMULA_RADIUS=5.0)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.plot_linechart_distance_by_frames(
     #    mode='THETA')
     # evaluator.show_mean_distance(mode='THETA')
-    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0)
+    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
