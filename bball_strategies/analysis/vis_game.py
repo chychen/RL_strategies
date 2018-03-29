@@ -13,7 +13,7 @@ import matplotlib.animation as animation
 from matplotlib.patches import Circle, Rectangle, Arc
 
 
-def update_all(frame_id, player_circles, ball_circle, annotations, data):
+def update_all(frame_id, player_circles, ball_circle, annotations, data, vis_ball_height):
     """ 
     Inputs
     ------
@@ -35,12 +35,16 @@ def update_all(frame_id, player_circles, ball_circle, annotations, data):
         annotations[j].set_position(circle.center)
     # ball
     ball_circle.center = data[frame_id, 0], data[frame_id, 1]
-    ball_circle.set_radius(1.0 + data[frame_id, 2] / 10.0)
+    if vis_ball_height:
+        ball_circle.set_radius(0.4 + data[frame_id, 2] / 10.0)
+    else:
+        ball_circle.set_radius(0.4)
+
     annotations[10].set_position(ball_circle.center)
     return
 
 
-def plot_data(data, length, file_path=None, if_save=False, fps=6, dpi=128):
+def plot_data(data, length, file_path=None, if_save=False, fps=5, dpi=128, vis_ball_height=False, vis_annotation=False):
     """
     Inputs
     ------
@@ -65,11 +69,11 @@ def plot_data(data, length, file_path=None, if_save=False, fps=6, dpi=128):
 
     # team A -> read circle, team B -> blue circle, ball -> small green circle
     player_circles = []
-    [player_circles.append(plt.Circle(xy=(0, 0), radius=2.5, color='r'))
+    [player_circles.append(plt.Circle(xy=(0, 0), radius=1.25, color='r'))
      for _ in range(5)]
-    [player_circles.append(plt.Circle(xy=(0, 0), radius=2.5, color='b'))
+    [player_circles.append(plt.Circle(xy=(0, 0), radius=1.25, color='b'))
      for _ in range(5)]
-    ball_circle = plt.Circle(xy=(0, 0), radius=1.5, color='g')
+    ball_circle = plt.Circle(xy=(0, 0), radius=0.4, color='g')
 
     # plot
     ax = plt.axes(xlim=(0, 100), ylim=(0, 50))
@@ -82,13 +86,20 @@ def plot_data(data, length, file_path=None, if_save=False, fps=6, dpi=128):
     ax.add_patch(ball_circle)
 
     # annotations on circles
-    annotations = [ax.annotate(name_list[i], xy=[0., 0.],
-                               horizontalalignment='center',
-                               verticalalignment='center', fontweight='bold')
-                   for i in range(11)]
+    if vis_annotation:
+        annotations = [ax.annotate(name_list[i], xy=[0., 0.],
+                                   horizontalalignment='center',
+                                   verticalalignment='center', fontweight='bold')
+                       for i in range(11)]
+    else:
+        annotations = [ax.annotate('', xy=[0., 0.],
+                                   horizontalalignment='center',
+                                   verticalalignment='center', fontweight='bold')
+                       for i in range(11)]
+
     # animation
     anim = animation.FuncAnimation(fig, update_all, fargs=(
-        player_circles, ball_circle, annotations, data), frames=length, interval=200)
+        player_circles, ball_circle, annotations, data, vis_ball_height), frames=length, interval=200)
 
     plt.imshow(court, zorder=0, extent=[0, 100 - 6, 50, 0])
     if if_save:
@@ -143,7 +154,7 @@ def test():
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
-        plot_data(results_data[0,i], length=results_len[i],
+        plot_data(results_data[0, i], length=results_len[i],
                   file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
 
     results_data = np.load('../data/WGAN/results_A_fake_B.npy')
@@ -152,7 +163,7 @@ def test():
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
-        plot_data(results_data[0,i], length=results_len[i],
+        plot_data(results_data[0, i], length=results_len[i],
                   file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
 
     exit()
