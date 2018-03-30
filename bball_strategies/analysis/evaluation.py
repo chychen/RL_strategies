@@ -39,6 +39,8 @@ import itertools
 import vis_game
 import shutil
 
+DIST_MODE = ['DISTANCE', 'THETA', 'THETA_ADD_SCORE', 'THETA_MUL_SCORE']
+
 
 class EvaluationMatrix(object):
     """ EvaluationMatrix
@@ -267,7 +269,6 @@ class EvaluationMatrix(object):
 
         for off_idx in range(5):
             offender = offense[:, :, off_idx:off_idx+1, :]
-
             if mode == 'DISTANCE':
                 # the distance to the closest defender
                 off2defs = defense - offender
@@ -476,7 +477,7 @@ class EvaluationMatrix(object):
                 #     opacity=0.5
                 # )
                 all_trace_speed.append(trace_speed)
-                msg += '{0} dataset:\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
+                msg += '{0} dataset:\n\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                     key+'_offense', np.mean(valid_speed), np.std(valid_speed))
 
             target = np.reshape(data[:, :, 13:23], [
@@ -516,7 +517,7 @@ class EvaluationMatrix(object):
             #     opacity=0.5
             # )
             all_trace_speed.append(trace_speed)
-            msg += '{0} dataset:\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
+            msg += '{0} dataset:\n\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                 key, np.mean(valid_speed), np.std(valid_speed))
         layout_speed = go.Layout(
             title='Speed',
@@ -571,7 +572,7 @@ class EvaluationMatrix(object):
                 #     opacity=0.5
                 # )
                 all_trace_acc.append(trace_acc)
-                msg += '{0} dataset:\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
+                msg += '{0} dataset:\n\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                     key+'_offense', np.mean(valid_acc), np.std(valid_acc))
 
             target = np.reshape(data[:, :, 13:23], [
@@ -611,7 +612,7 @@ class EvaluationMatrix(object):
             #     opacity=0.5
             # )
             all_trace_acc.append(trace_acc)
-            msg += '{0} dataset:\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
+            msg += '{0} dataset:\n\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                 key, np.mean(valid_acc), np.std(valid_acc))
         layout_acc = go.Layout(
             title='Acceleration',
@@ -858,6 +859,68 @@ class EvaluationMatrix(object):
                 plt.savefig(os.path.join(save_path, key+'_offense'))
                 plt.close()
 
+    def show_mean_distance_heatmap_with_ball(self, mode='THETA'):
+        """ Vis Heat map (frequency) of mean distance to closet defense 
+        """
+        # mkdir
+        save_path = os.path.join(self._file_name, 'heat_map_mean_dist')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        import matplotlib.pyplot as plt
+        print('\n### show_mean_distance_heatmap_with_ball ###\n')
+        ##########################################################
+        all_dist_dict = {}
+        for key, data in self._all_data_dict.items():
+            all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
+        all_trace = []
+        for key in self._all_data_dict:
+            data = self._all_data_dict[key]
+            dist = all_dist_dict[key]
+            # categorize into two set, withball and without ball
+            ball = np.reshape(data[:, :, 0:2], [
+                data.shape[0], data.shape[1], 1, 2])
+            offense = np.reshape(data[:, :, 3:13], [
+                data.shape[0], data.shape[1], 5, 2])
+            pad_next = np.pad(offense[:, 1:], [(0, 0), (0, 1),
+                                               (0, 0), (0, 0)], mode='constant', constant_values=1)
+            offense_speed = self.__get_length(offense, pad_next) * self.FPS
+            offense_speed[:, -1] = None
+            # tally the table : if offense handle the ball
+            if_handle_ball = np.empty(
+                shape=[data.shape[0], data.shape[1], 5], dtype=bool)
+            if_handle_ball[:] = False
+            for off_idx in range(5):
+                offender = offense[:, :, off_idx:off_idx+1, :]
+                indices = np.where(self.__get_length(
+                    offender[:, :, 0], ball[:, :, 0]) < self.WINGSPAN_RADIUS)
+                input(indices.shape)
+                if_handle_ball[indices[0], indices[1], off_idx] = True
+            # clean up unused length
+            for i in range(data.shape[0]):
+                if_handle_ball[i, self._length[i]:] = False
+            wiball_dist = dist[if_handle_ball]
+            if_handle_ball = np.logical_not(if_handle_ball)
+            # clean up unused length
+            for i in range(data.shape[0]):
+                if_handle_ball[i, self._length[i]:] = False
+            woball_dist = dist[if_handle_ball]
+
+        ##########################################################
+            heat_map_sum_table = np.zeros(shape=[95, 50], dtype=float)
+            heat_map_count_table = np.zeros(shape=[95, 50], dtype=float)
+            lookup = np.where(if_handle_ball)
+            off_wi_ball_pos = offense[lookup[0],
+                                      lookup[1], lookup[2]].reshape([-1, 2])
+            for pos in off_wi_ball_pos:
+                pos_x, pos_y = pos
+                heat_map_sum_table[int(pos_x), int(
+                    pos_y)] += dist[lookup[0], lookup[1], lookup[2]]
+                heat_map_count_table[int(pos_x), int(pos_y)] += 1.0
+            heat_map_mean_table = heat_map_sum_table / heat_map_count_table
+            trace = go.Heatmap(z=heat_map_mean_table, x=range(95), y=range(50))
+            py.plot([trace], filename=os.path.join(
+                save_path, key+'_heat_map.html'), auto_open=False)
+
     def plot_histogram_distance_by_frames(self, mode='THETA'):
         """ plot histogram of distance frame by frame, withball and without ball
         """
@@ -867,7 +930,7 @@ class EvaluationMatrix(object):
         for key, data in self._all_data_dict.items():
             all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
         # mkdir
-        save_path = os.path.join(self._file_name, 'histogram_'+mode)
+        save_path = os.path.join(self._file_name, 'histogram_' + mode)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         # vis
@@ -974,7 +1037,7 @@ class EvaluationMatrix(object):
         """ given episode index, draw out the play and show all matrix result in same folder
         """
         # mkdir
-        save_path = os.path.join(self._file_name, 'vis_analysis')
+        save_path = os.path.join(self._file_name, 'vis_analysis_'+mode)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         length = self._length[episode_idx:episode_idx+1]
@@ -1036,24 +1099,21 @@ def evaluate_new_data():
         file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0,
         real_data=real_data, cnn_wi_2000k=cnn_wi_2000k, cnn_wo_368k=cnn_wo_368k,
         cnn_verify_921k=cnn_verify_921k, cnn_wi_mul_2000k=cnn_wi_mul_2000k)
-    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    evaluator.plot_linechart_distance_by_frames(
-       mode='THETA')
-    evaluator.show_mean_distance(mode='THETA')
-    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
-    evaluator.plot_histogram_vel_acc()
-    evaluator.show_best_match()
-    evaluator.show_freq_heatmap()
-    evaluator.plot_histogram_distance_by_frames(
-       mode='DISTANCE')
-    evaluator.plot_histogram_distance_by_frames(
-       mode='THETA')
-    evaluator.plot_histogram_distance_by_frames(
-       mode='THETA_MUL_SCORE')
-    evaluator.plot_histogram_distance_by_frames(
-       mode='THETA_ADD_SCORE')
-    evaluator.vis_and_analysis_by_episode(
-        episode_idx=10, mode='THETA')
+    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
+    # evaluator.plot_histogram_vel_acc()
+    # evaluator.show_best_match()
+    # evaluator.show_freq_heatmap()
+    # for mode in DIST_MODE:
+    #     evaluator.plot_linechart_distance_by_frames(
+    #         mode=mode)
+    #     evaluator.show_mean_distance(mode=mode)
+    #     evaluator.plot_histogram_distance_by_frames(
+    #         mode=mode)
+    #     evaluator.show_mean_distance_heatmap_with_ball(mode=mode)
+    #     evaluator.vis_and_analysis_by_episode(
+    #         episode_idx=10, mode=mode)
+    evaluator.show_mean_distance_heatmap_with_ball(mode='THETA')
 
 
 if __name__ == '__main__':
