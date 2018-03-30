@@ -125,10 +125,10 @@ class EvaluationMatrix(object):
         print(show_msg)
         self._report_file.write(show_msg)
 
-    def show_mean_distance(self, mode='THETA'):
+    def show_mean_distance(self, mode='DISTANCE'):
         """ Mean/Stddev of distance between offense (wi/wo ball) and defense
         """
-        show_msg = '\n### show_mean_distance ###\n'
+        show_msg = '\n### show_mean_distance mode=\'{}\' ###\n'.format(mode)
         for key, data in self._all_data_dict.items():
             dist = self.__evalute_distance(data, mode=mode)
             ball = np.reshape(data[:, :, 0:2], [
@@ -240,7 +240,7 @@ class EvaluationMatrix(object):
 
         return result
 
-    def __evalute_distance(self, data, mode='THETA'):
+    def __evalute_distance(self, data, mode='DISTANCE'):
         """ evaluate the distance to the closest defender for each offensive player on each frames
         and mark the offensive player who has the ball according to self.WINGSPAN_RADIUS
 
@@ -278,7 +278,7 @@ class EvaluationMatrix(object):
                 off2defs_len = self.__get_length(offender, defense)
                 # find best defense according to defense_scores
                 defense_scores = np.array(off2defs_len)
-                defense_scores[dotvalue <= 0] = np.inf
+                # defense_scores[dotvalue <= 0] = np.inf
                 best_defense_idx = np.argmin(defense_scores, axis=-1)
                 for i in range(dist.shape[0]):
                     for j in range(dist.shape[1]):
@@ -294,7 +294,7 @@ class EvaluationMatrix(object):
                 # find best defense according to defense_scores
                 defense_scores = (np.arccos(dotvalue/(self.__get_length(defense, offender)
                                                       * self.__get_length(self.RIGHT_BASKET, offender)+1e-8))+1.0)*(off2defs_len+1.0)
-                defense_scores[dotvalue <= 0] = np.inf
+                # defense_scores[dotvalue <= 0] = np.inf
                 best_defense_idx = np.argmin(defense_scores, axis=-1)
                 for i in range(dist.shape[0]):
                     for j in range(dist.shape[1]):
@@ -339,7 +339,7 @@ class EvaluationMatrix(object):
 
         return dist
 
-    def plot_linechart_distance_by_frames(self, mode='THETA'):
+    def plot_linechart_distance_by_frames(self, mode='DISTANCE'):
         """ Vis dot distance of each offense to closest defense frame by frame
         (with indicators: inside 3pt line, ball handler, paint area)
 
@@ -350,7 +350,7 @@ class EvaluationMatrix(object):
         if_inside_3pt :
         if_inside_paint :
         """
-        print('\n### plot_linechart_distance_by_frames ###\n')
+        print('\n### plot_linechart_distance_by_frames mode=\'{}\' ###\n'.format(mode))
         # caculate the matrix
         all_dist_dict = {}
         for key, data in self._all_data_dict.items():
@@ -862,20 +862,17 @@ class EvaluationMatrix(object):
                 plt.savefig(os.path.join(save_path, key+'_offense'))
                 plt.close()
 
-    def show_mean_distance_heatmap_with_ball(self, mode='THETA'):
-        """ Vis Heat map (frequency) of mean distance to closet defense 
+    def __get_if_handle_ball(self, mode='DISTANCE'):
         """
-        # mkdir
-        save_path = os.path.join(self._file_name, 'heat_map_mean_dist_' + mode)
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        import matplotlib.pyplot as plt
-        print('\n### show_mean_distance_heatmap_with_ball ###\n')
-        ##########################################################
+        Return
+        ------
+        if_handle_ball_dict : dict, for each item shape=[num_episodes, length, 5]
+            for each frame in each dataset, which offensive players dribble the ball
+        """
         all_dist_dict = {}
         for key, data in self._all_data_dict.items():
             all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
-        all_trace = []
+        if_handle_ball_dict = {}
         for key in self._all_data_dict:
             data = self._all_data_dict[key]
             dist = all_dist_dict[key]
@@ -886,8 +883,6 @@ class EvaluationMatrix(object):
                 data.shape[0], data.shape[1], 5, 2])
             pad_next = np.pad(offense[:, 1:], [(0, 0), (0, 1),
                                                (0, 0), (0, 0)], mode='constant', constant_values=1)
-            offense_speed = self.__get_length(offense, pad_next) * self.FPS
-            offense_speed[:, -1] = None
             # tally the table : if offense handle the ball
             if_handle_ball = np.empty(
                 shape=[data.shape[0], data.shape[1], 5], dtype=bool)
@@ -900,53 +895,76 @@ class EvaluationMatrix(object):
             # clean up unused length
             for i in range(data.shape[0]):
                 if_handle_ball[i, self._length[i]:] = False
-            wiball_dist = dist[if_handle_ball]
-            if_handle_ball = np.logical_not(if_handle_ball)
-            # clean up unused length
-            for i in range(data.shape[0]):
-                if_handle_ball[i, self._length[i]:] = False
-            woball_dist = dist[if_handle_ball]
+            if_handle_ball_dict[key] = if_handle_ball
+        return if_handle_ball_dict
 
-        ##########################################################
-            heat_map_sum_table = np.zeros(shape=[50, 95], dtype=float)
-            heat_map_count_table = np.zeros(shape=[50, 95], dtype=float)
-            lookup = np.where(if_handle_ball)
-            off_wi_ball_pos = offense[lookup[0],
-                                      lookup[1], lookup[2]].reshape([-1, 2])
-            dist_lookup = dist[lookup[0], lookup[1], lookup[2]]
-            for i, pos in enumerate(off_wi_ball_pos):
-                pos_x, pos_y = pos
-                if pos_x < 0 or pos_x > 95:
-                    continue
-                if pos_y < 0 or pos_y > 50:
-                    continue
-                heat_map_sum_table[int(pos_y), int(
-                    pos_x)] += dist_lookup[i]
-                heat_map_count_table[int(pos_y), int(pos_x)] += 1.0
-            heat_map_mean_table = heat_map_sum_table / heat_map_count_table
-            heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
-            trace = go.Heatmap(
-                z=heat_map_mean_table,
-                x=[i for i in range(95)],
-                y=[i for i in range(50)],
-                zauto=False,
-                #    zsmooth='best',
-                zmin=0,
-                zmax=40
-            )
-            layout = go.Layout(
-                title=key,
-                xaxis=dict(title='feet'),
-                yaxis=dict(title='feet')
-            )
-            fig = go.Figure(data=[trace], layout=layout)
-            py.plot(fig, filename=os.path.join(
-                save_path, key+'_heat_map.html'), auto_open=False)
+    def show_mean_distance_heatmap_with_ball(self, mode='DISTANCE'):
+        """ Vis Heat map (frequency) of mean distance to closet defense 
+        """
+        # mkdir
+        save_path = os.path.join(self._file_name, 'heat_map_mean_dist_' + mode)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
 
-    def plot_histogram_distance_by_frames(self, mode='THETA'):
+        def draw_with_ball(target='with_ball'):
+            all_dist_dict = {}
+            for key, data in self._all_data_dict.items():
+                all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
+
+            if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
+            for key, if_handle_ball in if_handle_ball_dict.items():
+                if target == 'without_ball':
+                    if_handle_ball = np.logical_not(if_handle_ball)
+                    # clean up unused length
+                    for i in range(data.shape[0]):
+                        if_handle_ball[i, self._length[i]:] = False
+                data = self._all_data_dict[key]
+                dist = all_dist_dict[key]
+                offense = np.reshape(data[:, :, 3:13], [
+                    data.shape[0], data.shape[1], 5, 2])
+                heat_map_sum_table = np.zeros(shape=[50, 95], dtype=float)
+                heat_map_count_table = np.zeros(shape=[50, 95], dtype=float)
+                lookup = np.where(if_handle_ball)
+                off_wi_ball_pos = offense[lookup[0],
+                                          lookup[1], lookup[2]].reshape([-1, 2])
+                dist_lookup = dist[lookup[0], lookup[1], lookup[2]]
+                for i, pos in enumerate(off_wi_ball_pos):
+                    pos_x, pos_y = pos
+                    if pos_x < 0 or pos_x > 95:
+                        continue
+                    if pos_y < 0 or pos_y > 50:
+                        continue
+                    heat_map_sum_table[int(pos_y), int(
+                        pos_x)] += dist_lookup[i]
+                    heat_map_count_table[int(pos_y), int(pos_x)] += 1.0
+                heat_map_mean_table = heat_map_sum_table / heat_map_count_table
+                heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
+                trace = go.Heatmap(
+                    z=heat_map_mean_table,
+                    x=[i for i in range(95)],
+                    y=[i for i in range(50)],
+                    zauto=False,
+                    #    zsmooth='best',
+                    zmin=0,
+                    zmax=40
+                )
+                layout = go.Layout(
+                    title=key,
+                    xaxis=dict(title='feet'),
+                    yaxis=dict(title='feet')
+                )
+                fig = go.Figure(data=[trace], layout=layout)
+                py.plot(fig, filename=os.path.join(
+                    save_path, key+'_'+target+'.html'), auto_open=False)
+        print('\n### show_mean_distance_heatmap_with_ball mode=\'{}\' ###\n'.format(mode))
+        draw_with_ball(target='with_ball')
+        draw_with_ball(target='without_ball')
+
+    def plot_histogram_distance_by_frames(self, mode='DISTANCE'):
         """ plot histogram of distance frame by frame, withball and without ball
         """
-        msg = '\n### plot_histogram_distance_by_frames ###\n'
+        msg = '\n### plot_histogram_distance_by_frames mode=\'{}\' ###\n'.format(
+            mode)
         # caculate the matrix
         all_dist_dict = {}
         for key, data in self._all_data_dict.items():
@@ -957,30 +975,11 @@ class EvaluationMatrix(object):
             os.makedirs(save_path)
         # vis
         all_trace = []
+        if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
         for key in self._all_data_dict:
             data = self._all_data_dict[key]
             dist = all_dist_dict[key]
-            # categorize into two set, withball and without ball
-            ball = np.reshape(data[:, :, 0:2], [
-                data.shape[0], data.shape[1], 1, 2])
-            offense = np.reshape(data[:, :, 3:13], [
-                data.shape[0], data.shape[1], 5, 2])
-            pad_next = np.pad(offense[:, 1:], [(0, 0), (0, 1),
-                                               (0, 0), (0, 0)], mode='constant', constant_values=1)
-            offense_speed = self.__get_length(offense, pad_next) * self.FPS
-            offense_speed[:, -1] = None
-            # tally the table : if offense handle the ball
-            if_handle_ball = np.empty(
-                shape=[data.shape[0], data.shape[1], 5], dtype=bool)
-            if_handle_ball[:] = False
-            for off_idx in range(5):
-                offender = offense[:, :, off_idx:off_idx+1, :]
-                indices = np.where(self.__get_length(
-                    offender[:, :, 0], ball[:, :, 0]) < self.WINGSPAN_RADIUS)
-                if_handle_ball[indices[0], indices[1], off_idx] = True
-            # clean up unused length
-            for i in range(data.shape[0]):
-                if_handle_ball[i, self._length[i]:] = False
+            if_handle_ball = if_handle_ball_dict[key]
             wiball_dist = dist[if_handle_ball]
             if_handle_ball = np.logical_not(if_handle_ball)
             # clean up unused length
@@ -1001,7 +1000,6 @@ class EvaluationMatrix(object):
                 x=[i*bin_size for i in range(num_bins)],
                 y=counter
             )
-
             # trace_wiball_dist = go.Histogram(
             #     name=key+'_wi_ball',
             #     x=wiball_dist,
@@ -1055,7 +1053,7 @@ class EvaluationMatrix(object):
         print(msg)
         self._report_file.write(msg)
 
-    def vis_and_analysis_by_episode(self, episode_idx, mode='THETA'):
+    def vis_and_analysis_by_episode(self, episode_idx, mode='DISTANCE'):
         """ given episode index, draw out the play and show all matrix result in same folder
         """
         # mkdir
@@ -1080,15 +1078,15 @@ class EvaluationMatrix(object):
         evaluator.plot_show_best_match(save_path=video_save_path)
         # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
         # evaluator.plot_linechart_distance_by_frames(
-        #     mode='THETA')
-        # evaluator.show_mean_distance(mode='THETA')
+        #     mode='DISTANCE')
+        # evaluator.show_mean_distance(mode='DISTANCE')
         # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=True)
         # evaluator.plot_histogram_vel_acc()
         # evaluator.show_freq_heatmap()
         # evaluator.plot_histogram_distance_by_frames(
         #     mode='DISTANCE')
         # evaluator.plot_histogram_distance_by_frames(
-        #     mode='THETA')
+        #     mode='DISTANCE')
         # evaluator.plot_histogram_distance_by_frames(
         #     mode='THETA_MUL_SCORE')
         # evaluator.plot_histogram_distance_by_frames(
