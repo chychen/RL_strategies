@@ -538,14 +538,15 @@ class EvaluationMatrix(object):
                     data.shape[0], data.shape[1], 5, 2])
                 speed = self.__get_length(
                     target[:, 1:], target[:, :-1]) * self.FPS
-                acc = self.__get_length(speed[:, 1:], speed[:, :-1])
+                target_speed = target[:, 1:] - target[:, :-1]
+                acc = self.__get_length(
+                    target_speed[:, 1:], target_speed[:, :-1]) * self.FPS
                 # clean up unused length
                 valid_acc = []
                 for i in range(data.shape[0]):
                     valid_acc.append(
                         acc[i, :self._length[i]-2].reshape([-1, ]))
                 valid_acc = np.concatenate(valid_acc, axis=0)
-
                 bin_size = 0.5
                 max_v = np.amax(valid_acc)
                 min_v = np.amin(valid_acc)
@@ -579,7 +580,9 @@ class EvaluationMatrix(object):
                 data.shape[0], data.shape[1], 5, 2])
             speed = self.__get_length(
                 target[:, 1:], target[:, :-1]) * self.FPS
-            acc = self.__get_length(speed[:, 1:], speed[:, :-1])
+            target_speed = target[:, 1:] - target[:, :-1]
+            acc = self.__get_length(
+                target_speed[:, 1:], target_speed[:, :-1]) * self.FPS
             # clean up unused length
             valid_acc = []
             for i in range(data.shape[0]):
@@ -863,7 +866,7 @@ class EvaluationMatrix(object):
         """ Vis Heat map (frequency) of mean distance to closet defense 
         """
         # mkdir
-        save_path = os.path.join(self._file_name, 'heat_map_mean_dist')
+        save_path = os.path.join(self._file_name, 'heat_map_mean_dist_' + mode)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         import matplotlib.pyplot as plt
@@ -893,7 +896,6 @@ class EvaluationMatrix(object):
                 offender = offense[:, :, off_idx:off_idx+1, :]
                 indices = np.where(self.__get_length(
                     offender[:, :, 0], ball[:, :, 0]) < self.WINGSPAN_RADIUS)
-                input(indices.shape)
                 if_handle_ball[indices[0], indices[1], off_idx] = True
             # clean up unused length
             for i in range(data.shape[0]):
@@ -906,19 +908,39 @@ class EvaluationMatrix(object):
             woball_dist = dist[if_handle_ball]
 
         ##########################################################
-            heat_map_sum_table = np.zeros(shape=[95, 50], dtype=float)
-            heat_map_count_table = np.zeros(shape=[95, 50], dtype=float)
+            heat_map_sum_table = np.zeros(shape=[50, 95], dtype=float)
+            heat_map_count_table = np.zeros(shape=[50, 95], dtype=float)
             lookup = np.where(if_handle_ball)
             off_wi_ball_pos = offense[lookup[0],
                                       lookup[1], lookup[2]].reshape([-1, 2])
-            for pos in off_wi_ball_pos:
+            dist_lookup = dist[lookup[0], lookup[1], lookup[2]]
+            for i, pos in enumerate(off_wi_ball_pos):
                 pos_x, pos_y = pos
-                heat_map_sum_table[int(pos_x), int(
-                    pos_y)] += dist[lookup[0], lookup[1], lookup[2]]
-                heat_map_count_table[int(pos_x), int(pos_y)] += 1.0
+                if pos_x < 0 or pos_x > 95:
+                    continue
+                if pos_y < 0 or pos_y > 50:
+                    continue
+                heat_map_sum_table[int(pos_y), int(
+                    pos_x)] += dist_lookup[i]
+                heat_map_count_table[int(pos_y), int(pos_x)] += 1.0
             heat_map_mean_table = heat_map_sum_table / heat_map_count_table
-            trace = go.Heatmap(z=heat_map_mean_table, x=range(95), y=range(50))
-            py.plot([trace], filename=os.path.join(
+            heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
+            trace = go.Heatmap(
+                z=heat_map_mean_table,
+                x=[i for i in range(95)],
+                y=[i for i in range(50)],
+                zauto=False,
+                #    zsmooth='best',
+                zmin=0,
+                zmax=40
+            )
+            layout = go.Layout(
+                title=key,
+                xaxis=dict(title='feet'),
+                yaxis=dict(title='feet')
+            )
+            fig = go.Figure(data=[trace], layout=layout)
+            py.plot(fig, filename=os.path.join(
                 save_path, key+'_heat_map.html'), auto_open=False)
 
     def plot_histogram_distance_by_frames(self, mode='THETA'):
@@ -1085,7 +1107,7 @@ def evaluate_new_data():
     # cnn_wi_2000k_not_denorm = np.load('../data/WGAN/cnn_wi_2000k_not_denorm/A_fake_B_N100.npy')[0]
     cnn_wi_mul_2000k = np.load(
         '../data/WGAN/cnn_wi_mul_2000k/A_fake_B_N100.npy')[0]
-    # rnn_1000k = np.load('../data/WGAN/rnn_1000k/A_fake_B_N100.npy')[0]
+    # rnn_1000k = np.load('../data/WGAN/rnn_1000k/A_fake_B_N128.npy')[0]
     length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
 
     file_name = 'default'
@@ -1097,8 +1119,7 @@ def evaluate_new_data():
             print('rm -rf "%s" complete!' % file_name)
     evaluator = EvaluationMatrix(
         file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0,
-        real_data=real_data, cnn_wi_2000k=cnn_wi_2000k, cnn_wo_368k=cnn_wo_368k,
-        cnn_verify_921k=cnn_verify_921k, cnn_wi_mul_2000k=cnn_wi_mul_2000k)
+        real_data=real_data, cnn_wi_2000k=cnn_wi_2000k, cnn_wo_368k=cnn_wo_368k, cnn_verify_921k=cnn_verify_921k, cnn_wi_mul_2000k=cnn_wi_mul_2000k)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
     # evaluator.plot_histogram_vel_acc()
@@ -1113,7 +1134,7 @@ def evaluate_new_data():
     #     evaluator.show_mean_distance_heatmap_with_ball(mode=mode)
     #     evaluator.vis_and_analysis_by_episode(
     #         episode_idx=10, mode=mode)
-    evaluator.show_mean_distance_heatmap_with_ball(mode='THETA')
+    evaluator.show_mean_distance_heatmap_with_ball(mode='DISTANCE')
 
 
 if __name__ == '__main__':
