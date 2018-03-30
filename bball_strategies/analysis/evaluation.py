@@ -901,17 +901,37 @@ class EvaluationMatrix(object):
     def show_mean_distance_heatmap_with_ball(self, mode='DISTANCE'):
         """ Vis Heat map (frequency) of mean distance to closet defense 
         """
-        # mkdir
-        save_path = os.path.join(self._file_name, 'heat_map_mean_dist_' + mode)
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
+        def vis_heat_map(z, filename):
+            trace = go.Heatmap(
+                z=z,
+                x=[i for i in range(z.shape[1])],
+                y=[i for i in range(z.shape[0])],
+                zauto=False,
+                #    zsmooth='best',
+                zmin=0,
+                zmax=30
+            )
+            layout = go.Layout(
+                title=filename,
+                xaxis=dict(title='feet'),
+                yaxis=dict(title='feet')
+            )
+            fig = go.Figure(data=[trace], layout=layout)
+            py.plot(fig, filename=filename, auto_open=False)
 
-        def draw_with_ball(target='with_ball'):
+        def draw(save_path, target='with_ball'):
+            """
+            Return
+            ------
+            heat_map_mean_table_dict : dict, for each item's shape=[50, 95]
+                50 -> y, 95 -> x
+            """
             all_dist_dict = {}
             for key, data in self._all_data_dict.items():
                 all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
 
             if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
+            heat_map_mean_table_dict = {}
             for key, if_handle_ball in if_handle_ball_dict.items():
                 if target == 'without_ball':
                     if_handle_ball = np.logical_not(if_handle_ball)
@@ -939,26 +959,52 @@ class EvaluationMatrix(object):
                     heat_map_count_table[int(pos_y), int(pos_x)] += 1.0
                 heat_map_mean_table = heat_map_sum_table / heat_map_count_table
                 heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
-                trace = go.Heatmap(
-                    z=heat_map_mean_table,
-                    x=[i for i in range(95)],
-                    y=[i for i in range(50)],
-                    zauto=False,
-                    #    zsmooth='best',
-                    zmin=0,
-                    zmax=40
-                )
-                layout = go.Layout(
-                    title=key,
-                    xaxis=dict(title='feet'),
-                    yaxis=dict(title='feet')
-                )
-                fig = go.Figure(data=[trace], layout=layout)
-                py.plot(fig, filename=os.path.join(
-                    save_path, key+'_'+target+'.html'), auto_open=False)
+                # store heat_map_mean_table
+                heat_map_mean_table_dict[key] = heat_map_mean_table
+                # vis
+                filename = os.path.join(save_path, key+'_'+target+'.html')
+                vis_heat_map(heat_map_mean_table, filename)
+            return heat_map_mean_table_dict
+
+        def draw_diff(table_dict, save_path):
+            """
+            Args
+            ------
+            table_dict : dict, for each item's shape=[50, 95]
+                50 -> y, 95 -> x
+            """
+            for key, mean_table in table_dict.items():
+                if key == 'real_data':
+                    continue  # skip
+                real_mean_table = table_dict['real_data']
+                diff_table = np.abs(real_mean_table-mean_table)
+                # vis
+                filename = os.path.join(save_path, key+'.html')
+                vis_heat_map(diff_table, filename)
+
         print('\n### show_mean_distance_heatmap_with_ball mode=\'{}\' ###\n'.format(mode))
-        draw_with_ball(target='with_ball')
-        draw_with_ball(target='without_ball')
+        # with ball
+        save_path = os.path.join(
+            self._file_name, 'heat_map_mean_dist_wi_ball_' + mode)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        wi_ball_dict = draw(save_path=save_path, target='with_ball')
+        save_path = os.path.join(
+            self._file_name, 'heat_map_mean_dist_wi_ball_diff_' + mode)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        draw_diff(wi_ball_dict, save_path=save_path)
+        # without ball
+        save_path = os.path.join(
+            self._file_name, 'heat_map_mean_dist_wo_ball_' + mode)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        wo_ball_dict = draw(save_path=save_path, target='without_ball')
+        save_path = os.path.join(
+            self._file_name, 'heat_map_mean_dist_wo_ball_diff_' + mode)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        draw_diff(wo_ball_dict, save_path=save_path)
 
     def plot_histogram_distance_by_frames(self, mode='DISTANCE'):
         """ plot histogram of distance frame by frame, withball and without ball
