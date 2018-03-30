@@ -276,49 +276,75 @@ def test():
     plot real data
     """
 
-    # cmd e.g. python game_visualizer.py --data_path='../../data/collect/mode_6/results_A_fake_B.npy' --save_path='../../data/collect/try/' --amount=10
-    results_data = np.load('../data/WGAN/FULL.npy')
-    results_len = np.load('../data/WGAN/FULL-LEN.npy')
-    results_data = np.concatenate(
-        [
-            # ball
-            results_data[:, :, 0, :3].reshape(
-                [results_data.shape[0], results_data.shape[1], 1 * 3]),
-            # team A players
-            results_data[:, :, 1:6, :2].reshape(
-                [results_data.shape[0], results_data.shape[1], 5 * 2]),
-            # team B players
-            results_data[:, :, 6:11, :2].reshape(
-                [results_data.shape[0], results_data.shape[1], 5 * 2])
-        ], axis=-1
-    )
-    print(results_data.shape)
-    save_path = '../data/WGAN/real'
+    real_data = np.load('../data/WGAN/FixedFPS5.npy')[:10000:100]
+    real_data = np.concatenate([real_data[:, :, 0, :3], real_data[:, :, 1:6, :2].reshape(
+        [real_data.shape[0], real_data.shape[1], 10]), real_data[:, :, 6:11, :2].reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
+    cnn_wi_data = np.load('../data/WGAN/cnn_wi_2000k/A_fake_B_N100.npy')[0]
+    length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
+    save_path = '../data/WGAN/user_study/fake'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
-        plot_data(results_data[i], length=results_len[i],
-                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
-
-    results_data = np.load('../data/WGAN/results_A_fake_B_wo.npy')
-    print(results_data.shape)
-    save_path = '../data/WGAN/fake_wo'
+        try:
+            plot_data(cnn_wi_data[i], length=length[i],
+                    file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+        except:
+            pass
+    save_path = '../data/WGAN/user_study/real'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
-        plot_data(results_data[0, i], length=results_len[i],
-                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+        try:
+            plot_data(real_data[i], length=length[i],
+                    file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+        except:
+            pass
 
-    results_data = np.load('../data/WGAN/results_A_fake_B.npy')
-    print(results_data.shape)
-    save_path = '../data/WGAN/fake_wi'
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    for i in range(100):
-        plot_data(results_data[0, i], length=results_len[i],
-                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
 
-    exit()
+
+    ## cmd e.g. python game_visualizer.py --data_path='../../data/collect/mode_6/results_A_fake_B.npy' --save_path='../../data/collect/try/' --amount=10
+    # results_data = np.load('../data/WGAN/FULL.npy')
+    # results_len = np.load('../data/WGAN/FULL-LEN.npy')
+    # results_data = np.concatenate(
+    #     [
+    #         # ball
+    #         results_data[:, :, 0, :3].reshape(
+    #             [results_data.shape[0], results_data.shape[1], 1 * 3]),
+    #         # team A players
+    #         results_data[:, :, 1:6, :2].reshape(
+    #             [results_data.shape[0], results_data.shape[1], 5 * 2]),
+    #         # team B players
+    #         results_data[:, :, 6:11, :2].reshape(
+    #             [results_data.shape[0], results_data.shape[1], 5 * 2])
+    #     ], axis=-1
+    # )
+    # print(results_data.shape)
+    # save_path = '../data/WGAN/real'
+    # if not os.path.exists(save_path):
+    #     os.makedirs(save_path)
+    # for i in range(100):
+    #     plot_data(results_data[i], length=results_len[i],
+    #               file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+
+    # results_data = np.load('../data/WGAN/results_A_fake_B_wo.npy')
+    # print(results_data.shape)
+    # save_path = '../data/WGAN/fake_wo'
+    # if not os.path.exists(save_path):
+    #     os.makedirs(save_path)
+    # for i in range(100):
+    #     plot_data(results_data[0, i], length=results_len[i],
+    #               file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+
+    # results_data = np.load('../data/WGAN/results_A_fake_B.npy')
+    # print(results_data.shape)
+    # save_path = '../data/WGAN/fake_wi'
+    # if not os.path.exists(save_path):
+    #     os.makedirs(save_path)
+    # for i in range(100):
+    #     plot_data(results_data[0, i], length=results_len[i],
+    #               file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+
+    # exit()
 
     # target_data = np.zeros(shape=[100,23])
     # off_data = np.load('data/def_obs.npy')
@@ -327,26 +353,26 @@ def test():
     # plot_data(target_data, length=100,
     #             file_path=opt.save_path + 'play_def.mp4', if_save=opt.save)
 
-    train_data = np.load(opt.data_path)
-    train_data_len = np.load('../data/FixedFPS5Length.npy')
-    print(train_data.shape)
-    print(train_data_len.shape)
-    target_data = np.concatenate([train_data[:, :, 0:1, :3].reshape(
-        [train_data.shape[0], 235, 3]), train_data[:, :, 1:, :2].reshape([train_data.shape[0], 235, 20])], axis=-1)
+    # train_data = np.load(opt.data_path)
+    # train_data_len = np.load('../data/FixedFPS5Length.npy')
+    # print(train_data.shape)
+    # print(train_data_len.shape)
+    # target_data = np.concatenate([train_data[:, :, 0:1, :3].reshape(
+    #     [train_data.shape[0], 235, 3]), train_data[:, :, 1:, :2].reshape([train_data.shape[0], 235, 20])], axis=-1)
     # for i in range(100):
     #     plot_data(target_data[i], length=train_data_len[i],
     #               file_path=opt.save_path + 'play_{}.mp4'.format(i), if_save=opt.save)
-    transition_idx = 0
-    for i in range(100):
-        # discard both the head and tail while transform real positions to transitions
-        transition_idx += (train_data_len[i]-2)
-        plot_data(target_data[i], length=train_data_len[i],
-                  file_path=opt.save_path + 'play_tran_{}_epi_{}.mp4'.format(transition_idx, i), if_save=opt.save)
+    # transition_idx = 0
+    # for i in range(100):
+    #     # discard both the head and tail while transform real positions to transitions
+    #     transition_idx += (train_data_len[i]-2)
+    #     plot_data(target_data[i], length=train_data_len[i],
+    #               file_path=opt.save_path + 'play_tran_{}_epi_{}.mp4'.format(transition_idx, i), if_save=opt.save)
 
-    print('opt.save', opt.save)
-    print('opt.amount', opt.amount)
-    print('opt.seq_length', opt.seq_length)
-    print('opt.save_path', opt.save_path)
+    # print('opt.save', opt.save)
+    # print('opt.amount', opt.amount)
+    # print('opt.seq_length', opt.seq_length)
+    # print('opt.save_path', opt.save_path)
 
 
 if __name__ == '__main__':
