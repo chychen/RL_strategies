@@ -427,6 +427,131 @@ class EvaluationMatrix(object):
             py.plot(fig, filename=os.path.join(
                 save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
 
+    def calc_hausdorff(self):
+        """ calculate hausdorff distance between all other models
+        """
+        # https://github.com/mavillan/py-hausdorff
+        from hausdorff import hausdorff
+
+        print("\n### show_best_match ###\n")
+
+        # speed
+        print("Speed")
+        all_trace_speed = {}
+        for key, data in self._all_data_dict.items():
+            if key == 'real_data':  # vis offense tooooooo
+                target = np.reshape(data[:, :, 3:13], [
+                    data.shape[0], data.shape[1], 5, 2])
+                speed = self.__get_length(
+                    target[:, 1:], target[:, :-1]) * self.FPS
+                # clean up unused length
+                valid_speed = []
+                for i in range(data.shape[0]):
+                    valid_speed.append(
+                        speed[i, :self._length[i] - 1].reshape([-1, ]))
+                valid_speed = np.concatenate(valid_speed, axis=0)
+
+                bin_size = 0.5
+                max_v = np.amax(valid_speed)
+                min_v = np.amin(valid_speed)
+                num_bins = int((max_v - min_v) // bin_size) + 1
+                counter = np.zeros(shape=[num_bins, ])
+                for v in valid_speed:
+                    counter[int((v - min_v) // bin_size)] += 1
+
+                all_trace_speed[key] = np.vstack(
+                        (np.array([i * bin_size for i in range(num_bins)]),
+                         counter)).T
+
+            target = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            speed = self.__get_length(
+                target[:, 1:], target[:, :-1]) * self.FPS
+            # clean up unused length
+            valid_speed = []
+            for i in range(data.shape[0]):
+                valid_speed.append(
+                    speed[i, :self._length[i] - 1].reshape([-1, ]))
+            valid_speed = np.concatenate(valid_speed, axis=0)
+
+            bin_size = 0.5
+            max_v = np.amax(valid_speed)
+            min_v = np.amin(valid_speed)
+            num_bins = int((max_v - min_v) // bin_size) + 1
+            counter = np.zeros(shape=[num_bins, ])
+            for v in valid_speed:
+                counter[int((v - min_v) // bin_size)] += 1
+
+            all_trace_speed[key] = np.vstack(
+                (np.array([i * bin_size for i in range(num_bins)]),
+                 counter)).T
+        for key1, P in all_trace_speed:
+            for key2, Q in all_trace_speed:
+                print("{},{},{}".format(
+                    key1, key2,
+                    hausdorff(P, Q)))
+
+        # acc
+        print("Acc")
+        all_trace_acc = {}
+        for key, data in self._all_data_dict.items():
+            if key == 'real_data':  # vis offense tooooooo
+                target = np.reshape(data[:, :, 3:13], [
+                    data.shape[0], data.shape[1], 5, 2])
+                speed = self.__get_length(
+                    target[:, 1:], target[:, :-1]) * self.FPS
+                target_speed = target[:, 1:] - target[:, :-1]
+                acc = self.__get_length(
+                    target_speed[:, 1:], target_speed[:, :-1]) * self.FPS
+                # clean up unused length
+                valid_acc = []
+                for i in range(data.shape[0]):
+                    valid_acc.append(
+                        acc[i, :self._length[i] - 2].reshape([-1, ]))
+                valid_acc = np.concatenate(valid_acc, axis=0)
+                bin_size = 0.5
+                max_v = np.amax(valid_acc)
+                min_v = np.amin(valid_acc)
+                num_bins = int((max_v - min_v) // bin_size) + 1
+                counter = np.zeros(shape=[num_bins, ])
+                for v in valid_acc:
+                    counter[int((v - min_v) // bin_size)] += 1
+
+                all_trace_acc[key] = np.vstack(
+                    (np.array([i * bin_size for i in range(num_bins)]),
+                     counter)).T
+
+            target = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            speed = self.__get_length(
+                target[:, 1:], target[:, :-1]) * self.FPS
+            target_speed = target[:, 1:] - target[:, :-1]
+            acc = self.__get_length(
+                target_speed[:, 1:], target_speed[:, :-1]) * self.FPS
+            # clean up unused length
+            valid_acc = []
+            for i in range(data.shape[0]):
+                valid_acc.append(acc[i, :self._length[i] - 2].reshape([-1, ]))
+
+            valid_acc = np.concatenate(valid_acc, axis=0)
+            bin_size = 0.5
+            max_v = np.amax(valid_acc)
+            min_v = np.amin(valid_acc)
+            num_bins = int((max_v - min_v) // bin_size) + 1
+            counter = np.zeros(shape=[num_bins, ])
+            for v in valid_acc:
+                counter[int((v - min_v) // bin_size)] += 1
+
+            all_trace_acc[key] = np.vstack(
+                (np.array([i * bin_size for i in range(num_bins)]),
+                 counter)).T
+        for key1, P in all_trace_acc:
+            for key2, Q in all_trace_acc:
+                print("{},{},{}".format(
+                    key1, key2,
+                    hausdorff(P, Q)))
+
+
     def plot_histogram_vel_acc(self):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
         """
@@ -1179,6 +1304,7 @@ def evaluate_new_data():
     #     evaluator.vis_and_analysis_by_episode(
     #         episode_idx=10, mode=mode)
     evaluator.show_mean_distance_heatmap_with_ball(mode='DISTANCE')
+    # evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
