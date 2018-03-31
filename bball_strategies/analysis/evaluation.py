@@ -556,7 +556,63 @@ class EvaluationMatrix(object):
                     key1, key2,
                     hausdorff(P, Q)))
 
+        # distance
+        for mode in DIST_MODE:
+            print("Distance (mode={})".format(mode))
+            all_dist_dict = {}
+            for key, data in self._all_data_dict.items():
+                all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
 
+            if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
+            heat_map_mean_table_dict = {}
+            for key, if_handle_ball in if_handle_ball_dict.items():
+                if target == 'without_ball':
+                    if_handle_ball = np.logical_not(if_handle_ball)
+                    # clean up unused length
+                    for i in range(data.shape[0]):
+                        if_handle_ball[i, self._length[i]:] = False
+                data = self._all_data_dict[key]
+                dist = all_dist_dict[key]
+                offense = np.reshape(data[:, :, 3:13], [
+                    data.shape[0], data.shape[1], 5, 2])
+                heat_map_sum_table = np.zeros(shape=[50, 95], dtype=float)
+                heat_map_count_table = np.zeros(shape=[50, 95], dtype=float)
+                lookup = np.where(if_handle_ball)
+                off_wi_ball_pos = offense[lookup[0],
+                                          lookup[1], lookup[2]].reshape([-1, 2])
+                dist_lookup = dist[lookup[0], lookup[1], lookup[2]]
+                for i, pos in enumerate(off_wi_ball_pos):
+                    pos_x, pos_y = pos
+                    if pos_x < 0 or pos_x > 95:
+                        continue
+                    if pos_y < 0 or pos_y > 50:
+                        continue
+                    heat_map_sum_table[int(pos_y), int(
+                        pos_x)] += dist_lookup[i]
+                    heat_map_count_table[int(pos_y), int(pos_x)] += 1.0
+                heat_map_mean_table = heat_map_sum_table / heat_map_count_table
+                heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
+                # store heat_map_mean_table
+                heat_map_mean_table_dict[key] = heat_map_mean_table
+
+            for key1, p in heat_map_mean_table_dict.items():
+                for key2, q in heat_map_mean_table_dict.items():
+                    P = p.reshape(95*50)
+                    Q = q.reshape(95*50)
+                    index_to_remain = []
+                    for i in range(len(P)):
+                        if P[i] != 0 or Q[i] != 0:
+                            index_to_remain.append(i)
+                    P = P[index_to_remain]
+                    Q = Q[index_to_remain]
+                    idx = np.arange(len(P))
+                    P = np.vstack((idx, P)).T
+                    Q = np.vstack((idx, Q)).T
+                    P = P.copy(order='C')
+                    Q = Q.copy(order='C')
+                    print("{},{},{}".format(
+                        key1, key2,
+                        hausdorff(P, Q)))
 
     def plot_histogram_vel_acc(self):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
@@ -1307,7 +1363,7 @@ class EvaluationMatrix(object):
                 susp = [np.sum(y[win_idx:win_idx + WIN_SIZE]) for win_idx in range(epi_len - WIN_SIZE + 1)]
                 trace = go.Scatter(
                     x=np.arange(epi_len - WIN_SIZE + 1) / self.FPS + WIN_SIZE / self.FPS / 2,
-                    y=susp/max_susp_score,
+                    y=(susp/max_susp_score)/WIN_SIZE,
                     name=key,
                 )
                 all_trace.append(trace)
