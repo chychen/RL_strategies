@@ -556,6 +556,8 @@ class EvaluationMatrix(object):
                     key1, key2,
                     hausdorff(P, Q)))
 
+
+
     def plot_histogram_vel_acc(self):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
         """
@@ -1133,7 +1135,6 @@ class EvaluationMatrix(object):
             os.makedirs(save_path)
         draw_diff(wo_ball_dict, save_path=save_path)
 
-
     def plot_histogram_distance_by_frames(self, mode='DISTANCE'):
         """ plot histogram of distance frame by frame, withball and without ball
         """
@@ -1267,6 +1268,11 @@ class EvaluationMatrix(object):
         #     mode='THETA_ADD_SCORE')
 
     def plot_suspicious(self, mode='DISTANCE', WIN_SIZE=10):
+        """ Plot score of suspicious score.
+            The suspicious score is calculated by summing all distances to
+            closest defender within a window of frame.
+        """
+        print('\n### plot_suspicious ###\n')
         # mkdir
         save_path = os.path.join(self._file_name, 'suspicous_' + mode)
         if not os.path.exists(save_path):
@@ -1290,6 +1296,8 @@ class EvaluationMatrix(object):
                         if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
             handle_ball_dist_dict[key] = handle_ball_dist
 
+        max_susp_score = np.max([np.max(data) for key, data in handle_ball_dist_dict.items()])
+
         # vis
         for epi_idx in range(self._num_episodes):
             all_trace = []
@@ -1298,18 +1306,16 @@ class EvaluationMatrix(object):
                 y = dist[epi_idx, :epi_len]
                 susp = [np.sum(y[win_idx:win_idx + WIN_SIZE]) for win_idx in range(epi_len - WIN_SIZE + 1)]
                 trace = go.Scatter(
-                    x=np.arange(epi_len - WIN_SIZE + 1) / self.FPS,
-                    y=susp,
+                    x=np.arange(epi_len - WIN_SIZE + 1) / self.FPS + WIN_SIZE / self.FPS / 2,
+                    y=susp/max_susp_score,
                     name=key,
                 )
                 all_trace.append(trace)
-            if epi_idx == 3:
-                print(all_trace)
             layout = go.Layout(
                 title='Suspicious',
                 barmode='overlay',
                 xaxis=dict(title='time (sec)'),
-                yaxis=dict(title='suspicious score (feet)')
+                yaxis=dict(title='suspicious score')
             )
             fig = go.Figure(data=all_trace, layout=layout)
             py.plot(fig, filename=os.path.join(
@@ -1356,8 +1362,9 @@ def evaluate_new_data():
     #     evaluator.vis_and_analysis_by_episode(
     #         episode_idx=10, mode=mode)
     # evaluator.show_mean_distance_heatmap_with_ball(mode='DISTANCE')
-    # evaluator.calc_hausdorff()
-    evaluator.plot_suspicious()
+    evaluator.calc_hausdorff()
+    # evaluator.plot_suspicious()
+
 
 if __name__ == '__main__':
     evaluate_new_data()
