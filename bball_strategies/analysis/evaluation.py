@@ -1108,7 +1108,19 @@ class EvaluationMatrix(object):
             zmin=0,
             zmax=zmax
         )
-        layout = go.Layout(
+        layout = go.Layout(images= [dict(
+                #   source= "http://127.0.0.1:8050/", # NOTE: failed to add local iamge
+                  xref= "x",
+                  yref= "y",
+                  x= 0,
+                  y= 0,
+                  sizex= 95,
+                  sizey= 50,
+                  xanchor='left',
+                  yanchor='bottom',
+                  sizing= "stretch",
+                #   opacity= 0.5,
+                  layer= "above")],
             title=filename,
             xaxis=dict(title='feet'),
             yaxis=dict(title='feet')
@@ -1159,7 +1171,7 @@ class EvaluationMatrix(object):
                         pos_x)] += dist_lookup[i]
                     heat_map_count_table[int(pos_y), int(pos_x)] += 1.0
                 heat_map_mean_table = heat_map_sum_table / heat_map_count_table
-                heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
+                # heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
                 # store heat_map_mean_table
                 heat_map_mean_table_dict[key] = heat_map_mean_table
                 # vis
