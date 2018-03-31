@@ -374,7 +374,7 @@ class EvaluationMatrix(object):
                 for off_idx in range(5):
                     # real
                     trace = go.Scatter(
-                        x=np.arange(epi_len)/6.25,
+                        x=np.arange(epi_len)/self.FPS,
                         y=data[epi_idx, :epi_len, off_idx],
                         name=key+'_'+str(off_idx+1),
                         xaxis='x',
@@ -389,7 +389,7 @@ class EvaluationMatrix(object):
                 for off_idx in range(5):
                     # markers
                     trace = go.Scatter(
-                        x=np.arange(epi_len)/6.25,
+                        x=np.arange(epi_len)/self.FPS,
                         y=data[epi_idx, :epi_len, off_idx],
                         name=key+'_'+str(off_idx+1),
                         xaxis='x',
@@ -426,6 +426,135 @@ class EvaluationMatrix(object):
             fig = go.Figure(data=all_trace, layout=layout)
             py.plot(fig, filename=os.path.join(
                 save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
+
+    def calc_hausdorff(self):
+        """ calculate hausdorff distance between all other models
+        """
+        # https://github.com/mavillan/py-hausdorff
+        from hausdorff import hausdorff
+
+        print("\n### show_best_match ###\n")
+
+        # speed
+        print("Speed")
+        all_trace_speed = {}
+        for key, data in self._all_data_dict.items():
+            if key == 'real_data':  # vis offense tooooooo
+                target = np.reshape(data[:, :, 3:13], [
+                    data.shape[0], data.shape[1], 5, 2])
+                speed = self.__get_length(
+                    target[:, 1:], target[:, :-1]) * self.FPS
+                # clean up unused length
+                valid_speed = []
+                for i in range(data.shape[0]):
+                    valid_speed.append(
+                        speed[i, :self._length[i] - 1].reshape([-1, ]))
+                valid_speed = np.concatenate(valid_speed, axis=0)
+
+                bin_size = 0.5
+                max_v = np.amax(valid_speed)
+                min_v = np.amin(valid_speed)
+                num_bins = int((max_v - min_v) // bin_size) + 1
+                counter = np.zeros(shape=[num_bins, ])
+                for v in valid_speed:
+                    counter[int((v - min_v) // bin_size)] += 1
+
+                all_trace_speed[key] = np.vstack(
+                        (np.array([i * bin_size for i in range(num_bins)]),
+                         counter)).T
+
+            target = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            speed = self.__get_length(
+                target[:, 1:], target[:, :-1]) * self.FPS
+            # clean up unused length
+            valid_speed = []
+            for i in range(data.shape[0]):
+                valid_speed.append(
+                    speed[i, :self._length[i] - 1].reshape([-1, ]))
+            valid_speed = np.concatenate(valid_speed, axis=0)
+
+            bin_size = 0.5
+            max_v = np.amax(valid_speed)
+            min_v = np.amin(valid_speed)
+            num_bins = int((max_v - min_v) // bin_size) + 1
+            counter = np.zeros(shape=[num_bins, ])
+            for v in valid_speed:
+                counter[int((v - min_v) // bin_size)] += 1
+
+            all_trace_speed[key] = np.vstack(
+                (np.array([i * bin_size for i in range(num_bins)]),
+                 counter)).T
+        for key1, P in all_trace_speed.items():
+            for key2, Q in all_trace_speed.items():
+                P = P.copy(order='C')
+                Q = Q.copy(order='C')
+                print("{},{},{}".format(
+                    key1, key2,
+                    hausdorff(P, Q)))
+
+        # acc
+        print("Acc")
+        all_trace_acc = {}
+
+        for key, data in self._all_data_dict.items():
+            if key == 'real_data':  # vis offense tooooooo
+                target = np.reshape(data[:, :, 3:13], [
+                    data.shape[0], data.shape[1], 5, 2])
+                speed = self.__get_length(
+                    target[:, 1:], target[:, :-1]) * self.FPS
+                target_speed = target[:, 1:] - target[:, :-1]
+                acc = self.__get_length(
+                    target_speed[:, 1:], target_speed[:, :-1]) * self.FPS
+                # clean up unused length
+                valid_acc = []
+                for i in range(data.shape[0]):
+                    valid_acc.append(
+                        acc[i, :self._length[i] - 2].reshape([-1, ]))
+                valid_acc = np.concatenate(valid_acc, axis=0)
+                bin_size = 0.5
+                max_v = np.amax(valid_acc)
+                min_v = np.amin(valid_acc)
+                num_bins = int((max_v - min_v) // bin_size) + 1
+                counter = np.zeros(shape=[num_bins, ])
+                for v in valid_acc:
+                    counter[int((v - min_v) // bin_size)] += 1
+
+                all_trace_acc[key] = np.vstack(
+                    (np.array([i * bin_size for i in range(num_bins)]),
+                     counter)).T
+
+            target = np.reshape(data[:, :, 13:23], [
+                data.shape[0], data.shape[1], 5, 2])
+            speed = self.__get_length(
+                target[:, 1:], target[:, :-1]) * self.FPS
+            target_speed = target[:, 1:] - target[:, :-1]
+            acc = self.__get_length(
+                target_speed[:, 1:], target_speed[:, :-1]) * self.FPS
+            # clean up unused length
+            valid_acc = []
+            for i in range(data.shape[0]):
+                valid_acc.append(acc[i, :self._length[i] - 2].reshape([-1, ]))
+
+            valid_acc = np.concatenate(valid_acc, axis=0)
+            bin_size = 0.5
+            max_v = np.amax(valid_acc)
+            min_v = np.amin(valid_acc)
+            num_bins = int((max_v - min_v) // bin_size) + 1
+            counter = np.zeros(shape=[num_bins, ])
+            for v in valid_acc:
+                counter[int((v - min_v) // bin_size)] += 1
+
+            all_trace_acc[key] = np.vstack(
+                (np.array([i * bin_size for i in range(num_bins)]),
+                 counter)).T
+        for key1, P in all_trace_acc.items():
+            for key2, Q in all_trace_acc.items():
+                P = P.copy(order='C')
+                Q = Q.copy(order='C')
+                print("{},{},{}".format(
+                    key1, key2,
+                    hausdorff(P, Q)))
 
     def plot_histogram_vel_acc(self):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
@@ -866,7 +995,7 @@ class EvaluationMatrix(object):
         """
         Return
         ------
-        if_handle_ball_dict : dict, for each item shape=[num_episodes, length, 5]
+        if_handle_ball_dict : dict, for each item shape=[num_episodes, length, 5], dtype=bool
             for each frame in each dataset, which offensive players dribble the ball
         """
         all_dist_dict = {}
@@ -875,14 +1004,11 @@ class EvaluationMatrix(object):
         if_handle_ball_dict = {}
         for key in self._all_data_dict:
             data = self._all_data_dict[key]
-            dist = all_dist_dict[key]
             # categorize into two set, withball and without ball
             ball = np.reshape(data[:, :, 0:2], [
                 data.shape[0], data.shape[1], 1, 2])
             offense = np.reshape(data[:, :, 3:13], [
                 data.shape[0], data.shape[1], 5, 2])
-            pad_next = np.pad(offense[:, 1:], [(0, 0), (0, 1),
-                                               (0, 0), (0, 0)], mode='constant', constant_values=1)
             # tally the table : if offense handle the ball
             if_handle_ball = np.empty(
                 shape=[data.shape[0], data.shape[1], 5], dtype=bool)
@@ -1152,6 +1278,55 @@ class EvaluationMatrix(object):
         # evaluator.plot_histogram_distance_by_frames(
         #     mode='THETA_ADD_SCORE')
 
+    def plot_suspicious(self, mode='DISTANCE', WIN_SIZE=10):
+        # mkdir
+        save_path = os.path.join(self._file_name, 'suspicous_' + mode)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        all_dist_dict = {}
+        for key, data in self._all_data_dict.items():
+            all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
+        if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
+        handle_ball_dist_dict = {}
+        for key in all_dist_dict:
+            dist = all_dist_dict[key]
+            if_handle_ball = if_handle_ball_dict[key]
+            handle_ball_dist = np.zeros((dist.shape[0], dist.shape[1], ))
+            for epi_idx in range(self._num_episodes):
+                epi_len = self._length[epi_idx]
+                for frame_idx in range(epi_len):
+                    handle_ball_p_idx, = np.where(if_handle_ball[epi_idx, frame_idx] == True)
+                    handle_ball_dist[epi_idx, frame_idx] = \
+                        np.max(dist[epi_idx, frame_idx, handle_ball_p_idx]) \
+                        if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
+            handle_ball_dist_dict[key] = handle_ball_dist
+
+        # vis
+        for epi_idx in range(self._num_episodes):
+            all_trace = []
+            epi_len = self._length[epi_idx]
+            for key, dist in handle_ball_dist_dict.items():
+                y = dist[epi_idx, :epi_len]
+                susp = [np.sum(y[win_idx:win_idx + WIN_SIZE]) for win_idx in range(epi_len - WIN_SIZE + 1)]
+                trace = go.Scatter(
+                    x=np.arange(epi_len - WIN_SIZE + 1) / self.FPS,
+                    y=susp,
+                    name=key,
+                )
+                all_trace.append(trace)
+            if epi_idx == 3:
+                print(all_trace)
+            layout = go.Layout(
+                title='Suspicious',
+                barmode='overlay',
+                xaxis=dict(title='time (sec)'),
+                yaxis=dict(title='suspicious score (feet)')
+            )
+            fig = go.Figure(data=all_trace, layout=layout)
+            py.plot(fig, filename=os.path.join(
+                save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
+
 
 def evaluate_new_data():
     # real_data = np.load('../data/WGAN/cnn_wi/A_real_B.npy')#TODO wrong data
@@ -1192,8 +1367,9 @@ def evaluate_new_data():
     #     evaluator.plot_mean_distance_heatmap(mode=mode)
     #     evaluator.vis_and_analysis_by_episode(
     #         episode_idx=10, mode=mode)
-    evaluator.plot_mean_distance_heatmap(mode='DISTANCE')
-
+    # evaluator.show_mean_distance_heatmap_with_ball(mode='DISTANCE')
+    # evaluator.calc_hausdorff()
+    evaluator.plot_suspicious()
 
 if __name__ == '__main__':
     evaluate_new_data()

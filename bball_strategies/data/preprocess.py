@@ -186,7 +186,7 @@ def main():
 
     # save
     indices = range(len(data))
-    remove_indices = start_free_throw_arr + start_outside_arr + frame_discontinuous_arr
+    remove_indices = start_free_throw_arr + start_outside_arr + frame_discontinuous_arr + episode_too_short_arr + ball_stolen_arr
     remain_indices = [i for j, i in enumerate(indices) if j not in remove_indices]
     data = data[remain_indices]
     data_len = data_len[remain_indices]
