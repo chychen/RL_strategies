@@ -1024,26 +1024,27 @@ class EvaluationMatrix(object):
             if_handle_ball_dict[key] = if_handle_ball
         return if_handle_ball_dict
 
-    def show_mean_distance_heatmap_with_ball(self, mode='DISTANCE'):
+    def __vis_heat_map(self, z, zmax, filename):
+        trace = go.Heatmap(
+            z=z,
+            x=[i for i in range(z.shape[1])],
+            y=[i for i in range(z.shape[0])],
+            zauto=False,
+            #    zsmooth='best',
+            zmin=0,
+            zmax=zmax
+        )
+        layout = go.Layout(
+            title=filename,
+            xaxis=dict(title='feet'),
+            yaxis=dict(title='feet')
+        )
+        fig = go.Figure(data=[trace], layout=layout)
+        py.plot(fig, filename=filename, auto_open=False)
+
+    def plot_mean_distance_heatmap(self, mode='DISTANCE'):
         """ Vis Heat map (frequency) of mean distance to closet defense 
         """
-        def vis_heat_map(z, filename):
-            trace = go.Heatmap(
-                z=z,
-                x=[i for i in range(z.shape[1])],
-                y=[i for i in range(z.shape[0])],
-                zauto=False,
-                #    zsmooth='best',
-                zmin=0,
-                zmax=30
-            )
-            layout = go.Layout(
-                title=filename,
-                xaxis=dict(title='feet'),
-                yaxis=dict(title='feet')
-            )
-            fig = go.Figure(data=[trace], layout=layout)
-            py.plot(fig, filename=filename, auto_open=False)
 
         def draw(save_path, target='with_ball'):
             """
@@ -1089,7 +1090,7 @@ class EvaluationMatrix(object):
                 heat_map_mean_table_dict[key] = heat_map_mean_table
                 # vis
                 filename = os.path.join(save_path, key+'_'+target+'.html')
-                vis_heat_map(heat_map_mean_table, filename)
+                self.__vis_heat_map(heat_map_mean_table, 30, filename)
             return heat_map_mean_table_dict
 
         def draw_diff(table_dict, save_path):
@@ -1106,9 +1107,9 @@ class EvaluationMatrix(object):
                 diff_table = np.abs(real_mean_table-mean_table)
                 # vis
                 filename = os.path.join(save_path, key+'.html')
-                vis_heat_map(diff_table, filename)
+                self.__vis_heat_map(diff_table, 15, filename)
 
-        print('\n### show_mean_distance_heatmap_with_ball mode=\'{}\' ###\n'.format(mode))
+        print('\n### plot_mean_distance_heatmap mode=\'{}\' ###\n'.format(mode))
         # with ball
         save_path = os.path.join(
             self._file_name, 'heat_map_mean_dist_wi_ball_' + mode)
@@ -1131,6 +1132,7 @@ class EvaluationMatrix(object):
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         draw_diff(wo_ball_dict, save_path=save_path)
+
 
     def plot_histogram_distance_by_frames(self, mode='DISTANCE'):
         """ plot histogram of distance frame by frame, withball and without ball
@@ -1295,7 +1297,6 @@ class EvaluationMatrix(object):
             for key, dist in handle_ball_dist_dict.items():
                 y = dist[epi_idx, :epi_len]
                 susp = [np.sum(y[win_idx:win_idx + WIN_SIZE]) for win_idx in range(epi_len - WIN_SIZE + 1)]
-                if epi_idx == 3:
                 trace = go.Scatter(
                     x=np.arange(epi_len - WIN_SIZE + 1) / self.FPS,
                     y=susp,
@@ -1351,7 +1352,7 @@ def evaluate_new_data():
     #     evaluator.show_mean_distance(mode=mode)
     #     evaluator.plot_histogram_distance_by_frames(
     #         mode=mode)
-    #     evaluator.show_mean_distance_heatmap_with_ball(mode=mode)
+    #     evaluator.plot_mean_distance_heatmap(mode=mode)
     #     evaluator.vis_and_analysis_by_episode(
     #         episode_idx=10, mode=mode)
     # evaluator.show_mean_distance_heatmap_with_ball(mode='DISTANCE')
