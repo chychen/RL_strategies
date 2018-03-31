@@ -433,10 +433,21 @@ class EvaluationMatrix(object):
         # https://github.com/mavillan/py-hausdorff
         from hausdorff import hausdorff
 
+        def print_h_matrix(dict, h_matrix):
+            print("{:>20}".format(" "), end="")
+            for key, data in dict.items():
+                print("{:>20}".format(key), end="")
+            print("")
+            for i, (key, data) in enumerate(dict.items()):
+                print("{:>20}".format(key), end="")
+                for j, (key2, data2) in enumerate(dict.items()):
+                    print("{:>20}".format(h_matrix[i][j]), end="")
+                print("")
+
         print("\n### show_best_match ###\n")
 
         # speed
-        print("Speed")
+        print("\nSpeed")
         all_trace_speed = {}
         for key, data in self._all_data_dict.items():
             if key == 'real_data':  # vis offense tooooooo
@@ -485,18 +496,19 @@ class EvaluationMatrix(object):
             all_trace_speed[key] = np.vstack(
                 (np.array([i * bin_size for i in range(num_bins)]),
                  counter)).T
+        h_matrix = []
         for key1, P in all_trace_speed.items():
+            h_row = []
             for key2, Q in all_trace_speed.items():
                 P = P.copy(order='C')
                 Q = Q.copy(order='C')
-                print("{},{},{}".format(
-                    key1, key2,
-                    hausdorff(P, Q)))
+                h_row.append(hausdorff(P, Q))
+            h_matrix.append(h_row)
+        print_h_matrix(all_trace_speed, h_matrix)
 
         # acc
-        print("Acc")
+        print("\nAcc")
         all_trace_acc = {}
-
         for key, data in self._all_data_dict.items():
             if key == 'real_data':  # vis offense tooooooo
                 target = np.reshape(data[:, :, 3:13], [
@@ -548,17 +560,19 @@ class EvaluationMatrix(object):
             all_trace_acc[key] = np.vstack(
                 (np.array([i * bin_size for i in range(num_bins)]),
                  counter)).T
+        h_matrix = []
         for key1, P in all_trace_acc.items():
+            h_row = []
             for key2, Q in all_trace_acc.items():
                 P = P.copy(order='C')
                 Q = Q.copy(order='C')
-                print("{},{},{}".format(
-                    key1, key2,
-                    hausdorff(P, Q)))
+                h_row.append(hausdorff(P, Q))
+            h_matrix.append(h_row)
+        print_h_matrix(all_trace_acc, h_matrix)
 
         # distance
         for mode in DIST_MODE:
-            print("Distance (mode={})".format(mode))
+            print("\nDistance (mode={})".format(mode))
             all_dist_dict = {}
             for key, data in self._all_data_dict.items():
                 all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
@@ -595,7 +609,9 @@ class EvaluationMatrix(object):
                 # store heat_map_mean_table
                 heat_map_mean_table_dict[key] = heat_map_mean_table
 
+            h_matrix = []
             for key1, p in heat_map_mean_table_dict.items():
+                h_row = []
                 for key2, q in heat_map_mean_table_dict.items():
                     P = p.reshape(95*50)
                     Q = q.reshape(95*50)
@@ -610,9 +626,9 @@ class EvaluationMatrix(object):
                     Q = np.vstack((idx, Q)).T
                     P = P.copy(order='C')
                     Q = Q.copy(order='C')
-                    print("{},{},{}".format(
-                        key1, key2,
-                        hausdorff(P, Q)))
+                    h_row.append(hausdorff(P, Q))
+                h_matrix.append(h_row)
+            print_h_matrix(heat_map_mean_table_dict, h_matrix)
 
     def plot_histogram_vel_acc(self):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
