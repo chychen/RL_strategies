@@ -608,13 +608,42 @@ class EvaluationMatrix(object):
                 heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
                 # store heat_map_mean_table
                 heat_map_mean_table_dict[key] = heat_map_mean_table
-
+            # x and y
             h_matrix = []
             for key1, p in heat_map_mean_table_dict.items():
                 h_row = []
                 for key2, q in heat_map_mean_table_dict.items():
                     P = p.reshape(95*50)
                     Q = q.reshape(95*50)
+                    index_to_remain = []
+                    for i in range(len(P)):
+                        if P[i] != 0 or Q[i] != 0:
+                            index_to_remain.append(i)
+                    P = P[index_to_remain]
+                    Q = Q[index_to_remain]
+                    idx = np.arange(len(P))
+                    P = np.vstack((idx, P)).T
+                    Q = np.vstack((idx, Q)).T
+                    P = P.copy(order='C')
+                    Q = Q.copy(order='C')
+                    h_row.append(hausdorff(P, Q))
+                h_matrix.append(h_row)
+            print_h_matrix(heat_map_mean_table_dict, h_matrix)
+            # distance to basket
+            h_matrix = []
+            for key1, p in heat_map_mean_table_dict.items():
+                h_row = []
+                for key2, q in heat_map_mean_table_dict.items():
+                    # transform to distance to basket coordinate
+                    basket_x = 94 - 5.25
+                    basket_y = 25
+                    P = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
+                    Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
+                    for i in range(50):
+                        for j in range(95):
+                            dist2basket = int(np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
+                            P[dist2basket] += p[i][j]
+                            Q[dist2basket] += q[i][j]
                     index_to_remain = []
                     for i in range(len(P)):
                         if P[i] != 0 or Q[i] != 0:
@@ -1450,7 +1479,7 @@ def evaluate_new_data():
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    for mode in DIST_MODE:
+    # for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
         # evaluator.show_mean_distance(mode=mode)
@@ -1459,8 +1488,8 @@ def evaluate_new_data():
         # evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
-        evaluator.plot_suspicious(mode=mode)
-    # evaluator.calc_hausdorff()
+        # evaluator.plot_suspicious(mode=mode)
+    evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
