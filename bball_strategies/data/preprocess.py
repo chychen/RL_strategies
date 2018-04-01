@@ -64,11 +64,6 @@ def main():
     # filter
     for data_idx in range(data.shape[0]):
 
-        # filter out frame length < 25 (5 seconde)
-        if data_len[data_idx] <= 25:
-            episode_too_short_arr.append(data_idx)
-            continue
-
         for frame_idx in range(data_len[data_idx]):
             ball_x = data[data_idx][frame_idx][ball_idx][x_idx]
             ball_y = data[data_idx][frame_idx][ball_idx][y_idx]
@@ -170,6 +165,12 @@ def main():
                     for i in range(frame_idx, prev_data_len):
                         data[data_idx][i].fill(0)
                     break
+        
+
+        # filter out frame length < 25 (5 seconde)
+        if data_len[data_idx] <= 25:
+            episode_too_short_arr.append(data_idx)
+            continue
 
     # print preprocessed data id
     print("Data removed:")
