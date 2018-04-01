@@ -380,7 +380,7 @@ class EvaluationMatrix(object):
                         xaxis='x',
                         yaxis='y'+str(off_idx+1),
                         line=dict(
-                            color=('rgb'+str(RGB_tuples[color_count]))
+                            color=('rgb'+str(RGB_tuples[color_count%10]))
                         )
                     )
                     all_trace.append(trace)
@@ -395,7 +395,7 @@ class EvaluationMatrix(object):
                         xaxis='x',
                         yaxis='y'+str(off_idx+1),
                         line=dict(
-                            color=('rgb'+str(RGB_tuples[color_count])),
+                            color=('rgb'+str(RGB_tuples[color_count%10])),
                             width=3)
                     )
                     all_trace.append(trace)
@@ -1432,21 +1432,21 @@ def evaluate_new_data():
             print('rm -rf "%s" complete!' % file_name)
     evaluator = EvaluationMatrix(
         file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0, **all_data)
-    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
-    # evaluator.plot_histogram_vel_acc()
-    # evaluator.show_best_match()
-    # evaluator.show_freq_heatmap()
-    # for mode in DIST_MODE:
-    #     evaluator.plot_linechart_distance_by_frames(
-    #         mode=mode)
-    #     evaluator.show_mean_distance(mode=mode)
-    #     evaluator.plot_histogram_distance_by_frames(
-    #         mode=mode)
-    #     evaluator.plot_mean_distance_heatmap(mode=mode)
-    #     evaluator.vis_and_analysis_by_episode(
-    #         episode_idx=10, mode=mode)
-    #     evaluator.plot_suspicious(mode=mode)
+    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
+    evaluator.plot_histogram_vel_acc()
+    evaluator.show_best_match()
+    evaluator.show_freq_heatmap()
+    for mode in DIST_MODE:
+        evaluator.plot_linechart_distance_by_frames(
+            mode=mode)
+        evaluator.show_mean_distance(mode=mode)
+        evaluator.plot_histogram_distance_by_frames(
+            mode=mode)
+        evaluator.plot_mean_distance_heatmap(mode=mode)
+        evaluator.vis_and_analysis_by_episode(
+            episode_idx=10, mode=mode)
+        evaluator.plot_suspicious(mode=mode)
     # evaluator.calc_hausdorff()
 
 
