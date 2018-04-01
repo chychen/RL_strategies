@@ -471,8 +471,8 @@ class EvaluationMatrix(object):
                     counter[int((v - min_v) // bin_size)] += 1
 
                 all_trace_speed[key] = np.vstack(
-                        (np.array([i * bin_size for i in range(num_bins)]),
-                         counter)).T
+                    (np.array([i * bin_size for i in range(num_bins)]),
+                     counter)).T
 
             target = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
@@ -1108,19 +1108,19 @@ class EvaluationMatrix(object):
             zmin=0,
             zmax=zmax
         )
-        layout = go.Layout(images= [dict(
-                #   source= "http://127.0.0.1:8050/", # NOTE: failed to add local iamge
-                  xref= "x",
-                  yref= "y",
-                  x= 0,
-                  y= 0,
-                  sizex= 95,
-                  sizey= 50,
-                  xanchor='left',
-                  yanchor='bottom',
-                  sizing= "stretch",
-                #   opacity= 0.5,
-                  layer= "above")],
+        layout = go.Layout(images=[dict(
+            #   source= "http://127.0.0.1:8050/", # NOTE: failed to add local iamge
+            xref="x",
+            yref="y",
+            x=0,
+            y=0,
+            sizex=95,
+            sizey=50,
+            xanchor='left',
+            yanchor='bottom',
+            sizing="stretch",
+            #   opacity= 0.5,
+            layer="above")],
             title=filename,
             xaxis=dict(title='feet'),
             yaxis=dict(title='feet')
@@ -1374,13 +1374,15 @@ class EvaluationMatrix(object):
             for epi_idx in range(self._num_episodes):
                 epi_len = self._length[epi_idx]
                 for frame_idx in range(epi_len):
-                    handle_ball_p_idx, = np.where(if_handle_ball[epi_idx, frame_idx] == True)
+                    handle_ball_p_idx, = np.where(
+                        if_handle_ball[epi_idx, frame_idx] == True)
                     handle_ball_dist[epi_idx, frame_idx] = \
                         np.max(dist[epi_idx, frame_idx, handle_ball_p_idx]) \
                         if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
             handle_ball_dist_dict[key] = handle_ball_dist
 
-        max_susp_score = np.max([np.max(data) for key, data in handle_ball_dist_dict.items()])
+        max_susp_score = np.max([np.max(data)
+                                 for key, data in handle_ball_dist_dict.items()])
 
         # vis
         for epi_idx in range(self._num_episodes):
@@ -1388,9 +1390,11 @@ class EvaluationMatrix(object):
             epi_len = self._length[epi_idx]
             for key, dist in handle_ball_dist_dict.items():
                 y = dist[epi_idx, :epi_len]
-                susp = [np.sum(y[win_idx:win_idx + WIN_SIZE]) for win_idx in range(epi_len - WIN_SIZE + 1)]
+                susp = [np.sum(y[win_idx:win_idx + WIN_SIZE])
+                        for win_idx in range(epi_len - WIN_SIZE + 1)]
                 trace = go.Scatter(
-                    x=np.arange(epi_len - WIN_SIZE + 1) / self.FPS + WIN_SIZE / self.FPS / 2,
+                    x=np.arange(epi_len - WIN_SIZE + 1) /
+                    self.FPS + WIN_SIZE / self.FPS / 2,
                     y=(susp/max_susp_score)/WIN_SIZE,
                     name=key,
                 )
@@ -1407,19 +1411,17 @@ class EvaluationMatrix(object):
 
 
 def evaluate_new_data():
-    # real_data = np.load('../data/WGAN/cnn_wi/A_real_B.npy')#TODO wrong data
-    real_data = np.load('../data/WGAN/FixedFPS5.npy')[:10000:100]
-    real_data = np.concatenate([real_data[:, :, 0, :3], real_data[:, :, 1:6, :2].reshape(
-        [real_data.shape[0], real_data.shape[1], 10]), real_data[:, :, 6:11, :2].reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
-    cnn_wi_2000k = np.load('../data/WGAN/cnn_wi_2000k/A_fake_B_N100.npy')[0]
-    cnn_wo_368k = np.load('../data/WGAN/cnn_wo_368k/A_fake_B_N100.npy')[0]
-    cnn_verify_921k = np.load(
-        '../data/WGAN/cnn_verify_921k/A_fake_B_N100.npy')[0]
-    # cnn_wi_2000k_not_denorm = np.load('../data/WGAN/cnn_wi_2000k_not_denorm/A_fake_B_N100.npy')[0]
-    cnn_wi_mul_2000k = np.load(
-        '../data/WGAN/cnn_wi_mul_2000k/A_fake_B_N100.npy')[0]
-    # rnn_1000k = np.load('../data/WGAN/rnn_1000k/A_fake_B_N128.npy')[0]
-    length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
+    root_path = '../data/WGAN/all_model_results/'
+    all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
+                         'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
+                         'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wi_mul_598k_nl']
+    length = np.repeat(np.load(root_path+'length.npy'), 100, axis=0)
+    all_data = {}
+    all_data['real_data'] = np.repeat(
+        np.load(root_path+'real_data.npy'), 100, axis=0)
+    for key in all_data_key_list:
+        all_data[key] = np.load(
+            root_path+key+'/results_A_fake_B.npy').reshape([100*100, 235, 23])
 
     file_name = 'default'
     if os.path.exists(file_name):
@@ -1429,8 +1431,7 @@ def evaluate_new_data():
             shutil.rmtree(file_name)
             print('rm -rf "%s" complete!' % file_name)
     evaluator = EvaluationMatrix(
-        file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0,
-        real_data=real_data, cnn_wi_2000k=cnn_wi_2000k, cnn_wo_368k=cnn_wo_368k, cnn_verify_921k=cnn_verify_921k, cnn_wi_mul_2000k=cnn_wi_mul_2000k)
+        file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0, **all_data)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
     # evaluator.plot_histogram_vel_acc()
@@ -1446,7 +1447,7 @@ def evaluate_new_data():
     #     evaluator.vis_and_analysis_by_episode(
     #         episode_idx=10, mode=mode)
     # evaluator.show_mean_distance_heatmap_with_ball(mode='DISTANCE')
-    evaluator.calc_hausdorff()
+    # evaluator.calc_hausdorff()
     # evaluator.plot_suspicious()
 
 
