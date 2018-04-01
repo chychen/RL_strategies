@@ -1437,16 +1437,16 @@ def evaluate_new_data():
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    for mode in DIST_MODE:
-        # evaluator.plot_linechart_distance_by_frames(
-        #     mode=mode)
-        # evaluator.show_mean_distance(mode=mode)
-        # evaluator.plot_histogram_distance_by_frames(
-        #     mode=mode)
-        # evaluator.plot_mean_distance_heatmap(mode=mode)
-        evaluator.vis_and_analysis_by_episode(
-            episode_idx=10, mode=mode)
-        # evaluator.plot_suspicious(mode=mode)
+    # for mode in DIST_MODE:
+    #     evaluator.plot_linechart_distance_by_frames(
+    #         mode=mode)
+    #     evaluator.show_mean_distance(mode=mode)
+    #     evaluator.plot_histogram_distance_by_frames(
+    #         mode=mode)
+    #     evaluator.plot_mean_distance_heatmap(mode=mode)
+    #     evaluator.vis_and_analysis_by_episode(
+    #         episode_idx=10, mode=mode)
+    #     evaluator.plot_suspicious(mode=mode)
     # evaluator.calc_hausdorff()
 
 
