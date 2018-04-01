@@ -1415,10 +1415,10 @@ def evaluate_new_data():
     all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
                          'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
                          'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wi_mul_598k_nl']
-    length = np.repeat(np.load(root_path+'length.npy'), 100, axis=0)
+    length = np.tile(np.load(root_path+'length.npy'), [100])
     all_data = {}
-    all_data['real_data'] = np.repeat(
-        np.load(root_path+'real_data.npy'), 100, axis=0)
+    all_data['real_data'] = np.tile(
+        np.load(root_path+'real_data.npy'), [100, 1, 1])
     for key in all_data_key_list:
         all_data[key] = np.load(
             root_path+key+'/results_A_fake_B.npy').reshape([100*100, 235, 23])
@@ -1437,18 +1437,17 @@ def evaluate_new_data():
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    # for mode in DIST_MODE:
-    #     evaluator.plot_linechart_distance_by_frames(
-    #         mode=mode)
-    #     evaluator.show_mean_distance(mode=mode)
-    #     evaluator.plot_histogram_distance_by_frames(
-    #         mode=mode)
-    #     evaluator.plot_mean_distance_heatmap(mode=mode)
-    #     evaluator.vis_and_analysis_by_episode(
-    #         episode_idx=10, mode=mode)
-    # evaluator.show_mean_distance_heatmap_with_ball(mode='DISTANCE')
+    for mode in DIST_MODE:
+        # evaluator.plot_linechart_distance_by_frames(
+        #     mode=mode)
+        # evaluator.show_mean_distance(mode=mode)
+        # evaluator.plot_histogram_distance_by_frames(
+        #     mode=mode)
+        # evaluator.plot_mean_distance_heatmap(mode=mode)
+        evaluator.vis_and_analysis_by_episode(
+            episode_idx=10, mode=mode)
+        # evaluator.plot_suspicious(mode=mode)
     # evaluator.calc_hausdorff()
-    # evaluator.plot_suspicious()
 
 
 if __name__ == '__main__':
