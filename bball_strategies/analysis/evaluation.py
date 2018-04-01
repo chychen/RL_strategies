@@ -380,7 +380,7 @@ class EvaluationMatrix(object):
                         xaxis='x',
                         yaxis='y'+str(off_idx+1),
                         line=dict(
-                            color=('rgb'+str(RGB_tuples[color_count%10]))
+                            color=('rgb'+str(RGB_tuples[color_count % 10]))
                         )
                     )
                     all_trace.append(trace)
@@ -395,7 +395,7 @@ class EvaluationMatrix(object):
                         xaxis='x',
                         yaxis='y'+str(off_idx+1),
                         line=dict(
-                            color=('rgb'+str(RGB_tuples[color_count%10])),
+                            color=('rgb'+str(RGB_tuples[color_count % 10])),
                             width=3)
                     )
                     all_trace.append(trace)
@@ -1411,17 +1411,26 @@ class EvaluationMatrix(object):
 
 
 def evaluate_new_data():
+    analyze_all_noise = False
     root_path = '../data/WGAN/all_model_results/'
     all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
                          'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
-                         'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wi_mul_598k_nl']
-    length = np.tile(np.load(root_path+'length.npy'), [100])
-    all_data = {}
-    all_data['real_data'] = np.tile(
-        np.load(root_path+'real_data.npy'), [100, 1, 1])
-    for key in all_data_key_list:
-        all_data[key] = np.load(
-            root_path+key+'/results_A_fake_B.npy').reshape([100*100, 235, 23])
+                         'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl']
+    if analyze_all_noise:
+        length = np.tile(np.load(root_path+'length.npy'), [100])
+        all_data = {}
+        all_data['real_data'] = np.tile(
+            np.load(root_path+'real_data.npy'), [100, 1, 1])
+        for key in all_data_key_list:
+            all_data[key] = np.load(
+                root_path+key+'/results_A_fake_B.npy').reshape([100*100, 235, 23])
+    else:
+        length = np.load(root_path+'length.npy')
+        all_data = {}
+        all_data['real_data'] = np.load(root_path+'real_data.npy')
+        for key in all_data_key_list:
+            all_data[key] = np.load(
+                root_path+key+'/results_A_fake_B.npy')[0]
 
     file_name = 'default'
     if os.path.exists(file_name):
@@ -1432,20 +1441,20 @@ def evaluate_new_data():
             print('rm -rf "%s" complete!' % file_name)
     evaluator = EvaluationMatrix(
         file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0, **all_data)
-    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
+    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
     evaluator.plot_histogram_vel_acc()
-    evaluator.show_best_match()
-    evaluator.show_freq_heatmap()
+    # evaluator.show_best_match()
+    # evaluator.show_freq_heatmap()
     for mode in DIST_MODE:
-        evaluator.plot_linechart_distance_by_frames(
-            mode=mode)
-        evaluator.show_mean_distance(mode=mode)
-        evaluator.plot_histogram_distance_by_frames(
-            mode=mode)
+        # evaluator.plot_linechart_distance_by_frames(
+        #     mode=mode)
+        # evaluator.show_mean_distance(mode=mode)
+        # evaluator.plot_histogram_distance_by_frames(
+        #     mode=mode)
         evaluator.plot_mean_distance_heatmap(mode=mode)
-        evaluator.vis_and_analysis_by_episode(
-            episode_idx=10, mode=mode)
+        # evaluator.vis_and_analysis_by_episode(
+        #     episode_idx=10, mode=mode)
         evaluator.plot_suspicious(mode=mode)
     # evaluator.calc_hausdorff()
 
