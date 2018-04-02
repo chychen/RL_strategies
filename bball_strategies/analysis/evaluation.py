@@ -40,6 +40,7 @@ import vis_game
 import shutil
 
 DIST_MODE = ['DISTANCE', 'THETA', 'THETA_ADD_SCORE', 'THETA_MUL_SCORE']
+DIST_MODE = ['DISTANCE', 'THETA_MUL_SCORE']
 
 
 class EvaluationMatrix(object):
@@ -473,10 +474,10 @@ class EvaluationMatrix(object):
                 counter = np.zeros(shape=[num_bins, ])
                 for v in valid_speed:
                     counter[int((v - min_v) // bin_size)] += 1
-
+                all_counts = np.sum(counter)
                 all_trace_speed[key] = np.vstack(
                     (np.array([i * bin_size for i in range(num_bins)]),
-                     counter)).T
+                     counter/all_counts)).T
 
             target = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
@@ -496,10 +497,10 @@ class EvaluationMatrix(object):
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_speed:
                 counter[int((v - min_v) // bin_size)] += 1
-
+            all_counts = np.sum(counter)
             all_trace_speed[key] = np.vstack(
                 (np.array([i * bin_size for i in range(num_bins)]),
-                 counter)).T
+                 counter/all_counts)).T
         h_matrix = []
         for key1, P in all_trace_speed.items():
             h_row = []
@@ -535,10 +536,10 @@ class EvaluationMatrix(object):
                 counter = np.zeros(shape=[num_bins, ])
                 for v in valid_acc:
                     counter[int((v - min_v) // bin_size)] += 1
-
+                all_counts = np.sum(counter)
                 all_trace_acc[key] = np.vstack(
                     (np.array([i * bin_size for i in range(num_bins)]),
-                     counter)).T
+                     counter/all_counts)).T
 
             target = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
@@ -560,10 +561,10 @@ class EvaluationMatrix(object):
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_acc:
                 counter[int((v - min_v) // bin_size)] += 1
-
+            all_counts = np.sum(counter)
             all_trace_acc[key] = np.vstack(
                 (np.array([i * bin_size for i in range(num_bins)]),
-                 counter)).T
+                 counter/all_counts)).T
         h_matrix = []
         for key1, P in all_trace_acc.items():
             h_row = []
@@ -697,11 +698,11 @@ class EvaluationMatrix(object):
                 counter = np.zeros(shape=[num_bins, ])
                 for v in valid_speed:
                     counter[int((v-min_v)//bin_size)] += 1
-
+                all_counts = np.sum(counter)
                 trace_speed = go.Scatter(
                     name=key+'_offense',
                     x=[i*bin_size for i in range(num_bins)],
-                    y=counter
+                    y=counter/all_counts
                 )
 
                 # trace_speed = go.Histogram(
@@ -737,11 +738,11 @@ class EvaluationMatrix(object):
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_speed:
                 counter[int((v-min_v)//bin_size)] += 1
-
+            all_counts = np.sum(counter)
             trace_speed = go.Scatter(
                 name=key,
                 x=[i*bin_size for i in range(num_bins)],
-                y=counter
+                y=counter/all_counts
             )
 
             # trace_speed = go.Histogram(
@@ -786,18 +787,18 @@ class EvaluationMatrix(object):
                     valid_acc.append(
                         acc[i, :self._length[i]-2].reshape([-1, ]))
                 valid_acc = np.concatenate(valid_acc, axis=0)
-                bin_size = 0.5
+                bin_size = 0.1
                 max_v = np.amax(valid_acc)
                 min_v = np.amin(valid_acc)
                 num_bins = int((max_v-min_v)//bin_size)+1
                 counter = np.zeros(shape=[num_bins, ])
                 for v in valid_acc:
                     counter[int((v-min_v)//bin_size)] += 1
-
+                all_counts = np.sum(counter)
                 trace_acc = go.Scatter(
                     name=key+'_offense',
                     x=[i*bin_size for i in range(num_bins)],
-                    y=counter
+                    y=counter/all_counts
                 )
 
                 # trace_acc = go.Histogram(
@@ -828,18 +829,18 @@ class EvaluationMatrix(object):
                 valid_acc.append(acc[i, :self._length[i]-2].reshape([-1, ]))
 
             valid_acc = np.concatenate(valid_acc, axis=0)
-            bin_size = 0.5
+            bin_size = 0.1
             max_v = np.amax(valid_acc)
             min_v = np.amin(valid_acc)
             num_bins = int((max_v-min_v)//bin_size)+1
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_acc:
                 counter[int((v-min_v)//bin_size)] += 1
-
+            all_counts = np.sum(counter)
             trace_acc = go.Scatter(
                 name=key,
                 x=[i*bin_size for i in range(num_bins)],
-                y=counter
+                y=counter/all_counts
             )
 
             # trace_acc = go.Histogram(
@@ -1291,11 +1292,11 @@ class EvaluationMatrix(object):
             counter = np.zeros(shape=[num_bins, ])
             for v in wiball_dist:
                 counter[int((v-min_v)//bin_size)] += 1
-
+            all_counts = np.sum(counter)
             trace_wiball_dist = go.Scatter(
                 name=key+'_wi_ball',
                 x=[i*bin_size for i in range(num_bins)],
-                y=counter
+                y=counter/all_counts
             )
             # trace_wiball_dist = go.Histogram(
             #     name=key+'_wi_ball',
@@ -1318,11 +1319,11 @@ class EvaluationMatrix(object):
             counter = np.zeros(shape=[num_bins, ])
             for v in woball_dist:
                 counter[int((v-min_v)//bin_size)] += 1
-
+            all_counts = np.sum(counter)
             trace_woball_dist = go.Scatter(
                 name=key+'_wo_ball',
                 x=[i*bin_size for i in range(num_bins)],
-                y=counter
+                y=counter/all_counts
             )
             # trace_woball_dist = go.Histogram(
             #     name=key+'_wo_ball',
@@ -1525,17 +1526,17 @@ def evaluate_new_data():
     evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    for mode in DIST_MODE:
+    # for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
         # evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_histogram_distance_by_frames(
         #     mode=mode)
-        evaluator.plot_mean_distance_heatmap(mode=mode)
+        # evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
-        evaluator.plot_suspicious(mode=mode)
-    evaluator.calc_hausdorff()
+        # evaluator.plot_suspicious(mode=mode)
+    # evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
