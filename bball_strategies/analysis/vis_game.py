@@ -275,22 +275,21 @@ def test():
     """
     plot real data
     """
-
-    real_data = np.load('../data/WGAN/FixedFPS5.npy')[:10000:100]
-    real_data = np.concatenate([real_data[:, :, 0, :3], real_data[:, :, 1:6, :2].reshape(
-        [real_data.shape[0], real_data.shape[1], 10]), real_data[:, :, 6:11, :2].reshape([real_data.shape[0], real_data.shape[1], 10])], axis=-1)
-    cnn_wi_data = np.load('../data/WGAN/cnn_wi_2000k/A_fake_B_N100.npy')[0]
-    length = np.load('../data/WGAN/FixedFPS5Length.npy')[:10000:100]
-    save_path = '../data/WGAN/user_study/fake'
+    root_path = '../data/WGAN/all_model_results/'
+    length = np.load(root_path+'length.npy')
+    real_data = np.load(root_path+'real_data.npy')
+    
+    cnn_wi_mul_828k = np.load(root_path+'cnn_wi_mul_828k/results_A_fake_B.npy')[0]
+    save_path = root_path + 'cnn_wi_mul_828k/user_study/fake'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
         try:
-            plot_data(cnn_wi_data[i], length=length[i],
+            plot_data(cnn_wi_mul_828k[i], length=length[i],
                     file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
         except:
             pass
-    save_path = '../data/WGAN/user_study/real'
+    save_path = root_path + 'cnn_wi_mul_828k/user_study/real'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
