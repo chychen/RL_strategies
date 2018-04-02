@@ -441,7 +441,7 @@ class EvaluationMatrix(object):
             for i, (key, data) in enumerate(dict.items()):
                 print("{:>20}".format(key), end="")
                 for j, (key2, data2) in enumerate(dict.items()):
-                    print("{:>20}".format(h_matrix[i][j]), end="")
+                    print("{:>20.2f}".format(h_matrix[i][j]), end="")
                 print("")
 
         print("\n### show_best_match ###\n")
@@ -641,6 +641,8 @@ class EvaluationMatrix(object):
                     Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
                     for i in range(50):
                         for j in range(95):
+                            if j<95/2:
+                                continue
                             dist2basket = int(np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
                             P[dist2basket] += p[i][j]
                             Q[dist2basket] += q[i][j]
@@ -1410,8 +1412,11 @@ class EvaluationMatrix(object):
                         if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
             handle_ball_dist_dict[key] = handle_ball_dist
 
+        # for key, data in all_dist_dict.items():
+        #     handle_ball_dist_dict[key] = handle_ball_dist_dict[key] - handle_ball_dist_dict["real_data"]
+
         max_susp_score = np.max([np.max(data)
-                                 for key, data in handle_ball_dist_dict.items()])
+            for key, data in handle_ball_dist_dict.items()])
 
         # vis
         for epi_idx in range(self._num_episodes):
@@ -1440,11 +1445,13 @@ class EvaluationMatrix(object):
 
 
 def evaluate_new_data():
-    analyze_all_noise = True
+    analyze_all_noise = False
     root_path = '../data/WGAN/all_model_results/'
-    all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
-                         'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
-                         'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl']
+    # all_data_key_list = ['cnn_wi_mul_828k']
+    # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
+    #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
+    #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl']
+    all_data_key_list = ['cnn_wi_mul_598k_nl', 'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
     if analyze_all_noise:
         length = np.tile(np.load(root_path+'length.npy'), [100])
         all_data = {}
@@ -1470,22 +1477,22 @@ def evaluate_new_data():
             print('rm -rf "%s" complete!' % file_name)
     evaluator = EvaluationMatrix(
         file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0, **all_data)
-    evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
-    evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
-    evaluator.plot_histogram_vel_acc()
-    evaluator.show_best_match()
-    evaluator.show_freq_heatmap()
-    for mode in DIST_MODE:
-        evaluator.plot_linechart_distance_by_frames(
-            mode=mode)
-        evaluator.show_mean_distance(mode=mode)
-        evaluator.plot_histogram_distance_by_frames(
-            mode=mode)
-        evaluator.plot_mean_distance_heatmap(mode=mode)
-        evaluator.vis_and_analysis_by_episode(
-            episode_idx=10, mode=mode)
-        evaluator.plot_suspicious(mode=mode)
-    # evaluator.calc_hausdorff()
+    # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
+    # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
+    # evaluator.plot_histogram_vel_acc()
+    # evaluator.show_best_match()
+    # evaluator.show_freq_heatmap()
+    # for mode in DIST_MODE:
+        # evaluator.plot_linechart_distance_by_frames(
+        #     mode=mode)
+        # evaluator.show_mean_distance(mode=mode)
+        # evaluator.plot_histogram_distance_by_frames(
+        #     mode=mode)
+        # evaluator.plot_mean_distance_heatmap(mode=mode)
+        # evaluator.vis_and_analysis_by_episode(
+        #     episode_idx=10, mode=mode)
+        # evaluator.plot_suspicious(mode=mode)
+    evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
