@@ -467,7 +467,7 @@ class EvaluationMatrix(object):
                         speed[i, :self._length[i] - 1].reshape([-1, ]))
                 valid_speed = np.concatenate(valid_speed, axis=0)
 
-                bin_size = 0.5
+                bin_size = 0.1
                 max_v = np.amax(valid_speed)
                 min_v = np.amin(valid_speed)
                 num_bins = int((max_v - min_v) // bin_size) + 1
@@ -490,7 +490,7 @@ class EvaluationMatrix(object):
                     speed[i, :self._length[i] - 1].reshape([-1, ]))
             valid_speed = np.concatenate(valid_speed, axis=0)
 
-            bin_size = 0.5
+            bin_size = 0.1
             max_v = np.amax(valid_speed)
             min_v = np.amin(valid_speed)
             num_bins = int((max_v - min_v) // bin_size) + 1
@@ -529,7 +529,7 @@ class EvaluationMatrix(object):
                     valid_acc.append(
                         acc[i, :self._length[i] - 2].reshape([-1, ]))
                 valid_acc = np.concatenate(valid_acc, axis=0)
-                bin_size = 0.5
+                bin_size = 0.1
                 max_v = np.amax(valid_acc)
                 min_v = np.amin(valid_acc)
                 num_bins = int((max_v - min_v) // bin_size) + 1
@@ -554,7 +554,7 @@ class EvaluationMatrix(object):
                 valid_acc.append(acc[i, :self._length[i] - 2].reshape([-1, ]))
 
             valid_acc = np.concatenate(valid_acc, axis=0)
-            bin_size = 0.5
+            bin_size = 0.1
             max_v = np.amax(valid_acc)
             min_v = np.amin(valid_acc)
             num_bins = int((max_v - min_v) // bin_size) + 1
@@ -691,7 +691,7 @@ class EvaluationMatrix(object):
                         speed[i, :self._length[i]-1].reshape([-1, ]))
                 valid_speed = np.concatenate(valid_speed, axis=0)
 
-                bin_size = 0.5
+                bin_size = 0.1
                 max_v = np.amax(valid_speed)
                 min_v = np.amin(valid_speed)
                 num_bins = int((max_v-min_v)//bin_size)+1
@@ -731,7 +731,7 @@ class EvaluationMatrix(object):
                     speed[i, :self._length[i]-1].reshape([-1, ]))
             valid_speed = np.concatenate(valid_speed, axis=0)
 
-            bin_size = 0.5
+            bin_size = 0.1
             max_v = np.amax(valid_speed)
             min_v = np.amin(valid_speed)
             num_bins = int((max_v-min_v)//bin_size)+1
@@ -1285,7 +1285,7 @@ class EvaluationMatrix(object):
                 if_handle_ball[i, self._length[i]:] = False
             woball_dist = dist[if_handle_ball]
             # # trace_wiball_dist
-            bin_size = 0.5
+            bin_size = 0.1
             max_v = np.amax(wiball_dist)
             min_v = np.amin(wiball_dist)
             num_bins = int((max_v-min_v)//bin_size)+1
@@ -1312,7 +1312,7 @@ class EvaluationMatrix(object):
             all_trace.append(trace_wiball_dist)
             # trace_woball_dist
 
-            bin_size = 0.5
+            bin_size = 0.1
             max_v = np.amax(woball_dist)
             min_v = np.amin(woball_dist)
             num_bins = int((max_v-min_v)//bin_size)+1
@@ -1526,17 +1526,17 @@ def evaluate_new_data():
     evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    # for mode in DIST_MODE:
+    for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
         # evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_histogram_distance_by_frames(
         #     mode=mode)
-        # evaluator.plot_mean_distance_heatmap(mode=mode)
+        evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
-        # evaluator.plot_suspicious(mode=mode)
-    # evaluator.calc_hausdorff()
+        evaluator.plot_suspicious(mode=mode)
+    evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
