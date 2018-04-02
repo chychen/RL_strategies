@@ -22,6 +22,8 @@ http://140.113.210.22:6006:without open shot penalty, baseline, and compare to b
 http://140.113.210.22:6007:without open shot penalty, without latent penalty, vanilla
 	vanilla/checkpoints/model.ckpt-322321
 	cnn_wo_322k_vanilla
+	vanilla/checkpoints/model.ckpt-644741
+	cnn_wo_644k_vanilla
 http://140.113.210.4:6126 :with open shot penalty=(theta+1)*(length+1), no latent peanlty
 	wi_no_latent/checkpoints/model.ckpt-598681
 	cnn_wi_mul_598k_nl
