@@ -1,0 +1,29 @@
+http://140.113.210.4:6123 :without open shot penalty, baseline
+	v2/checkpoints/model.ckpt-368381
+	cnn_wo_368k
+http://140.113.210.4:6124 :with open shot penalty=(theta+length)
+	v1/checkpoints/model.ckpt-2003178
+	cnn_wi_add_2003k
+http://140.113.210.4:6125 :with open shot penalty=(theta+1)*(length+1), and compare to baseline
+	v3/checkpoints/model.ckpt-828882
+	cnn_wi_mul_828k
+http://140.113.210.27:6007:with open shot penalty=(10*theta+length), and compare to baseline
+	v3/checkpoints/model.ckpt-1151167
+	cnn_wi_add10_1151k
+http://140.113.210.3:6006 :without open shot penalty, RNN, and compare to baseline
+	RNN/checkpoints/model.ckpt-442668
+	rnn_wo_442k
+http://140.113.210.3:6007 :with open shot penalty, RNN, and compare to baseline
+	RNN_with/checkpoints/model.ckpt-442668
+	rnn_wi_442k
+http://140.113.210.22:6006:without open shot penalty, baseline, and compare to baseline
+	verify/checkpoints/model.ckpt-921101
+	cnn_wo_921k_verify
+http://140.113.210.22:6007:without open shot penalty, without latent penalty, vanilla
+	vanilla/checkpoints/model.ckpt-322321
+	cnn_wo_322k_vanilla
+http://140.113.210.4:6126 :with open shot penalty=(theta+1)*(length+1), no latent peanlty
+	wi_no_latent/checkpoints/model.ckpt-598681
+	cnn_wi_mul_598k_nl
+
+

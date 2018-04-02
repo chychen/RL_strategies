@@ -641,6 +641,8 @@ class EvaluationMatrix(object):
                     Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
                     for i in range(50):
                         for j in range(95):
+                            if j<95/2:
+                                continue
                             dist2basket = int(np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
                             P[dist2basket] += p[i][j]
                             Q[dist2basket] += q[i][j]
@@ -1410,8 +1412,8 @@ class EvaluationMatrix(object):
                         if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
             handle_ball_dist_dict[key] = handle_ball_dist
 
-        for key, data in all_dist_dict.items():
-            handle_ball_dist_dict[key] = handle_ball_dist_dict[key] - handle_ball_dist_dict["real_data"]
+        # for key, data in all_dist_dict.items():
+        #     handle_ball_dist_dict[key] = handle_ball_dist_dict[key] - handle_ball_dist_dict["real_data"]
 
         max_susp_score = np.max([np.max(data)
             for key, data in handle_ball_dist_dict.items()])
@@ -1445,10 +1447,10 @@ class EvaluationMatrix(object):
 def evaluate_new_data():
     analyze_all_noise = False
     root_path = '../data/WGAN/all_model_results/'
-    # all_data_key_list = ['cnn_wi_mul_828k']
-    all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
-                         'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
-                         'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl']
+    all_data_key_list = ['cnn_wi_mul_828k']
+    # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
+    #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
+    #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl']
     if analyze_all_noise:
         length = np.tile(np.load(root_path+'length.npy'), [100])
         all_data = {}
@@ -1479,7 +1481,7 @@ def evaluate_new_data():
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    # for mode in DIST_MODE:
+    for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
         # evaluator.show_mean_distance(mode=mode)
@@ -1488,7 +1490,7 @@ def evaluate_new_data():
         # evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
-        # evaluator.plot_suspicious(mode=mode)
+        evaluator.plot_suspicious(mode=mode)
     evaluator.calc_hausdorff()
 
 
