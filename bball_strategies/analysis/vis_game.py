@@ -279,25 +279,19 @@ def test():
     length = np.load(root_path+'length.npy')
     real_data = np.load(root_path+'real_data.npy')
     
-    cnn_wi_mul_828k = np.load(root_path+'cnn_wi_mul_828k/results_A_fake_B.npy')[0]
-    save_path = root_path + 'cnn_wi_mul_828k/user_study/fake'
+    cnn_wi_mul_598k_nl = np.load(root_path+'cnn_wi_mul_598k_nl/results_A_fake_B.npy')[0]
+    save_path = root_path + 'cnn_wi_mul_598k_nl/user_study/fake'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
-        try:
-            plot_data(cnn_wi_mul_828k[i], length=length[i],
-                    file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
-        except:
-            pass
-    save_path = root_path + 'cnn_wi_mul_828k/user_study/real'
+        plot_data(cnn_wi_mul_598k_nl[i], length=length[i],
+                file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+    save_path = root_path + 'cnn_wi_mul_598k_nl/user_study/real'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
-        try:
-            plot_data(real_data[i], length=length[i],
-                    file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
-        except:
-            pass
+        plot_data(real_data[i], length=length[i],
+                file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
 
 
 

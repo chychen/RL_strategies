@@ -72,7 +72,10 @@ class EvaluationMatrix(object):
 
         self.RIGHT_BASKET = [94 - 5.25, 25]
         self.WINGSPAN_RADIUS = 3.5 + 0.5  # to judge who handle the ball
-        self.LEN_3PT_BASKET = 23.75 + 5
+        # if distance from player to basket < self.THREEPT_LEN_BASKET, player is ready to shoot 3pt
+        self.THREEPT_LEN_BASKET = 23.75 + 5
+        # if x > self.bottom_3pt_line_x, player is ready to shoot 3pt
+        self.THREEPT_BOTTOM_LINE_X = 94-14
         self.FPS = FPS
 
         self._file_name = file_name
@@ -213,7 +216,7 @@ class EvaluationMatrix(object):
             handler_idx[indices[0], indices[1], off_idx] = -2  # dummy constant
             # check position whether inside the 3pt line
             indices = np.where(self.__get_length(
-                offender[:, :, 0], self.RIGHT_BASKET) < self.LEN_3PT_BASKET)
+                offender[:, :, 0], self.RIGHT_BASKET) < self.THREEPT_LEN_BASKET)
             if_inside_3pt[indices[0], indices[1],
                           off_idx] = -4  # dummy constant
             # check position whether inside the paint area
@@ -641,9 +644,10 @@ class EvaluationMatrix(object):
                     Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
                     for i in range(50):
                         for j in range(95):
-                            if j<95/2:
+                            if j < 95/2:
                                 continue
-                            dist2basket = int(np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
+                            dist2basket = int(
+                                np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
                             P[dist2basket] += p[i][j]
                             Q[dist2basket] += q[i][j]
                     index_to_remain = []
@@ -1399,6 +1403,11 @@ class EvaluationMatrix(object):
         if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
         handle_ball_dist_dict = {}
         for key in all_dist_dict:
+            # offense pos
+            data = self._all_data_dict['real_data']
+            offense = np.reshape(data[:, :, 3:13], [
+                data.shape[0], data.shape[1], 5, 2])
+            # defender's distance to offense
             dist = all_dist_dict[key]
             if_handle_ball = if_handle_ball_dict[key]
             handle_ball_dist = np.zeros((dist.shape[0], dist.shape[1], ))
@@ -1407,16 +1416,29 @@ class EvaluationMatrix(object):
                 for frame_idx in range(epi_len):
                     handle_ball_p_idx, = np.where(
                         if_handle_ball[epi_idx, frame_idx] == True)
-                    handle_ball_dist[epi_idx, frame_idx] = \
-                        np.max(dist[epi_idx, frame_idx, handle_ball_p_idx]) \
-                        if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
+                    # if possible to shoot 3pt
+                    # handle_ball_p_idx might be 0 or >1
+                    if_handle_ball_p_close_3pt_line = True
+                    if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) == 1:
+                        handle_ball_p_pos = offense[epi_idx,
+                                                    frame_idx, handle_ball_p_idx][0]
+                        len_dist2basket = self.__get_length(
+                            handle_ball_p_pos, self.RIGHT_BASKET)
+                        if len_dist2basket > self.THREEPT_LEN_BASKET and handle_ball_p_pos[0] < self.THREEPT_BOTTOM_LINE_X:
+                            if_handle_ball_p_close_3pt_line = False
+                    if if_handle_ball_p_close_3pt_line:
+                        handle_ball_dist[epi_idx, frame_idx] = \
+                            np.max(dist[epi_idx, frame_idx, handle_ball_p_idx]) \
+                            if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
+                    else:
+                        handle_ball_dist[epi_idx, frame_idx] = 0.0
             handle_ball_dist_dict[key] = handle_ball_dist
 
         # for key, data in all_dist_dict.items():
         #     handle_ball_dist_dict[key] = handle_ball_dist_dict[key] - handle_ball_dist_dict["real_data"]
 
         max_susp_score = np.max([np.max(data)
-            for key, data in handle_ball_dist_dict.items()])
+                                 for key, data in handle_ball_dist_dict.items()])
 
         # vis
         for epi_idx in range(self._num_episodes):
@@ -1451,7 +1473,8 @@ def evaluate_new_data():
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
     #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
     #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl']
-    all_data_key_list = ['cnn_wi_mul_598k_nl', 'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
+    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wi_mul_598k_nl',
+                         'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
     if analyze_all_noise:
         length = np.tile(np.load(root_path+'length.npy'), [100])
         all_data = {}
@@ -1482,7 +1505,7 @@ def evaluate_new_data():
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    # for mode in DIST_MODE:
+    for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
         # evaluator.show_mean_distance(mode=mode)
@@ -1491,8 +1514,8 @@ def evaluate_new_data():
         # evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
-        # evaluator.plot_suspicious(mode=mode)
-    evaluator.calc_hausdorff()
+        evaluator.plot_suspicious(mode=mode)
+    # evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
