@@ -34,7 +34,8 @@ def update_all(frame_id, player_circles, ball_circle, annotations, data, vis_bal
     for j, circle in enumerate(player_circles):
         circle.center = data[frame_id, 3 + j *
                              2 + 0], data[frame_id, 3 + j * 2 + 1]
-        annotations[j].set_position([circle.center[0], circle.center[1]-3]) #-3: annotations are below the circle
+        # -3: annotations are below the circle
+        annotations[j].set_position([circle.center[0], circle.center[1]-3])
     # ball
     ball_circle.center = data[frame_id, 0], data[frame_id, 1]
     if vis_ball_height:
@@ -42,7 +43,9 @@ def update_all(frame_id, player_circles, ball_circle, annotations, data, vis_bal
     else:
         ball_circle.set_radius(0.4)
 
-    annotations[10].set_position([ball_circle.center[0], ball_circle.center[1]-3]) #-3: annotations are below the circle
+    # -3: annotations are below the circle
+    annotations[10].set_position(
+        [ball_circle.center[0], ball_circle.center[1]-3])
     return
 
 
@@ -66,18 +69,21 @@ def update_compare_all(frame_id, match_distance_text, player_circles, ball_circl
         23 = ball's xyz + 10 players's xy
     """
     # text
-    match_distance_text.set_text('match/frame: {0:6.4f} ft'.format(permu_min[frame_id]))
+    match_distance_text.set_text(
+        'match/frame: {0:6.4f} ft'.format(permu_min[frame_id]))
     # players
     for j, circle in enumerate(player_circles):
         if j < 10:
             circle.center = data_1[frame_id, 3 + j *
                                    2 + 0], data_1[frame_id, 3 + j * 2 + 1]
-            annotations[j].set_position([circle.center[0], circle.center[1]-3]) #-3: annotations are below the circle
+            # -3: annotations are below the circle
+            annotations[j].set_position([circle.center[0], circle.center[1]-3])
         else:
             idx = j-10+5  # data_2's defense
             circle.center = data_2[frame_id, 3 + idx *
                                    2 + 0], data_2[frame_id, 3 + idx * 2 + 1]
-            annotations[j].set_position([circle.center[0], circle.center[1]-3]) #-3: annotations are below the circle
+            # -3: annotations are below the circle
+            annotations[j].set_position([circle.center[0], circle.center[1]-3])
     # lines
     for i in range(5):
         real_idx = i+5
@@ -96,7 +102,9 @@ def update_compare_all(frame_id, match_distance_text, player_circles, ball_circl
     else:
         ball_circle.set_radius(0.4)
 
-    annotations[15].set_position([ball_circle.center[0], ball_circle.center[1]-3]) #-3: annotations are below the circle
+    # -3: annotations are below the circle
+    annotations[15].set_position(
+        [ball_circle.center[0], ball_circle.center[1]-3])
     return
 
 
@@ -144,9 +152,11 @@ def plot_compare_data(data_1, data_2, length, permu_min, best_match_pairs, file_
     [lines.append(Line2D([0], [0])) for _ in range(5)]
 
     # text
-    match_distance_text = Text(x=0, y=60, text='match/frame: {0:6.4f} ft'.format(0), size=15)
+    match_distance_text = Text(
+        x=0, y=60, text='match/frame: {0:6.4f} ft'.format(0), size=15)
     permu_min = permu_min[:length]
-    total_distance_text = Text(x=0, y=52.5, text='mean: {0:6.4f} ft'.format(np.mean(permu_min)), size=15)
+    total_distance_text = Text(
+        x=0, y=52.5, text='mean: {0:6.4f} ft'.format(np.mean(permu_min)), size=15)
 
     # plot
     ax = plt.axes(xlim=(0, 100), ylim=(-20, 70))
@@ -278,24 +288,26 @@ def test():
     root_path = '../data/WGAN/all_model_results/'
     length = np.load(root_path+'length.npy')
     real_data = np.load(root_path+'real_data.npy')
-    
-    cnn_wi_mul_828k_nl = np.load(root_path+'cnn_wi_mul_828k_nl/results_A_fake_B.npy')[0]
+
+    cnn_wi_mul_828k_nl = np.load(
+        root_path+'cnn_wi_mul_828k_nl/results_A_fake_B.npy')
+    critic_scores = np.load(
+        root_path+'cnn_wi_mul_828k_nl/results_critic_scores.npy')
     save_path = root_path + 'cnn_wi_mul_828k_nl/user_study/fake'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
-        plot_data(cnn_wi_mul_828k_nl[i], length=length[i],
-                file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True, vis_annotation=True)
+        best_idx = np.argmax(critic_scores[:, i])
+        plot_data(cnn_wi_mul_828k_nl[best_idx, i], length=length[i],
+                  file_path=save_path+'/play_' + str(i) + '_N' + str(best_idx) + '.mp4', if_save=True, vis_annotation=True)
     save_path = root_path + 'cnn_wi_mul_828k_nl/user_study/real'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
         plot_data(real_data[i], length=length[i],
-                file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True, vis_annotation=True)
+                  file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True, vis_annotation=True)
 
-
-
-    ## cmd e.g. python game_visualizer.py --data_path='../../data/collect/mode_6/results_A_fake_B.npy' --save_path='../../data/collect/try/' --amount=10
+    # cmd e.g. python game_visualizer.py --data_path='../../data/collect/mode_6/results_A_fake_B.npy' --save_path='../../data/collect/try/' --amount=10
     # results_data = np.load('../data/WGAN/FULL.npy')
     # results_len = np.load('../data/WGAN/FULL-LEN.npy')
     # results_data = np.concatenate(
