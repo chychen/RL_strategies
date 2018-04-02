@@ -34,7 +34,7 @@ def update_all(frame_id, player_circles, ball_circle, annotations, data, vis_bal
     for j, circle in enumerate(player_circles):
         circle.center = data[frame_id, 3 + j *
                              2 + 0], data[frame_id, 3 + j * 2 + 1]
-        annotations[j].set_position(circle.center)
+        annotations[j].set_position([circle.center[0], circle.center[1]-3]) #-3: annotations are below the circle
     # ball
     ball_circle.center = data[frame_id, 0], data[frame_id, 1]
     if vis_ball_height:
@@ -42,7 +42,7 @@ def update_all(frame_id, player_circles, ball_circle, annotations, data, vis_bal
     else:
         ball_circle.set_radius(0.4)
 
-    annotations[10].set_position(ball_circle.center)
+    annotations[10].set_position([ball_circle.center[0], ball_circle.center[1]-3]) #-3: annotations are below the circle
     return
 
 
@@ -72,12 +72,12 @@ def update_compare_all(frame_id, match_distance_text, player_circles, ball_circl
         if j < 10:
             circle.center = data_1[frame_id, 3 + j *
                                    2 + 0], data_1[frame_id, 3 + j * 2 + 1]
-            annotations[j].set_position(circle.center)
+            annotations[j].set_position([circle.center[0], circle.center[1]-3]) #-3: annotations are below the circle
         else:
             idx = j-10+5  # data_2's defense
             circle.center = data_2[frame_id, 3 + idx *
                                    2 + 0], data_2[frame_id, 3 + idx * 2 + 1]
-            annotations[j].set_position(circle.center)
+            annotations[j].set_position([circle.center[0], circle.center[1]-3]) #-3: annotations are below the circle
     # lines
     for i in range(5):
         real_idx = i+5
@@ -96,7 +96,7 @@ def update_compare_all(frame_id, match_distance_text, player_circles, ball_circl
     else:
         ball_circle.set_radius(0.4)
 
-    annotations[15].set_position(ball_circle.center)
+    annotations[15].set_position([ball_circle.center[0], ball_circle.center[1]-3]) #-3: annotations are below the circle
     return
 
 
@@ -164,14 +164,14 @@ def plot_compare_data(data_1, data_2, length, permu_min, best_match_pairs, file_
 
     # annotations on circles
     if vis_annotation:
-        annotations = [ax.annotate(name_list[i], xy=[0., 0.],
-                                   horizontalalignment='center',
-                                   verticalalignment='center', fontweight='bold')
+        annotations = [ax.annotate(name_list[i], xy=[0., 0.], fontsize=12,
+                                   horizontalalignment='center', color='black',
+                                   verticalalignment='center')
                        for i in range(16)]
     else:
-        annotations = [ax.annotate('', xy=[0., 0.],
-                                   horizontalalignment='center',
-                                   verticalalignment='center', fontweight='bold')
+        annotations = [ax.annotate('', xy=[0., 0.], fontsize=12,
+                                   horizontalalignment='center', color='black',
+                                   verticalalignment='center')
                        for i in range(16)]
 
     # animation
@@ -217,7 +217,7 @@ def plot_data(data, length, file_path=None, if_save=False, fps=5, dpi=128, vis_b
     """
     court = plt.imread("../gym_bball/envs/fullcourt.png")  # 500*939
     name_list = ['A1', 'A2', 'A3', 'A4', 'A5',
-                 'B1', 'B2', 'B3', 'B4', 'B5', 'O']
+                 'B1', 'B2', 'B3', 'B4', 'B5', '']
 
     # team A -> read circle, team B -> blue circle, ball -> small green circle
     player_circles = []
@@ -239,14 +239,14 @@ def plot_data(data, length, file_path=None, if_save=False, fps=5, dpi=128, vis_b
 
     # annotations on circles
     if vis_annotation:
-        annotations = [ax.annotate(name_list[i], xy=[0., 0.],
-                                   horizontalalignment='center',
-                                   verticalalignment='center', fontweight='bold')
+        annotations = [ax.annotate(name_list[i], xy=[0., 0.], fontsize=12,
+                                   horizontalalignment='center', color='black',
+                                   verticalalignment='center')
                        for i in range(11)]
     else:
-        annotations = [ax.annotate('', xy=[0., 0.],
-                                   horizontalalignment='center',
-                                   verticalalignment='center', fontweight='bold')
+        annotations = [ax.annotate('', xy=[0., 0.], fontsize=12,
+                                   horizontalalignment='center', color='black',
+                                   verticalalignment='center')
                        for i in range(11)]
 
     # animation
@@ -279,19 +279,19 @@ def test():
     length = np.load(root_path+'length.npy')
     real_data = np.load(root_path+'real_data.npy')
     
-    cnn_wi_mul_598k_nl = np.load(root_path+'cnn_wi_mul_598k_nl/results_A_fake_B.npy')[0]
-    save_path = root_path + 'cnn_wi_mul_598k_nl/user_study/fake'
+    cnn_wi_mul_828k_nl = np.load(root_path+'cnn_wi_mul_828k_nl/results_A_fake_B.npy')[0]
+    save_path = root_path + 'cnn_wi_mul_828k_nl/user_study/fake'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
-        plot_data(cnn_wi_mul_598k_nl[i], length=length[i],
-                file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
-    save_path = root_path + 'cnn_wi_mul_598k_nl/user_study/real'
+        plot_data(cnn_wi_mul_828k_nl[i], length=length[i],
+                file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True, vis_annotation=True)
+    save_path = root_path + 'cnn_wi_mul_828k_nl/user_study/real'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     for i in range(100):
         plot_data(real_data[i], length=length[i],
-                file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True)
+                file_path=save_path+'/play_' + str(i) + '.mp4', if_save=True, vis_annotation=True)
 
 
 

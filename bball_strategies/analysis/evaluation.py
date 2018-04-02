@@ -93,7 +93,7 @@ class EvaluationMatrix(object):
         self._report_file = open(report_file_path, "a")
 
         if FORMULA_RADIUS is not None:
-            self.create_formula_1_defense(RADIUS=FORMULA_RADIUS)
+            # self.create_formula_1_defense(RADIUS=FORMULA_RADIUS)
             self.create_formula_2_defense(RADIUS=FORMULA_RADIUS)
 
     def show_overlap_freq(self, OVERLAP_RADIUS=1.0, interp_flag=True):
@@ -108,7 +108,9 @@ class EvaluationMatrix(object):
                 data.shape[0], data.shape[1], 5, 2])
             defense = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
-            total_frames = data.shape[0]*data.shape[1]
+            total_frames = 0
+            for i in range(data.shape[0]):
+                total_frames += self._length[i]
 
             counter = 0
             for off_idx in range(5):
@@ -435,6 +437,7 @@ class EvaluationMatrix(object):
         """
         # https://github.com/mavillan/py-hausdorff
         from hausdorff import hausdorff
+        print("\n### calc_hausdorff ###\n")
 
         def print_h_matrix(dict, h_matrix):
             print("{:>20}".format(" "), end="")
@@ -446,8 +449,6 @@ class EvaluationMatrix(object):
                 for j, (key2, data2) in enumerate(dict.items()):
                     print("{:>20.2f}".format(h_matrix[i][j]), end="")
                 print("")
-
-        print("\n### show_best_match ###\n")
 
         # speed
         print("\nSpeed")
@@ -1047,7 +1048,9 @@ class EvaluationMatrix(object):
             valid_theta = np.concatenate(valid_theta, axis=0)
             counter = np.count_nonzero(valid_theta <= THETA*np.pi/180.0)
             # show
-            total_frames = data.shape[0] * data.shape[1]
+            total_frames = 0
+            for i in range(data.shape[0]):
+                total_frames += self._length[i]
             show_msg += '\'{0}\' dataset\n'.format(
                 key) + '-- frequency={0:4.2f}\n'.format(counter/total_frames)
         print(show_msg)
@@ -1386,12 +1389,11 @@ class EvaluationMatrix(object):
         # evaluator.plot_histogram_distance_by_frames(
         #     mode='THETA_ADD_SCORE')
 
-    def plot_suspicious(self, mode='DISTANCE', WIN_SIZE=10):
+    def plot_suspicious(self, mode='DISTANCE', WIN_SIZE=10, EPSILON=0.33):
         """ Plot score of suspicious score.
             The suspicious score is calculated by summing all distances to
             closest defender within a window of frame.
         """
-        print('\n### plot_suspicious ###\n')
         # mkdir
         save_path = os.path.join(self._file_name, 'suspicous_' + mode)
         if not os.path.exists(save_path):
@@ -1440,6 +1442,9 @@ class EvaluationMatrix(object):
         max_susp_score = np.max([np.max(data)
                                  for key, data in handle_ball_dist_dict.items()])
 
+        peak_counter = {}
+        for key in self._all_data_dict:
+            peak_counter[key] = 0
         # vis
         for epi_idx in range(self._num_episodes):
             all_trace = []
@@ -1448,13 +1453,19 @@ class EvaluationMatrix(object):
                 y = dist[epi_idx, :epi_len]
                 susp = [np.sum(y[win_idx:win_idx + WIN_SIZE])
                         for win_idx in range(epi_len - WIN_SIZE + 1)]
+                normed = (susp/max_susp_score)/WIN_SIZE
                 trace = go.Scatter(
                     x=np.arange(epi_len - WIN_SIZE + 1) /
                     self.FPS + WIN_SIZE / self.FPS / 2,
-                    y=(susp/max_susp_score)/WIN_SIZE,
+                    y=normed,
                     name=key,
                 )
                 all_trace.append(trace)
+                # count suspicous peak
+                for v in normed:
+                    if v > EPSILON:
+                        peak_counter[key] += 1
+
             layout = go.Layout(
                 title='Suspicious',
                 barmode='overlay',
@@ -1464,17 +1475,26 @@ class EvaluationMatrix(object):
             fig = go.Figure(data=all_trace, layout=layout)
             py.plot(fig, filename=os.path.join(
                 save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
+        total_frames = 0
+        for i in range(data.shape[0]):
+            total_frames += self._length[i]
+
+        msg = '\n### plot_suspicious, mode=\'{}\' ###\n'.format(mode)
+        for key in self._all_data_dict:
+            msg += '{0} dataset:\n\tpeak_freqency:{1:5.4f}\n'.format(
+                key, peak_counter[key]/total_frames)
+        print(msg)
+        self._report_file.write(msg)
 
 
 def evaluate_new_data():
-    analyze_all_noise = False
+    analyze_all_noise = True
     root_path = '../data/WGAN/all_model_results/'
     # all_data_key_list = ['cnn_wi_mul_828k']
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
     #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
-    #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl']
-    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wi_mul_598k_nl',
-                         'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
+    #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl', 'cnn_wi_mul_828k_nl']
+    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
     if analyze_all_noise:
         length = np.tile(np.load(root_path+'length.npy'), [100])
         all_data = {}
@@ -1502,7 +1522,7 @@ def evaluate_new_data():
         file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0, **all_data)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
-    # evaluator.plot_histogram_vel_acc()
+    evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
     for mode in DIST_MODE:
@@ -1511,11 +1531,11 @@ def evaluate_new_data():
         # evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_histogram_distance_by_frames(
         #     mode=mode)
-        # evaluator.plot_mean_distance_heatmap(mode=mode)
+        evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
         evaluator.plot_suspicious(mode=mode)
-    # evaluator.calc_hausdorff()
+    evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
