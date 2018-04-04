@@ -284,7 +284,7 @@ class EvaluationMatrix(object):
                 off2defs_len = self.__get_length(offender, defense)
                 # find best defense according to defense_scores
                 defense_scores = np.array(off2defs_len)
-                # defense_scores[dotvalue <= 0] = np.inf
+                defense_scores = np.nan_to_num(defense_scores)
                 best_defense_idx = np.argmin(defense_scores, axis=-1)
                 for i in range(dist.shape[0]):
                     for j in range(dist.shape[1]):
@@ -300,7 +300,7 @@ class EvaluationMatrix(object):
                 # find best defense according to defense_scores
                 defense_scores = (np.arccos(dotvalue/(self.__get_length(defense, offender)
                                                       * self.__get_length(self.RIGHT_BASKET, offender)+1e-8))+1.0)*(off2defs_len+1.0)
-                # defense_scores[dotvalue <= 0] = np.inf
+                defense_scores = np.nan_to_num(defense_scores)
                 best_defense_idx = np.argmin(defense_scores, axis=-1)
                 for i in range(dist.shape[0]):
                     for j in range(dist.shape[1]):
@@ -316,7 +316,7 @@ class EvaluationMatrix(object):
                 # find best defense according to defense_scores
                 defense_scores = (np.arccos(dotvalue/(self.__get_length(defense, offender)
                                                       * self.__get_length(self.RIGHT_BASKET, offender)+1e-4))*10.0)+off2defs_len
-                # defense_scores[dotvalue <= 0] = np.inf  # avoid nan and no need
+                defense_scores = np.nan_to_num(defense_scores)
                 best_defense_idx = np.argmin(defense_scores, axis=-1)
                 for i in range(dist.shape[0]):
                     for j in range(dist.shape[1]):
@@ -331,8 +331,8 @@ class EvaluationMatrix(object):
                 off2defs_len = self.__get_length(offender, defense)
                 # find best defense according to defense_scores
                 defense_scores = (np.arccos(dotvalue/(self.__get_length(defense, offender)
-                                                      * self.__get_length(self.RIGHT_BASKET, offender)+1e-4))+1.0)*(off2defs_len+1.0)
-                # defense_scores[dotvalue <= 0] = np.inf  # avoid nan and no need
+                                                      * self.__get_length(self.RIGHT_BASKET, offender)))+1.0)*(off2defs_len+1.0)
+                defense_scores = np.nan_to_num(defense_scores)
                 best_defense_idx = np.argmin(defense_scores, axis=-1)
                 for i in range(dist.shape[0]):
                     for j in range(dist.shape[1]):
@@ -433,11 +433,11 @@ class EvaluationMatrix(object):
             py.plot(fig, filename=os.path.join(
                 save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
 
-    def calc_hausdorff(self):
+    def calc_hausdorff(self, target_mode='without_ball'):
         """ calculate hausdorff distance between all other models
         """
         # https://github.com/mavillan/py-hausdorff
-        from hausdorff import hausdorff
+        from hausdorff import hausdorff, weighted_hausdorff
         print("\n### calc_hausdorff ###\n")
 
         def print_h_matrix(dict, h_matrix):
@@ -584,8 +584,9 @@ class EvaluationMatrix(object):
 
             if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
             heat_map_mean_table_dict = {}
+            heat_map_count_table_dict = {}
             for key, if_handle_ball in if_handle_ball_dict.items():
-                if target == 'without_ball':
+                if target_mode == 'without_ball':
                     if_handle_ball = np.logical_not(if_handle_ball)
                     # clean up unused length
                     for i in range(data.shape[0]):
@@ -613,6 +614,7 @@ class EvaluationMatrix(object):
                 heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
                 # store heat_map_mean_table
                 heat_map_mean_table_dict[key] = heat_map_mean_table
+                heat_map_count_table_dict[key] = heat_map_count_table
             # x and y
             h_matrix = []
             for key1, p in heat_map_mean_table_dict.items():
@@ -620,18 +622,22 @@ class EvaluationMatrix(object):
                 for key2, q in heat_map_mean_table_dict.items():
                     P = p.reshape(95*50)
                     Q = q.reshape(95*50)
+                    # W = heat_map_count_table_dict[key2].reshape(95*50)
                     index_to_remain = []
                     for i in range(len(P)):
                         if P[i] != 0 or Q[i] != 0:
                             index_to_remain.append(i)
                     P = P[index_to_remain]
                     Q = Q[index_to_remain]
+                    # W = W[index_to_remain]
                     idx = np.arange(len(P))
                     P = np.vstack((idx, P)).T
                     Q = np.vstack((idx, Q)).T
                     P = P.copy(order='C')
                     Q = Q.copy(order='C')
+                    # W = W.copy(order='C')
                     h_row.append(hausdorff(P, Q))
+                    # h_row.append(weighted_hausdorff(P, Q, W))
                 h_matrix.append(h_row)
             print_h_matrix(heat_map_mean_table_dict, h_matrix)
             # distance to basket
@@ -1491,7 +1497,7 @@ class EvaluationMatrix(object):
 def evaluate_new_data():
     analyze_all_noise = True
     root_path = '../data/WGAN/all_model_results/'
-    # all_data_key_list = ['cnn_wi_mul_828k']
+    # all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
     #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
     #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl', 'cnn_wi_mul_828k_nl']
@@ -1529,14 +1535,15 @@ def evaluate_new_data():
     for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
-        # evaluator.show_mean_distance(mode=mode)
+        evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_histogram_distance_by_frames(
         #     mode=mode)
         evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
         evaluator.plot_suspicious(mode=mode)
-    evaluator.calc_hausdorff()
+    evaluator.calc_hausdorff(target_mode='with_ball')
+    evaluator.calc_hausdorff(target_mode='without_ball')
 
 
 if __name__ == '__main__':
