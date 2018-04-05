@@ -438,6 +438,7 @@ class EvaluationMatrix(object):
         """
         # https://github.com/mavillan/py-hausdorff
         from hausdorff import hausdorff, weighted_hausdorff
+        from scipy.spatial.distance import directed_hausdorff
         print("\n### calc_hausdorff ###\n")
 
         def print_h_matrix(dict, h_matrix):
@@ -469,7 +470,7 @@ class EvaluationMatrix(object):
 
                 bin_size = 0.1
                 max_v = np.amax(valid_speed)
-                min_v = np.amin(valid_speed)
+                min_v = 0.0
                 num_bins = int((max_v - min_v) // bin_size) + 1
                 counter = np.zeros(shape=[num_bins, ])
                 for v in valid_speed:
@@ -492,7 +493,7 @@ class EvaluationMatrix(object):
 
             bin_size = 0.1
             max_v = np.amax(valid_speed)
-            min_v = np.amin(valid_speed)
+            min_v = 0.0
             num_bins = int((max_v - min_v) // bin_size) + 1
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_speed:
@@ -507,7 +508,8 @@ class EvaluationMatrix(object):
             for key2, Q in all_trace_speed.items():
                 P = P.copy(order='C')
                 Q = Q.copy(order='C')
-                h_row.append(hausdorff(P, Q))
+                h_row.append(directed_hausdorff(P, Q)[0])
+                # h_row.append(hausdorff(P, Q))
             h_matrix.append(h_row)
         print_h_matrix(all_trace_speed, h_matrix)
 
@@ -571,7 +573,8 @@ class EvaluationMatrix(object):
             for key2, Q in all_trace_acc.items():
                 P = P.copy(order='C')
                 Q = Q.copy(order='C')
-                h_row.append(hausdorff(P, Q))
+                h_row.append(directed_hausdorff(P, Q)[0])
+                # h_row.append(hausdorff(P, Q))
             h_matrix.append(h_row)
         print_h_matrix(all_trace_acc, h_matrix)
 
@@ -620,24 +623,18 @@ class EvaluationMatrix(object):
             for key1, p in heat_map_mean_table_dict.items():
                 h_row = []
                 for key2, q in heat_map_mean_table_dict.items():
-                    P = p.reshape(95*50)
-                    Q = q.reshape(95*50)
-                    # W = heat_map_count_table_dict[key2].reshape(95*50)
-                    index_to_remain = []
-                    for i in range(len(P)):
-                        if P[i] != 0 or Q[i] != 0:
-                            index_to_remain.append(i)
-                    P = P[index_to_remain]
-                    Q = Q[index_to_remain]
-                    # W = W[index_to_remain]
-                    idx = np.arange(len(P))
-                    P = np.vstack((idx, P)).T
-                    Q = np.vstack((idx, Q)).T
-                    P = P.copy(order='C')
-                    Q = Q.copy(order='C')
-                    # W = W.copy(order='C')
-                    h_row.append(hausdorff(P, Q))
-                    # h_row.append(weighted_hausdorff(P, Q, W))
+                    P = []
+                    for i in range(p.shape[0]):
+                        for j in range(p.shape[1]):
+                            P.append([i, j, p[i][j]])
+                    P = np.array(P)
+                    Q = []
+                    for i in range(q.shape[0]):
+                        for j in range(q.shape[1]):
+                            Q.append([i, j, q[i][j]])
+                    Q = np.array(Q)
+                    h_row.append(directed_hausdorff(P, Q)[0])                
+                    # h_row.append(hausdorff(P, Q))
                 h_matrix.append(h_row)
             print_h_matrix(heat_map_mean_table_dict, h_matrix)
             # distance to basket
@@ -669,7 +666,8 @@ class EvaluationMatrix(object):
                     Q = np.vstack((idx, Q)).T
                     P = P.copy(order='C')
                     Q = Q.copy(order='C')
-                    h_row.append(hausdorff(P, Q))
+                    h_row.append(directed_hausdorff(P, Q)[0])
+                    # h_row.append(hausdorff(P, Q))
                 h_matrix.append(h_row)
             print_h_matrix(heat_map_mean_table_dict, h_matrix)
 
@@ -699,7 +697,7 @@ class EvaluationMatrix(object):
 
                 bin_size = 0.1
                 max_v = np.amax(valid_speed)
-                min_v = np.amin(valid_speed)
+                min_v = 0.0
                 num_bins = int((max_v-min_v)//bin_size)+1
                 counter = np.zeros(shape=[num_bins, ])
                 for v in valid_speed:
@@ -739,7 +737,7 @@ class EvaluationMatrix(object):
 
             bin_size = 0.1
             max_v = np.amax(valid_speed)
-            min_v = np.amin(valid_speed)
+            min_v = 0.0
             num_bins = int((max_v-min_v)//bin_size)+1
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_speed:
@@ -1497,11 +1495,12 @@ class EvaluationMatrix(object):
 def evaluate_new_data():
     analyze_all_noise = True
     root_path = '../data/WGAN/all_model_results/'
-    # all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
+    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
     #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
     #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl', 'cnn_wi_mul_828k_nl']
-    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
+    # all_data_key_list = ['cnn_wi_mul_828k_nl',
+    #                      'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
     if analyze_all_noise:
         length = np.tile(np.load(root_path+'length.npy'), [100])
         all_data = {}
@@ -1529,22 +1528,28 @@ def evaluate_new_data():
         file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0, **all_data)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
-    evaluator.plot_histogram_vel_acc()
+    # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    for mode in DIST_MODE:
+    # for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
-        evaluator.show_mean_distance(mode=mode)
+        # evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_histogram_distance_by_frames(
         #     mode=mode)
-        evaluator.plot_mean_distance_heatmap(mode=mode)
+        # evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
-        evaluator.plot_suspicious(mode=mode)
+        # evaluator.plot_suspicious(mode=mode)
     evaluator.calc_hausdorff(target_mode='with_ball')
     evaluator.calc_hausdorff(target_mode='without_ball')
 
 
 if __name__ == '__main__':
+    # data = np.load('../data/FixedFPS5.npy')[-100:]
+    # print(data.shape)
+    # len_ = np.load('../data/FixedFPS5Length.npy')[-100:]
+    # target_data = np.concatenate([data[:, :, 0:1, :3].reshape([data.shape[0],data.shape[1], 3]), data[:, :, 1:, :2].reshape([data.shape[0],data.shape[1], 20])], axis=-1)
+    # np.save('real_data.npy', target_data)
+    # np.save('length.npy', len_)
     evaluate_new_data()
