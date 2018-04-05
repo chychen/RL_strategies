@@ -11,7 +11,7 @@ from __future__ import absolute_import
 import sys
 import numpy as np
 from sklearn.metrics import mean_squared_error
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 """
 data format:
@@ -28,25 +28,78 @@ defense_idx = range(6, 11)
 x_idx, y_idx, z_idx, player_pos_idx = range(0, 4)
 
 mse_threshold = 10
+FPS = 5
+
+
+def get_length(a, b, axis=-1):
+    vec = a-b
+    return np.sqrt(np.sum(vec*vec, axis=axis))
 
 
 def dist_squared(p0, p1):
     return (p0[0] - p1[0]) ** 2 + (p0[1] - p1[1]) ** 2
 
 
-def vis_frame(frame_data):
-    img = plt.imread("../gym_bball/envs/fullcourt.png")
-    plt.imshow(img, extent=[0.0, 93.9, 0.0, 50.0])
-    plt.scatter(frame_data[ball_idx][x_idx], frame_data[ball_idx][y_idx], c='g', marker='o')
-    for player_idx in offense_idx:
-        plt.scatter(frame_data[player_idx][x_idx], frame_data[player_idx][y_idx], c='r', marker='o')
-    for player_idx in defense_idx:
-        plt.scatter(frame_data[player_idx][x_idx], frame_data[player_idx][y_idx], c='b', marker='o')
-    plt.show()
+# def vis_frame(frame_data):
+#     img = plt.imread("../gym_bball/envs/fullcourt.png")
+#     plt.imshow(img, extent=[0.0, 93.9, 0.0, 50.0])
+#     plt.scatter(frame_data[ball_idx][x_idx], frame_data[ball_idx][y_idx], c='g', marker='o')
+#     for player_idx in offense_idx:
+#         plt.scatter(frame_data[player_idx][x_idx], frame_data[player_idx][y_idx], c='r', marker='o')
+#     for player_idx in defense_idx:
+#         plt.scatter(frame_data[player_idx][x_idx], frame_data[player_idx][y_idx], c='b', marker='o')
+#     plt.show()
+
+def get_analysis(data, data_len):
+    """
+        targets = ['ball','off','def']
+        data_analysis[targets[t_idx]]['speed_mean']
+        data_analysis[targets[t_idx]]['speed_std']
+        data_analysis[targets[t_idx]]['speed_threshold']
+    """
+    data_analysis = {}
+    targets = ['ball', 'off', 'def']
+    for t_idx in range(3):
+        data_analysis[targets[t_idx]] = {}
+        if targets[t_idx] == 'ball':
+            target = data[:, :, 0:1, :2]
+        if targets[t_idx] == 'off':
+            target = data[:, :, 1:6, :2]
+        if targets[t_idx] == 'def':
+            target = data[:, :, 6:11, :2]
+        # statistic the mean and stddev of speed and acceleration
+        speed_vec = target[:, 1:] - target[:, :-1]
+        speed = get_length(
+            target[:, 1:], target[:, :-1]) * FPS
+        acc = get_length(
+            speed_vec[:, 1:], speed_vec[:, :-1]) * FPS
+        print(acc.shape)
+        # clean up unused length
+        valid_speed = []
+        for i in range(data.shape[0]):
+            valid_speed.append(
+                speed[i, :data_len[i] - 1].reshape([-1, ]))
+        valid_speed = np.concatenate(valid_speed, axis=0)
+        data_analysis[targets[t_idx]]['speed_mean'] = np.mean(valid_speed)
+        data_analysis[targets[t_idx]]['speed_std'] = np.std(valid_speed)
+        data_analysis[targets[t_idx]]['speed_threshold'] = data_analysis[targets[t_idx]
+                                                                         ]['speed_mean'] + 3*data_analysis[targets[t_idx]]['speed_std']
+        # clean up unused length
+        valid_acc = []
+        for i in range(data.shape[0]):
+            valid_acc.append(
+                acc[i, :data_len[i] - 2].reshape([-1, ]))
+        valid_acc = np.concatenate(valid_acc, axis=0)
+        data_analysis[targets[t_idx]]['acc_mean'] = np.mean(valid_acc)
+        data_analysis[targets[t_idx]]['acc_std'] = np.std(valid_acc)
+        data_analysis[targets[t_idx]]['acc_threshold'] = data_analysis[targets[t_idx]
+                                                                       ]['acc_mean'] + 3*data_analysis[targets[t_idx]]['acc_std']
+    return data_analysis
 
 
 def main():
     frame_discontinuous_arr = []
+    exceed_threshold_arr = []
     ball_stolen_arr = []
     ball_outside_arr = []
     ball_shot_arr = []
@@ -60,6 +113,8 @@ def main():
     data_len = np.load('FPS5Length.npy')
     print(data.shape)
     print(data_len.shape)
+
+    data_analysis = get_analysis(data, data_len)
 
     # filter
     for data_idx in range(data.shape[0]):
@@ -97,12 +152,12 @@ def main():
 
                         if is_offensive:
                             return len(free_throw_line_player) == 1 and \
-                                   len(three_point_line_player) == 2 and \
-                                   len(rebound_player) == 2
+                                len(three_point_line_player) == 2 and \
+                                len(rebound_player) == 2
                         else:
                             return len(free_throw_line_player) == 0 and \
-                                   len(three_point_line_player) == 2 and \
-                                   len(rebound_player) == 3
+                                len(three_point_line_player) == 2 and \
+                                len(rebound_player) == 3
 
                     if check_player_position(offense_idx, is_offensive=True) and \
                             check_player_position(defense_idx, is_offensive=False):
@@ -122,7 +177,8 @@ def main():
             else:
                 # frame discontinuous
                 if frame_idx >= 5:
-                    mse = mean_squared_error(data[data_idx][frame_idx], data[data_idx][frame_idx - 1])
+                    mse = mean_squared_error(
+                        data[data_idx][frame_idx], data[data_idx][frame_idx - 1])
                     if mse >= mse_threshold:
                         frame_discontinuous_arr.append(data_idx)
                         break
@@ -165,15 +221,41 @@ def main():
                     for i in range(frame_idx, prev_data_len):
                         data[data_idx][i].fill(0)
                     break
-        
 
         # filter out frame length < 25 (5 seconde)
         if data_len[data_idx] <= 25:
             episode_too_short_arr.append(data_idx)
             continue
 
+        # exceed_threshold_arr
+        epi_speed = get_length(data[data_idx, 1:data_len[data_idx],
+                                    0:1, :2], data[data_idx, 0:data_len[data_idx]-1, 0:1, :2])
+        epi_speed_vec = data[data_idx, 1:data_len[data_idx], 0:1,
+                             :2] - data[data_idx, 0:data_len[data_idx]-1, 0:1, :2]
+        epi_acc = get_length(epi_speed_vec[:, 1:], epi_speed_vec[:, :-1])
+        if np.argwhere(epi_speed > data_analysis['ball']['speed_threshold']).shape[0] > 0 or np.argwhere(epi_acc > data_analysis['ball']['acc_threshold']).shape[0] > 0:
+            exceed_threshold_arr.append(data_idx)
+            continue
+        epi_speed = get_length(data[data_idx, 1:data_len[data_idx],
+                                    1:6, :2], data[data_idx, 0:data_len[data_idx]-1, 1:6, :2])
+        epi_speed_vec = data[data_idx, 1:data_len[data_idx], 1:6,
+                             :2] - data[data_idx, 0:data_len[data_idx]-1, 1:6, :2]
+        epi_acc = get_length(epi_speed_vec[:, 1:], epi_speed_vec[:, :-1])
+        if np.argwhere(epi_speed > data_analysis['ball']['speed_threshold']).shape[0] > 0 or np.argwhere(epi_acc > data_analysis['ball']['acc_threshold']).shape[0] > 0:
+            exceed_threshold_arr.append(data_idx)
+            continue
+        epi_speed = get_length(data[data_idx, 1:data_len[data_idx], 6:11, :2],
+                               data[data_idx, 0:data_len[data_idx]-1, 6:11, :2])
+        epi_speed_vec = data[data_idx, 1:data_len[data_idx], 6:11,
+                             :2] - data[data_idx, 0:data_len[data_idx]-1, 6:11, :2]
+        epi_acc = get_length(epi_speed_vec[:, 1:], epi_speed_vec[:, :-1])
+        if np.argwhere(epi_speed > data_analysis['ball']['speed_threshold']).shape[0] > 0 or np.argwhere(epi_acc > data_analysis['ball']['acc_threshold']).shape[0] > 0:
+            exceed_threshold_arr.append(data_idx)
+            continue
+
     # print preprocessed data id
     print("Data removed:")
+    input("exceed_threshold_arr: {}".format(exceed_threshold_arr))
     print("frame_discontinuous: {}", frame_discontinuous_arr)
     print("ball_stolen: {}", ball_stolen_arr)
     print("start_outside: {}", start_outside_arr)
@@ -187,8 +269,10 @@ def main():
 
     # save
     indices = range(len(data))
-    remove_indices = start_free_throw_arr + start_outside_arr + frame_discontinuous_arr + episode_too_short_arr + ball_stolen_arr
-    remain_indices = [i for j, i in enumerate(indices) if j not in remove_indices]
+    remove_indices = exceed_threshold_arr + start_free_throw_arr + start_outside_arr + \
+        frame_discontinuous_arr + episode_too_short_arr + ball_stolen_arr
+    remain_indices = [i for j, i in enumerate(
+        indices) if j not in remove_indices]
     data = data[remain_indices]
     data_len = data_len[remain_indices]
     print(data.shape)
