@@ -433,7 +433,7 @@ class EvaluationMatrix(object):
             py.plot(fig, filename=os.path.join(
                 save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
 
-    def calc_hausdorff(self, target_mode='without_ball'):
+    def calc_hausdorff(self):
         """ calculate hausdorff distance between all other models
         """
         # https://github.com/mavillan/py-hausdorff
@@ -579,97 +579,98 @@ class EvaluationMatrix(object):
         print_h_matrix(all_trace_acc, h_matrix)
 
         # distance
-        for mode in DIST_MODE:
-            print("\nDistance (mode={})".format(mode))
-            all_dist_dict = {}
-            for key, data in self._all_data_dict.items():
-                all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
+        for target_mode in ['with_ball', 'without_ball']:
+            for mode in DIST_MODE:
+                print("\nDistance (mode={}) : {}".format(mode, target_mode))
+                all_dist_dict = {}
+                for key, data in self._all_data_dict.items():
+                    all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
 
-            if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
-            heat_map_mean_table_dict = {}
-            heat_map_count_table_dict = {}
-            for key, if_handle_ball in if_handle_ball_dict.items():
-                if target_mode == 'without_ball':
-                    if_handle_ball = np.logical_not(if_handle_ball)
-                    # clean up unused length
-                    for i in range(data.shape[0]):
-                        if_handle_ball[i, self._length[i]:] = False
-                data = self._all_data_dict[key]
-                dist = all_dist_dict[key]
-                offense = np.reshape(data[:, :, 3:13], [
-                    data.shape[0], data.shape[1], 5, 2])
-                heat_map_sum_table = np.zeros(shape=[50, 95], dtype=float)
-                heat_map_count_table = np.zeros(shape=[50, 95], dtype=float)
-                lookup = np.where(if_handle_ball)
-                off_wi_ball_pos = offense[lookup[0],
-                                          lookup[1], lookup[2]].reshape([-1, 2])
-                dist_lookup = dist[lookup[0], lookup[1], lookup[2]]
-                for i, pos in enumerate(off_wi_ball_pos):
-                    pos_x, pos_y = pos
-                    if pos_x < 0 or pos_x > 95:
-                        continue
-                    if pos_y < 0 or pos_y > 50:
-                        continue
-                    heat_map_sum_table[int(pos_y), int(
-                        pos_x)] += dist_lookup[i]
-                    heat_map_count_table[int(pos_y), int(pos_x)] += 1.0
-                heat_map_mean_table = heat_map_sum_table / heat_map_count_table
-                heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
-                # store heat_map_mean_table
-                heat_map_mean_table_dict[key] = heat_map_mean_table
-                heat_map_count_table_dict[key] = heat_map_count_table
-            # x and y
-            h_matrix = []
-            for key1, p in heat_map_mean_table_dict.items():
-                h_row = []
-                for key2, q in heat_map_mean_table_dict.items():
-                    P = []
-                    for i in range(p.shape[0]):
-                        for j in range(p.shape[1]):
-                            P.append([i, j, p[i][j]])
-                    P = np.array(P)
-                    Q = []
-                    for i in range(q.shape[0]):
-                        for j in range(q.shape[1]):
-                            Q.append([i, j, q[i][j]])
-                    Q = np.array(Q)
-                    h_row.append(directed_hausdorff(P, Q)[0])                
-                    # h_row.append(hausdorff(P, Q))
-                h_matrix.append(h_row)
-            print_h_matrix(heat_map_mean_table_dict, h_matrix)
-            # distance to basket
-            h_matrix = []
-            for key1, p in heat_map_mean_table_dict.items():
-                h_row = []
-                for key2, q in heat_map_mean_table_dict.items():
-                    # transform to distance to basket coordinate
-                    basket_x = 94 - 5.25
-                    basket_y = 25
-                    P = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
-                    Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
-                    for i in range(50):
-                        for j in range(95):
-                            if j < 95/2:
-                                continue
-                            dist2basket = int(
-                                np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
-                            P[dist2basket] += p[i][j]
-                            Q[dist2basket] += q[i][j]
-                    index_to_remain = []
-                    for i in range(len(P)):
-                        if P[i] != 0 or Q[i] != 0:
-                            index_to_remain.append(i)
-                    P = P[index_to_remain]
-                    Q = Q[index_to_remain]
-                    idx = np.arange(len(P))
-                    P = np.vstack((idx, P)).T
-                    Q = np.vstack((idx, Q)).T
-                    P = P.copy(order='C')
-                    Q = Q.copy(order='C')
-                    h_row.append(directed_hausdorff(P, Q)[0])
-                    # h_row.append(hausdorff(P, Q))
-                h_matrix.append(h_row)
-            print_h_matrix(heat_map_mean_table_dict, h_matrix)
+                if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
+                heat_map_mean_table_dict = {}
+                heat_map_count_table_dict = {}
+                for key, if_handle_ball in if_handle_ball_dict.items():
+                    if target_mode == 'without_ball':
+                        if_handle_ball = np.logical_not(if_handle_ball)
+                        # clean up unused length
+                        for i in range(data.shape[0]):
+                            if_handle_ball[i, self._length[i]:] = False
+                    data = self._all_data_dict[key]
+                    dist = all_dist_dict[key]
+                    offense = np.reshape(data[:, :, 3:13], [
+                        data.shape[0], data.shape[1], 5, 2])
+                    heat_map_sum_table = np.zeros(shape=[50, 95], dtype=float)
+                    heat_map_count_table = np.zeros(shape=[50, 95], dtype=float)
+                    lookup = np.where(if_handle_ball)
+                    off_wi_ball_pos = offense[lookup[0],
+                                            lookup[1], lookup[2]].reshape([-1, 2])
+                    dist_lookup = dist[lookup[0], lookup[1], lookup[2]]
+                    for i, pos in enumerate(off_wi_ball_pos):
+                        pos_x, pos_y = pos
+                        if pos_x < 0 or pos_x > 95:
+                            continue
+                        if pos_y < 0 or pos_y > 50:
+                            continue
+                        heat_map_sum_table[int(pos_y), int(
+                            pos_x)] += dist_lookup[i]
+                        heat_map_count_table[int(pos_y), int(pos_x)] += 1.0
+                    heat_map_mean_table = heat_map_sum_table / heat_map_count_table
+                    heat_map_mean_table = np.nan_to_num(heat_map_mean_table)
+                    # store heat_map_mean_table
+                    heat_map_mean_table_dict[key] = heat_map_mean_table
+                    heat_map_count_table_dict[key] = heat_map_count_table
+                # x and y
+                h_matrix = []
+                for key1, p in heat_map_mean_table_dict.items():
+                    h_row = []
+                    for key2, q in heat_map_mean_table_dict.items():
+                        P = []
+                        for i in range(p.shape[0]):
+                            for j in range(p.shape[1]):
+                                P.append([i, j, p[i][j]])
+                        P = np.array(P)
+                        Q = []
+                        for i in range(q.shape[0]):
+                            for j in range(q.shape[1]):
+                                Q.append([i, j, q[i][j]])
+                        Q = np.array(Q)
+                        h_row.append(directed_hausdorff(P, Q)[0])                
+                        # h_row.append(hausdorff(P, Q))
+                    h_matrix.append(h_row)
+                print_h_matrix(heat_map_mean_table_dict, h_matrix)
+                # distance to basket
+                h_matrix = []
+                for key1, p in heat_map_mean_table_dict.items():
+                    h_row = []
+                    for key2, q in heat_map_mean_table_dict.items():
+                        # transform to distance to basket coordinate
+                        basket_x = 94 - 5.25
+                        basket_y = 25
+                        P = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
+                        Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
+                        for i in range(50):
+                            for j in range(95):
+                                if j < 95/2:
+                                    continue
+                                dist2basket = int(
+                                    np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
+                                P[dist2basket] += p[i][j]
+                                Q[dist2basket] += q[i][j]
+                        index_to_remain = []
+                        for i in range(len(P)):
+                            if P[i] != 0 or Q[i] != 0:
+                                index_to_remain.append(i)
+                        P = P[index_to_remain]
+                        Q = Q[index_to_remain]
+                        idx = np.arange(len(P))
+                        P = np.vstack((idx, P)).T
+                        Q = np.vstack((idx, Q)).T
+                        P = P.copy(order='C')
+                        Q = Q.copy(order='C')
+                        h_row.append(directed_hausdorff(P, Q)[0])
+                        # h_row.append(hausdorff(P, Q))
+                    h_matrix.append(h_row)
+                print_h_matrix(heat_map_mean_table_dict, h_matrix)
 
     def plot_histogram_vel_acc(self):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
@@ -1541,8 +1542,7 @@ def evaluate_new_data():
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
         # evaluator.plot_suspicious(mode=mode)
-    evaluator.calc_hausdorff(target_mode='with_ball')
-    evaluator.calc_hausdorff(target_mode='without_ball')
+    evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
