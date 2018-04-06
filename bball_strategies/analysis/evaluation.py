@@ -584,7 +584,8 @@ class EvaluationMatrix(object):
                 print("\nDistance (mode={}) : {}".format(mode, target_mode))
                 all_dist_dict = {}
                 for key, data in self._all_data_dict.items():
-                    all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
+                    all_dist_dict[key] = self.__evalute_distance(
+                        data, mode=mode)
 
                 if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
                 heat_map_mean_table_dict = {}
@@ -600,10 +601,11 @@ class EvaluationMatrix(object):
                     offense = np.reshape(data[:, :, 3:13], [
                         data.shape[0], data.shape[1], 5, 2])
                     heat_map_sum_table = np.zeros(shape=[50, 95], dtype=float)
-                    heat_map_count_table = np.zeros(shape=[50, 95], dtype=float)
+                    heat_map_count_table = np.zeros(
+                        shape=[50, 95], dtype=float)
                     lookup = np.where(if_handle_ball)
                     off_wi_ball_pos = offense[lookup[0],
-                                            lookup[1], lookup[2]].reshape([-1, 2])
+                                              lookup[1], lookup[2]].reshape([-1, 2])
                     dist_lookup = dist[lookup[0], lookup[1], lookup[2]]
                     for i, pos in enumerate(off_wi_ball_pos):
                         pos_x, pos_y = pos
@@ -634,7 +636,7 @@ class EvaluationMatrix(object):
                             for j in range(q.shape[1]):
                                 Q.append([i, j, q[i][j]])
                         Q = np.array(Q)
-                        h_row.append(directed_hausdorff(P, Q)[0])                
+                        h_row.append(directed_hausdorff(P, Q)[0])
                         # h_row.append(hausdorff(P, Q))
                     h_matrix.append(h_row)
                 print_h_matrix(heat_map_mean_table_dict, h_matrix)
@@ -1446,7 +1448,7 @@ class EvaluationMatrix(object):
         #     handle_ball_dist_dict[key] = handle_ball_dist_dict[key] - handle_ball_dist_dict["real_data"]
         if if_norm:
             max_susp_score = np.max([np.max(data)
-                                 for key, data in handle_ball_dist_dict.items()])
+                                     for key, data in handle_ball_dist_dict.items()])
         else:
             max_susp_score = 1
 
@@ -1460,7 +1462,7 @@ class EvaluationMatrix(object):
             for key, dist in handle_ball_dist_dict.items():
                 y = dist[epi_idx, :epi_len]
                 susp = np.array([np.sum(y[win_idx:win_idx + WIN_SIZE])
-                        for win_idx in range(epi_len - WIN_SIZE + 1)])
+                                 for win_idx in range(epi_len - WIN_SIZE + 1)])
                 normed = (susp/max_susp_score)/WIN_SIZE
                 if vis:
                     trace = go.Scatter(
@@ -1488,23 +1490,104 @@ class EvaluationMatrix(object):
         for i in range(data.shape[0]):
             total_frames += self._length[i]
 
-        msg = '\n### plot_suspicious, mode=\'{}\' ###\n'.format(mode)
+        msg = '\n### plot_suspicious, mode=\'{}\', epsilon=\'{}\', window_size=\'{}\' ###\n'.format(
+            mode, EPSILON, WIN_SIZE)
         for key in self._all_data_dict:
             msg += '{0} dataset:\n\tpeak_freqency:{1:5.4f}\n'.format(
                 key, peak_counter[key]/total_frames)
         print(msg)
         self._report_file.write(msg)
 
+    def plot_linechart_suspicious(self, mode='DISTANCE'):
+        """ Plot score of suspicious score.
+            The suspicious score is calculated by summing all distances to
+            closest defender within a window of frame.
+        """
+        # mkdir
+        save_path = os.path.join(
+            self._file_name, 'suspicous_line_chart' + mode)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        all_dist_dict = {}
+        for key, data in self._all_data_dict.items():
+            all_dist_dict[key] = self.__evalute_distance(data, mode=mode)
+        if_handle_ball_dict = self.__get_if_handle_ball(mode=mode)
+        handle_ball_dist_dict = {}
+        for key in all_dist_dict:
+            # offense pos
+            data = self._all_data_dict['real_data']
+            offense = np.reshape(data[:, :, 3:13], [
+                data.shape[0], data.shape[1], 5, 2])
+            # defender's distance to offense
+            dist = all_dist_dict[key]
+            if_handle_ball = if_handle_ball_dict[key]
+            handle_ball_dist = np.zeros((dist.shape[0], dist.shape[1], ))
+            for epi_idx in range(self._num_episodes):
+                epi_len = self._length[epi_idx]
+                for frame_idx in range(epi_len):
+                    handle_ball_p_idx, = np.where(
+                        if_handle_ball[epi_idx, frame_idx] == True)
+                    # if possible to shoot 3pt
+                    # handle_ball_p_idx might be 0 or >1
+                    if_handle_ball_p_close_3pt_line = True
+                    if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) == 1:
+                        handle_ball_p_pos = offense[epi_idx,
+                                                    frame_idx, handle_ball_p_idx][0]
+                        len_dist2basket = self.__get_length(
+                            handle_ball_p_pos, self.RIGHT_BASKET)
+                        if len_dist2basket > self.THREEPT_LEN_BASKET and handle_ball_p_pos[0] < self.THREEPT_BOTTOM_LINE_X:
+                            if_handle_ball_p_close_3pt_line = False
+                    if if_handle_ball_p_close_3pt_line:
+                        handle_ball_dist[epi_idx, frame_idx] = \
+                            np.max(dist[epi_idx, frame_idx, handle_ball_p_idx]) \
+                            if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
+                    else:
+                        handle_ball_dist[epi_idx, frame_idx] = 0.0
+            handle_ball_dist_dict[key] = handle_ball_dist
+
+        peak_counter = {}
+        for key in self._all_data_dict:
+            peak_counter[key] = 0
+        # vis
+        total_frames = 0
+        for i in range(data.shape[0]):
+            total_frames += self._length[i]
+        all_trace = []
+        for key, dist in handle_ball_dist_dict.items():
+            freq = []
+            for epsilon in range(1, 11):
+                suspicious = dist >= epsilon
+                # clean up unused length
+                for i in range(dist.shape[0]):
+                    suspicious[:, self._length[i]:] = False
+                counter = np.count_nonzero(suspicious)
+                freq.append(counter/total_frames * 100.0)
+            trace = go.Scatter(
+                x=np.arange(1,11),
+                y=freq,
+                name=key
+            )
+            all_trace.append(trace)
+        layout = go.Layout(
+            title='Frequency of Occurrence of Wide Open',
+            xaxis=dict(title='Epsilon (feet)'),
+            yaxis=dict(title='Frequency (%)')
+        )
+        fig = go.Figure(data=all_trace, layout=layout)
+        py.plot(fig, filename=os.path.join(
+            save_path, 'Frequency of Occurrence of Wide Open.html'), auto_open=False)
+
 
 def evaluate_new_data():
-    analyze_all_noise = True
+    analyze_all_noise = False
     root_path = '../data/WGAN/all_model_results/'
-    # all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
+    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
     #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
     #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl', 'cnn_wi_mul_828k_nl']
-    all_data_key_list = ['cnn_wi_mul_828k_nl',
-                         'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
+    # all_data_key_list = ['cnn_wi_mul_828k_nl',
+    #                      'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
     if analyze_all_noise:
         length = np.tile(np.load(root_path+'length.npy'), [100])
         all_data = {}
@@ -1534,22 +1617,21 @@ def evaluate_new_data():
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
+    # evaluator.plot_suspicious(mode='DISTANCE', EPSILON=3.28)
+    # evaluator.plot_suspicious(mode='THETA_MUL_SCORE', EPSILON=4.28)
     # for mode in DIST_MODE:
-        # evaluator.plot_linechart_distance_by_frames(
-        #     mode=mode)
-        # evaluator.plot_histogram_distance_by_frames(
-        #     mode=mode)
-        # evaluator.vis_and_analysis_by_episode(
-        #     episode_idx=10, mode=mode)
+    # evaluator.plot_linechart_distance_by_frames(
+    #     mode=mode)
+    # evaluator.plot_histogram_distance_by_frames(
+    #     mode=mode)
+    # evaluator.vis_and_analysis_by_episode(
+    #     episode_idx=10, mode=mode)
     for mode in DIST_MODE:
-        evaluator.show_mean_distance(mode=mode)
-        evaluator.plot_mean_distance_heatmap(mode=mode)
-    for episolon in range(10):
-        for win_size in range(1, 21, 2):
-            evaluator.plot_suspicious(mode='DISTANCE', EPSILON=episolon, WIN_SIZE=win_size)
-            evaluator.plot_suspicious(mode='THETA_MUL_SCORE', EPSILON=episolon, WIN_SIZE=win_size)
-    evaluator.plot_histogram_vel_acc()
-    evaluator.calc_hausdorff()
+        # evaluator.show_mean_distance(mode=mode)
+        # evaluator.plot_mean_distance_heatmap(mode=mode)
+        evaluator.plot_linechart_suspicious(mode=mode)
+    # evaluator.plot_histogram_vel_acc()
+    # evaluator.calc_hausdorff()
 
 
 if __name__ == '__main__':
