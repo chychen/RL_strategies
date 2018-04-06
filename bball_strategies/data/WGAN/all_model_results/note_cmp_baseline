@@ -27,5 +27,9 @@ http://140.113.210.22:6007:without open shot penalty, without latent penalty, va
 http://140.113.210.4:6126 :with open shot penalty=(theta+1)*(length+1), no latent peanlty
 	wi_no_latent/checkpoints/model.ckpt-598681
 	cnn_wi_mul_598k_nl
-
+	wi_no_latent/checkpoints/model.ckpt-828981
+	cnn_wi_mul_828k_nl
+http://140.113.210.4:6127 : 
+with too close penalty and with open shot penalty=(theta+1)*(length+1), no latent peanlty
+	
 
