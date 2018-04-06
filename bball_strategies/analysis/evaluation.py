@@ -156,8 +156,8 @@ class EvaluationMatrix(object):
             wo_mean = np.mean(dist[indices])
             wo_std = np.std(dist[indices])
             # show
-            show_msg += '\'{0}\' dataset\n'.format(key) + '-- wi ball:\tmean={0:4.2f},\tstddev={1:4.2f}\n'.format(
-                wi_mean, wi_std) + '-- wo ball:\tmean={0:4.2f},\tstddev={1:4.2f}\n'.format(wo_mean, wo_std)
+            show_msg += '\'{0}\' dataset\n'.format(key) + '-- wi ball:\tmean={0:6.4f},\tstddev={1:6.4f}\n'.format(
+                wi_mean, wi_std) + '-- wo ball:\tmean={0:6.4f},\tstddev={1:6.4f}\n'.format(wo_mean, wo_std)
         print(show_msg)
         self._report_file.write(show_msg)
 
@@ -1495,12 +1495,12 @@ class EvaluationMatrix(object):
 def evaluate_new_data():
     analyze_all_noise = True
     root_path = '../data/WGAN/all_model_results/'
-    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
+    # all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
     #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
     #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl', 'cnn_wi_mul_828k_nl']
-    # all_data_key_list = ['cnn_wi_mul_828k_nl',
-    #                      'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
+    all_data_key_list = ['cnn_wi_mul_828k_nl',
+                         'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
     if analyze_all_noise:
         length = np.tile(np.load(root_path+'length.npy'), [100])
         all_data = {}
@@ -1531,18 +1531,18 @@ def evaluate_new_data():
     # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    # for mode in DIST_MODE:
+    for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
-        # evaluator.show_mean_distance(mode=mode)
+        evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_histogram_distance_by_frames(
         #     mode=mode)
         # evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
         # evaluator.plot_suspicious(mode=mode)
-    evaluator.calc_hausdorff(target_mode='with_ball')
-    evaluator.calc_hausdorff(target_mode='without_ball')
+    # evaluator.calc_hausdorff(target_mode='with_ball')
+    # evaluator.calc_hausdorff(target_mode='without_ball')
 
 
 if __name__ == '__main__':
