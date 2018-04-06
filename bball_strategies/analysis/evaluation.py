@@ -1395,7 +1395,7 @@ class EvaluationMatrix(object):
         # evaluator.plot_histogram_distance_by_frames(
         #     mode='THETA_ADD_SCORE')
 
-    def plot_suspicious(self, mode='DISTANCE', WIN_SIZE=10, EPSILON=0.33):
+    def plot_suspicious(self, mode='DISTANCE', WIN_SIZE=10, EPSILON=3.28, if_norm=False, vis=False):
         """ Plot score of suspicious score.
             The suspicious score is calculated by summing all distances to
             closest defender within a window of frame.
@@ -1444,9 +1444,11 @@ class EvaluationMatrix(object):
 
         # for key, data in all_dist_dict.items():
         #     handle_ball_dist_dict[key] = handle_ball_dist_dict[key] - handle_ball_dist_dict["real_data"]
-
-        max_susp_score = np.max([np.max(data)
+        if if_norm:
+            max_susp_score = np.max([np.max(data)
                                  for key, data in handle_ball_dist_dict.items()])
+        else:
+            max_susp_score = 1
 
         peak_counter = {}
         for key in self._all_data_dict:
@@ -1460,27 +1462,28 @@ class EvaluationMatrix(object):
                 susp = [np.sum(y[win_idx:win_idx + WIN_SIZE])
                         for win_idx in range(epi_len - WIN_SIZE + 1)]
                 normed = (susp/max_susp_score)/WIN_SIZE
-                trace = go.Scatter(
-                    x=np.arange(epi_len - WIN_SIZE + 1) /
-                    self.FPS + WIN_SIZE / self.FPS / 2,
-                    y=normed,
-                    name=key,
-                )
-                all_trace.append(trace)
+                if vis:
+                    trace = go.Scatter(
+                        x=np.arange(epi_len - WIN_SIZE + 1) /
+                        self.FPS + WIN_SIZE / self.FPS / 2,
+                        y=normed,
+                        name=key,
+                    )
+                    all_trace.append(trace)
                 # count suspicous peak
                 for v in normed:
                     if v > EPSILON:
                         peak_counter[key] += 1
-
-            layout = go.Layout(
-                title='Suspicious',
-                barmode='overlay',
-                xaxis=dict(title='time (sec)'),
-                yaxis=dict(title='suspicious score')
-            )
-            fig = go.Figure(data=all_trace, layout=layout)
-            py.plot(fig, filename=os.path.join(
-                save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
+            if vis:
+                layout = go.Layout(
+                    title='Suspicious',
+                    barmode='overlay',
+                    xaxis=dict(title='time (sec)'),
+                    yaxis=dict(title='suspicious score')
+                )
+                fig = go.Figure(data=all_trace, layout=layout)
+                py.plot(fig, filename=os.path.join(
+                    save_path, 'epi_{}.html'.format(epi_idx)), auto_open=False)
         total_frames = 0
         for i in range(data.shape[0]):
             total_frames += self._length[i]
@@ -1529,19 +1532,23 @@ def evaluate_new_data():
         file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0, **all_data)
     # evaluator.show_freq_of_valid_defense(RADIUS=10.0, THETA=10.0)
     # evaluator.show_overlap_freq(OVERLAP_RADIUS=1.0, interp_flag=False)
-    # evaluator.plot_histogram_vel_acc()
     # evaluator.show_best_match()
     # evaluator.show_freq_heatmap()
-    for mode in DIST_MODE:
+    # for mode in DIST_MODE:
         # evaluator.plot_linechart_distance_by_frames(
         #     mode=mode)
-        evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_histogram_distance_by_frames(
         #     mode=mode)
-        # evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.vis_and_analysis_by_episode(
         #     episode_idx=10, mode=mode)
-        # evaluator.plot_suspicious(mode=mode)
+    for mode in DIST_MODE:
+        evaluator.show_mean_distance(mode=mode)
+        evaluator.plot_mean_distance_heatmap(mode=mode)
+    for episolon in range(10):
+        for win_size in range(1, 21, 2):
+            evaluator.plot_suspicious(mode='DISTANCE', EPSILON=episolon, WIN_SIZE=win_size)
+            evaluator.plot_suspicious(mode='THETA_MUL_SCORE', EPSILON=episolon, WIN_SIZE=win_size)
+    evaluator.plot_histogram_vel_acc()
     evaluator.calc_hausdorff()
 
 
