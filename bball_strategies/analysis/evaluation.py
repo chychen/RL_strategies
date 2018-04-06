@@ -1459,8 +1459,8 @@ class EvaluationMatrix(object):
             epi_len = self._length[epi_idx]
             for key, dist in handle_ball_dist_dict.items():
                 y = dist[epi_idx, :epi_len]
-                susp = [np.sum(y[win_idx:win_idx + WIN_SIZE])
-                        for win_idx in range(epi_len - WIN_SIZE + 1)]
+                susp = np.array([np.sum(y[win_idx:win_idx + WIN_SIZE])
+                        for win_idx in range(epi_len - WIN_SIZE + 1)])
                 normed = (susp/max_susp_score)/WIN_SIZE
                 if vis:
                     trace = go.Scatter(
