@@ -1498,14 +1498,18 @@ class EvaluationMatrix(object):
         print(msg)
         self._report_file.write(msg)
 
-    def plot_linechart_suspicious(self, mode='DISTANCE'):
+    def plot_linechart_suspicious(self, mode='DISTANCE', judge_close_3pt=True):
         """ Plot score of suspicious score.
             The suspicious score is calculated by summing all distances to
             closest defender within a window of frame.
         """
         # mkdir
-        save_path = os.path.join(
-            self._file_name, 'suspicous_line_chart' + mode)
+        if judge_close_3pt:
+            save_path = os.path.join(
+                self._file_name, 'suspicous_line_chart_{}_wi3pt'.format(mode))
+        else:
+            save_path = os.path.join(
+                self._file_name, 'suspicous_line_chart_{}_wo3pt'.format(mode))
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
@@ -1528,20 +1532,17 @@ class EvaluationMatrix(object):
                 for frame_idx in range(epi_len):
                     handle_ball_p_idx, = np.where(
                         if_handle_ball[epi_idx, frame_idx] == True)
-                    # if possible to shoot 3pt
                     # handle_ball_p_idx might be 0 or >1
-                    if_handle_ball_p_close_3pt_line = True
-                    if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) == 1:
-                        handle_ball_p_pos = offense[epi_idx,
-                                                    frame_idx, handle_ball_p_idx][0]
-                        len_dist2basket = self.__get_length(
-                            handle_ball_p_pos, self.RIGHT_BASKET)
-                        if len_dist2basket > self.THREEPT_LEN_BASKET and handle_ball_p_pos[0] < self.THREEPT_BOTTOM_LINE_X:
-                            if_handle_ball_p_close_3pt_line = False
-                    if if_handle_ball_p_close_3pt_line:
+                    if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0:
                         handle_ball_dist[epi_idx, frame_idx] = \
-                            np.max(dist[epi_idx, frame_idx, handle_ball_p_idx]) \
-                            if len(dist[epi_idx, frame_idx, handle_ball_p_idx]) > 0 else 0.0
+                            np.max(dist[epi_idx, frame_idx, handle_ball_p_idx])
+                        if judge_close_3pt:
+                            handle_ball_p_pos = offense[epi_idx,
+                                                        frame_idx, handle_ball_p_idx][0]
+                            len_dist2basket = self.__get_length(
+                                handle_ball_p_pos, self.RIGHT_BASKET)
+                            if len_dist2basket > self.THREEPT_LEN_BASKET and handle_ball_p_pos[0] < self.THREEPT_BOTTOM_LINE_X:
+                                handle_ball_dist[epi_idx, frame_idx] = 0.0
                     else:
                         handle_ball_dist[epi_idx, frame_idx] = 0.0
             handle_ball_dist_dict[key] = handle_ball_dist
@@ -1560,7 +1561,7 @@ class EvaluationMatrix(object):
                 suspicious = dist >= epsilon
                 # clean up unused length
                 for i in range(dist.shape[0]):
-                    suspicious[:, self._length[i]:] = False
+                    suspicious[i, self._length[i]:] = False
                 counter = np.count_nonzero(suspicious)
                 freq.append(counter/total_frames * 100.0)
             trace = go.Scatter(
@@ -1580,14 +1581,14 @@ class EvaluationMatrix(object):
 
 
 def evaluate_new_data():
-    analyze_all_noise = False
+    analyze_all_noise = True
     root_path = '../data/WGAN/all_model_results/'
-    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
+    # all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
     #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
     #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl', 'cnn_wi_mul_828k_nl']
-    # all_data_key_list = ['cnn_wi_mul_828k_nl',
-    #                      'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
+    all_data_key_list = ['cnn_wi_mul_828k_nl',
+                         'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k']
     if analyze_all_noise:
         length = np.tile(np.load(root_path+'length.npy'), [100])
         all_data = {}
@@ -1629,7 +1630,8 @@ def evaluate_new_data():
     for mode in DIST_MODE:
         # evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_mean_distance_heatmap(mode=mode)
-        evaluator.plot_linechart_suspicious(mode=mode)
+        evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=True)
+        evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=False)
     # evaluator.plot_histogram_vel_acc()
     # evaluator.calc_hausdorff()
 
