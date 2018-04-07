@@ -1581,7 +1581,7 @@ class EvaluationMatrix(object):
 
 
 def evaluate_new_data():
-    analyze_all_noise = True
+    analyze_all_noise = False
     root_path = '../data/WGAN/all_model_results/'
     # all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
@@ -1620,18 +1620,18 @@ def evaluate_new_data():
     # evaluator.show_freq_heatmap()
     # evaluator.plot_suspicious(mode='DISTANCE', EPSILON=3.28)
     # evaluator.plot_suspicious(mode='THETA_MUL_SCORE', EPSILON=4.28)
-    # for mode in DIST_MODE:
+    for mode in DIST_MODE:
     # evaluator.plot_linechart_distance_by_frames(
     #     mode=mode)
     # evaluator.plot_histogram_distance_by_frames(
     #     mode=mode)
-    # evaluator.vis_and_analysis_by_episode(
-    #     episode_idx=10, mode=mode)
-    for mode in DIST_MODE:
+        evaluator.vis_and_analysis_by_episode(
+            episode_idx=10, mode=mode)
+    # for mode in DIST_MODE:
         # evaluator.show_mean_distance(mode=mode)
         # evaluator.plot_mean_distance_heatmap(mode=mode)
-        evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=True)
-        evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=False)
+        # evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=True)
+        # evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=False)
     # evaluator.plot_histogram_vel_acc()
     # evaluator.calc_hausdorff()
 
