@@ -1636,6 +1636,43 @@ def evaluate_new_data():
     # evaluator.calc_hausdorff()
 
 
+
+def evaluate_diff_iterations():
+    file_name = 'cnn_wi_mul_nl_ALL_K/'
+    if os.path.exists(file_name):
+        ans = input('"%s" will be removed!! are you sure (y/N)? ' % file_name)
+        if ans == 'Y' or ans == 'y':
+            # when not restore, remove follows (old) for new training
+            shutil.rmtree(file_name)
+            print('rm -rf "%s" complete!' % file_name)
+
+    analyze_all_noise = False
+    root_path = '../data/WGAN/'+ file_name
+    all_data = {}
+    length = None
+    for filename in os.listdir(root_path):
+        if filename.endswith('.npy'):
+            if analyze_all_noise:
+                length = np.tile(np.load(root_path+'length.npy'), [100])
+                all_data['real_data'] = np.tile(
+                    np.load(root_path+'real_data.npy'), [100, 1, 1])
+            else:
+                length = np.load(root_path+'length.npy')
+                all_data['real_data'] = np.load(root_path+'real_data.npy')
+        else:
+            if analyze_all_noise:
+                all_data[filename] = np.load(
+                    root_path+filename+'/results_A_fake_B.npy').reshape([100*100, 235, 23])
+            else:
+                all_data[filename] = np.load(
+                    root_path+filename+'/results_A_fake_B.npy')[0]
+    evaluator = EvaluationMatrix(
+        file_name=file_name, length=length, FPS=5, FORMULA_RADIUS=5.0, **all_data)
+    for mode in DIST_MODE:
+        evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=True)
+        evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=False)
+    evaluator.plot_histogram_vel_acc()
+    
 if __name__ == '__main__':
     # data = np.load('../data/FixedFPS5.npy')[-100:]
     # print(data.shape)
@@ -1643,4 +1680,7 @@ if __name__ == '__main__':
     # target_data = np.concatenate([data[:, :, 0:1, :3].reshape([data.shape[0],data.shape[1], 3]), data[:, :, 1:, :2].reshape([data.shape[0],data.shape[1], 20])], axis=-1)
     # np.save('real_data.npy', target_data)
     # np.save('length.npy', len_)
-    evaluate_new_data()
+    
+    # evaluate_new_data()
+
+    evaluate_diff_iterations()
