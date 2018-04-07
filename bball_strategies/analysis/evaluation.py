@@ -78,6 +78,8 @@ class EvaluationMatrix(object):
         # if x > self.bottom_3pt_line_x, player is ready to shoot 3pt
         self.THREEPT_BOTTOM_LINE_X = 94-14
         self.FPS = FPS
+        self.SPEED_LIMITATION = 40.0  # for speed and acceleration
+        self.ACC_LIMITATION = 20.0  # for speed and acceleration
 
         self._file_name = file_name
         self._all_data_dict = kwargs
@@ -449,37 +451,13 @@ class EvaluationMatrix(object):
             for i, (key, data) in enumerate(dict.items()):
                 print("{:>20}".format(key), end="")
                 for j, (key2, data2) in enumerate(dict.items()):
-                    print("{:>20.2f}".format(h_matrix[i][j]), end="")
+                    print("{:>20.6f}".format(h_matrix[i][j]), end="")
                 print("")
 
         # speed
         print("\nSpeed")
         all_trace_speed = {}
         for key, data in self._all_data_dict.items():
-            if key == 'real_data':  # vis offense tooooooo
-                target = np.reshape(data[:, :, 3:13], [
-                    data.shape[0], data.shape[1], 5, 2])
-                speed = self.__get_length(
-                    target[:, 1:], target[:, :-1]) * self.FPS
-                # clean up unused length
-                valid_speed = []
-                for i in range(data.shape[0]):
-                    valid_speed.append(
-                        speed[i, :self._length[i] - 1].reshape([-1, ]))
-                valid_speed = np.concatenate(valid_speed, axis=0)
-
-                bin_size = 0.1
-                max_v = np.amax(valid_speed)
-                min_v = 0.0
-                num_bins = int((max_v - min_v) // bin_size) + 1
-                counter = np.zeros(shape=[num_bins, ])
-                for v in valid_speed:
-                    counter[int((v - min_v) // bin_size)] += 1
-                all_counts = np.sum(counter)
-                all_trace_speed[key] = np.vstack(
-                    (np.array([i * bin_size for i in range(num_bins)]),
-                     counter/all_counts)).T
-
             target = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
             speed = self.__get_length(
@@ -490,6 +468,8 @@ class EvaluationMatrix(object):
                 valid_speed.append(
                     speed[i, :self._length[i] - 1].reshape([-1, ]))
             valid_speed = np.concatenate(valid_speed, axis=0)
+            # remove outlier
+            valid_speed = valid_speed[valid_speed<self.SPEED_LIMITATION]
 
             bin_size = 0.1
             max_v = np.amax(valid_speed)
@@ -499,17 +479,18 @@ class EvaluationMatrix(object):
             for v in valid_speed:
                 counter[int((v - min_v) // bin_size)] += 1
             all_counts = np.sum(counter)
-            all_trace_speed[key] = np.vstack(
-                (np.array([i * bin_size for i in range(num_bins)]),
-                 counter/all_counts)).T
+            data_ = []
+            for i in range(num_bins):
+                data_.append([i*bin_size, counter[i]/all_counts*100.0])
+            all_trace_speed[key] = np.array(data_)
         h_matrix = []
         for key1, P in all_trace_speed.items():
             h_row = []
             for key2, Q in all_trace_speed.items():
                 P = P.copy(order='C')
                 Q = Q.copy(order='C')
-                h_row.append(directed_hausdorff(P, Q)[0])
-                # h_row.append(hausdorff(P, Q))
+                #h_row.append(max(directed_hausdorff(P, Q)[0],directed_hausdorff(Q, P)[0]))
+                h_row.append(hausdorff(P, Q))
             h_matrix.append(h_row)
         print_h_matrix(all_trace_speed, h_matrix)
 
@@ -517,32 +498,6 @@ class EvaluationMatrix(object):
         print("\nAcc")
         all_trace_acc = {}
         for key, data in self._all_data_dict.items():
-            if key == 'real_data':  # vis offense tooooooo
-                target = np.reshape(data[:, :, 3:13], [
-                    data.shape[0], data.shape[1], 5, 2])
-                speed = self.__get_length(
-                    target[:, 1:], target[:, :-1]) * self.FPS
-                target_speed = target[:, 1:] - target[:, :-1]
-                acc = self.__get_length(
-                    target_speed[:, 1:], target_speed[:, :-1]) * self.FPS
-                # clean up unused length
-                valid_acc = []
-                for i in range(data.shape[0]):
-                    valid_acc.append(
-                        acc[i, :self._length[i] - 2].reshape([-1, ]))
-                valid_acc = np.concatenate(valid_acc, axis=0)
-                bin_size = 0.1
-                max_v = np.amax(valid_acc)
-                min_v = np.amin(valid_acc)
-                num_bins = int((max_v - min_v) // bin_size) + 1
-                counter = np.zeros(shape=[num_bins, ])
-                for v in valid_acc:
-                    counter[int((v - min_v) // bin_size)] += 1
-                all_counts = np.sum(counter)
-                all_trace_acc[key] = np.vstack(
-                    (np.array([i * bin_size for i in range(num_bins)]),
-                     counter/all_counts)).T
-
             target = np.reshape(data[:, :, 13:23], [
                 data.shape[0], data.shape[1], 5, 2])
             speed = self.__get_length(
@@ -554,8 +509,9 @@ class EvaluationMatrix(object):
             valid_acc = []
             for i in range(data.shape[0]):
                 valid_acc.append(acc[i, :self._length[i] - 2].reshape([-1, ]))
-
             valid_acc = np.concatenate(valid_acc, axis=0)
+            # remove outlier
+            valid_acc = valid_acc[valid_acc<self.ACC_LIMITATION]
             bin_size = 0.1
             max_v = np.amax(valid_acc)
             min_v = np.amin(valid_acc)
@@ -564,17 +520,18 @@ class EvaluationMatrix(object):
             for v in valid_acc:
                 counter[int((v - min_v) // bin_size)] += 1
             all_counts = np.sum(counter)
-            all_trace_acc[key] = np.vstack(
-                (np.array([i * bin_size for i in range(num_bins)]),
-                 counter/all_counts)).T
+            data_ = []
+            for i in range(num_bins):
+                data_.append([i*bin_size, counter[i]/all_counts*100.0])
+            all_trace_acc[key] = np.array(data_)
         h_matrix = []
         for key1, P in all_trace_acc.items():
             h_row = []
             for key2, Q in all_trace_acc.items():
                 P = P.copy(order='C')
                 Q = Q.copy(order='C')
-                h_row.append(directed_hausdorff(P, Q)[0])
-                # h_row.append(hausdorff(P, Q))
+                #h_row.append(max(directed_hausdorff(P, Q)[0],directed_hausdorff(Q, P)[0]))
+                h_row.append(hausdorff(P, Q))
             h_matrix.append(h_row)
         print_h_matrix(all_trace_acc, h_matrix)
 
@@ -636,43 +593,43 @@ class EvaluationMatrix(object):
                             for j in range(q.shape[1]):
                                 Q.append([i, j, q[i][j]])
                         Q = np.array(Q)
-                        h_row.append(directed_hausdorff(P, Q)[0])
-                        # h_row.append(hausdorff(P, Q))
+                        #h_row.append(max(directed_hausdorff(P, Q)[0],directed_hausdorff(Q, P)[0]))
+                        h_row.append(hausdorff(P, Q))
                     h_matrix.append(h_row)
                 print_h_matrix(heat_map_mean_table_dict, h_matrix)
-                # distance to basket
-                h_matrix = []
-                for key1, p in heat_map_mean_table_dict.items():
-                    h_row = []
-                    for key2, q in heat_map_mean_table_dict.items():
-                        # transform to distance to basket coordinate
-                        basket_x = 94 - 5.25
-                        basket_y = 25
-                        P = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
-                        Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
-                        for i in range(50):
-                            for j in range(95):
-                                if j < 95/2:
-                                    continue
-                                dist2basket = int(
-                                    np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
-                                P[dist2basket] += p[i][j]
-                                Q[dist2basket] += q[i][j]
-                        index_to_remain = []
-                        for i in range(len(P)):
-                            if P[i] != 0 or Q[i] != 0:
-                                index_to_remain.append(i)
-                        P = P[index_to_remain]
-                        Q = Q[index_to_remain]
-                        idx = np.arange(len(P))
-                        P = np.vstack((idx, P)).T
-                        Q = np.vstack((idx, Q)).T
-                        P = P.copy(order='C')
-                        Q = Q.copy(order='C')
-                        h_row.append(directed_hausdorff(P, Q)[0])
-                        # h_row.append(hausdorff(P, Q))
-                    h_matrix.append(h_row)
-                print_h_matrix(heat_map_mean_table_dict, h_matrix)
+                # # distance to basket
+                # h_matrix = []
+                # for key1, p in heat_map_mean_table_dict.items():
+                #     h_row = []
+                #     for key2, q in heat_map_mean_table_dict.items():
+                #         # transform to distance to basket coordinate
+                #         basket_x = 94 - 5.25
+                #         basket_y = 25
+                #         P = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
+                #         Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
+                #         for i in range(50):
+                #             for j in range(95):
+                #                 if j < 95/2:
+                #                     continue
+                #                 dist2basket = int(
+                #                     np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
+                #                 P[dist2basket] += p[i][j]
+                #                 Q[dist2basket] += q[i][j]
+                #         index_to_remain = []
+                #         for i in range(len(P)):
+                #             if P[i] != 0 or Q[i] != 0:
+                #                 index_to_remain.append(i)
+                #         P = P[index_to_remain]
+                #         Q = Q[index_to_remain]
+                #         idx = np.arange(len(P))
+                #         P = np.vstack((idx, P)).T
+                #         Q = np.vstack((idx, Q)).T
+                #         P = P.copy(order='C')
+                #         Q = Q.copy(order='C')
+                #         #h_row.append(max(directed_hausdorff(P, Q)[0],directed_hausdorff(Q, P)[0]))
+                #         h_row.append(hausdorff(P, Q))
+                #     h_matrix.append(h_row)
+                # print_h_matrix(heat_map_mean_table_dict, h_matrix)
 
     def plot_histogram_vel_acc(self):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
@@ -697,7 +654,8 @@ class EvaluationMatrix(object):
                     valid_speed.append(
                         speed[i, :self._length[i]-1].reshape([-1, ]))
                 valid_speed = np.concatenate(valid_speed, axis=0)
-
+                # remove outlier
+                valid_speed = valid_speed[valid_speed < self.SPEED_LIMITATION]
                 bin_size = 0.1
                 max_v = np.amax(valid_speed)
                 min_v = 0.0
@@ -709,20 +667,9 @@ class EvaluationMatrix(object):
                 trace_speed = go.Scatter(
                     name=key+'_offense',
                     x=[i*bin_size for i in range(num_bins)],
-                    y=counter/all_counts
+                    y=counter/all_counts * 100.0
                 )
 
-                # trace_speed = go.Histogram(
-                #     name=key+'_offense',
-                #     x=valid_speed,
-                #     autobinx=False,
-                #     xbins=dict(
-                #         start=0.0,
-                #         end=1000.0,
-                #         size=0.5
-                #     ),
-                #     opacity=0.5
-                # )
                 all_trace_speed.append(trace_speed)
                 msg += '{0} dataset:\n\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                     key+'_offense', np.mean(valid_speed), np.std(valid_speed))
@@ -737,6 +684,8 @@ class EvaluationMatrix(object):
                 valid_speed.append(
                     speed[i, :self._length[i]-1].reshape([-1, ]))
             valid_speed = np.concatenate(valid_speed, axis=0)
+            # remove outlier
+            valid_speed = valid_speed[valid_speed < self.SPEED_LIMITATION]
 
             bin_size = 0.1
             max_v = np.amax(valid_speed)
@@ -749,20 +698,9 @@ class EvaluationMatrix(object):
             trace_speed = go.Scatter(
                 name=key,
                 x=[i*bin_size for i in range(num_bins)],
-                y=counter/all_counts
+                y=counter/all_counts * 100.0
             )
 
-            # trace_speed = go.Histogram(
-            #     name=key,
-            #     x=valid_speed,
-            #     autobinx=False,
-            #     xbins=dict(
-            #         start=0.0,
-            #         end=1000.0,
-            #         size=0.5
-            #     ),
-            #     opacity=0.5
-            # )
             all_trace_speed.append(trace_speed)
             msg += '{0} dataset:\n\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                 key, np.mean(valid_speed), np.std(valid_speed))
@@ -770,7 +708,7 @@ class EvaluationMatrix(object):
             title='Speed',
             barmode='overlay',
             xaxis=dict(title='speed (feet/sec)'),
-            yaxis=dict(title='counts')
+            yaxis=dict(title='probability (%)')
         )
         fig_speed = go.Figure(data=all_trace_speed, layout=layout_speed)
         py.plot(fig_speed, filename=os.path.join(
@@ -794,6 +732,8 @@ class EvaluationMatrix(object):
                     valid_acc.append(
                         acc[i, :self._length[i]-2].reshape([-1, ]))
                 valid_acc = np.concatenate(valid_acc, axis=0)
+                # remove outlier
+                valid_acc = valid_acc[valid_acc < self.ACC_LIMITATION]
                 bin_size = 0.1
                 max_v = np.amax(valid_acc)
                 min_v = np.amin(valid_acc)
@@ -805,20 +745,9 @@ class EvaluationMatrix(object):
                 trace_acc = go.Scatter(
                     name=key+'_offense',
                     x=[i*bin_size for i in range(num_bins)],
-                    y=counter/all_counts
+                    y=counter/all_counts * 100.0
                 )
 
-                # trace_acc = go.Histogram(
-                #     name=key+'_offense',
-                #     x=valid_acc,
-                #     autobinx=False,
-                #     xbins=dict(
-                #         start=0.0,
-                #         end=1000.0,
-                #         size=0.5
-                #     ),
-                #     opacity=0.5
-                # )
                 all_trace_acc.append(trace_acc)
                 msg += '{0} dataset:\n\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                     key+'_offense', np.mean(valid_acc), np.std(valid_acc))
@@ -834,8 +763,9 @@ class EvaluationMatrix(object):
             valid_acc = []
             for i in range(data.shape[0]):
                 valid_acc.append(acc[i, :self._length[i]-2].reshape([-1, ]))
-
             valid_acc = np.concatenate(valid_acc, axis=0)
+            # remove outlier
+            valid_acc = valid_acc[valid_acc < self.ACC_LIMITATION]
             bin_size = 0.1
             max_v = np.amax(valid_acc)
             min_v = np.amin(valid_acc)
@@ -847,20 +777,9 @@ class EvaluationMatrix(object):
             trace_acc = go.Scatter(
                 name=key,
                 x=[i*bin_size for i in range(num_bins)],
-                y=counter/all_counts
+                y=counter/all_counts * 100.0
             )
 
-            # trace_acc = go.Histogram(
-            #     name=key,
-            #     x=valid_acc,
-            #     autobinx=False,
-            #     xbins=dict(
-            #         start=0.0,
-            #         end=1000.0,
-            #         size=0.5
-            #     ),
-            #     opacity=0.5
-            # )
             all_trace_acc.append(trace_acc)
             msg += '{0} dataset:\n\tmean={1:4.2f},\tstddev={2:4.2f}\n'.format(
                 key, np.mean(valid_acc), np.std(valid_acc))
@@ -868,7 +787,7 @@ class EvaluationMatrix(object):
             title='Acceleration',
             barmode='overlay',
             xaxis=dict(title='acceleration (feet/sec^2)'),
-            yaxis=dict(title='counts')
+            yaxis=dict(title='probability (%)')
         )
         fig_acc = go.Figure(data=all_trace_acc, layout=layout_acc)
         py.plot(fig_acc, filename=os.path.join(
@@ -1303,7 +1222,7 @@ class EvaluationMatrix(object):
             trace_wiball_dist = go.Scatter(
                 name=key+'_wi_ball',
                 x=[i*bin_size for i in range(num_bins)],
-                y=counter/all_counts
+                y=counter/all_counts * 100.0
             )
             # trace_wiball_dist = go.Histogram(
             #     name=key+'_wi_ball',
@@ -1330,7 +1249,7 @@ class EvaluationMatrix(object):
             trace_woball_dist = go.Scatter(
                 name=key+'_wo_ball',
                 x=[i*bin_size for i in range(num_bins)],
-                y=counter/all_counts
+                y=counter/all_counts * 100.0
             )
             # trace_woball_dist = go.Histogram(
             #     name=key+'_wo_ball',
@@ -1350,7 +1269,7 @@ class EvaluationMatrix(object):
             title='Distance',
             barmode='overlay',
             xaxis=dict(title='feet'),
-            yaxis=dict(title='counts')
+            yaxis=dict(title='probability (%)')
         )
         fig = go.Figure(data=all_trace, layout=layout)
         py.plot(fig, filename=os.path.join(
@@ -1565,7 +1484,7 @@ class EvaluationMatrix(object):
                 counter = np.count_nonzero(suspicious)
                 freq.append(counter/total_frames * 100.0)
             trace = go.Scatter(
-                x=np.arange(1,11),
+                x=np.arange(1, 11),
                 y=freq,
                 name=key
             )
@@ -1620,21 +1539,20 @@ def evaluate_new_data():
     # evaluator.show_freq_heatmap()
     # evaluator.plot_suspicious(mode='DISTANCE', EPSILON=3.28)
     # evaluator.plot_suspicious(mode='THETA_MUL_SCORE', EPSILON=4.28)
-    for mode in DIST_MODE:
+    # for mode in DIST_MODE:
     # evaluator.plot_linechart_distance_by_frames(
     #     mode=mode)
     # evaluator.plot_histogram_distance_by_frames(
     #     mode=mode)
-        evaluator.vis_and_analysis_by_episode(
-            episode_idx=10, mode=mode)
+    # evaluator.vis_and_analysis_by_episode(
+    #     episode_idx=10, mode=mode)
     # for mode in DIST_MODE:
-        # evaluator.show_mean_distance(mode=mode)
-        # evaluator.plot_mean_distance_heatmap(mode=mode)
+    #     evaluator.show_mean_distance(mode=mode)
+    #     evaluator.plot_mean_distance_heatmap(mode=mode)
         # evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=True)
-        # evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=False)
+    #     evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=False)
     # evaluator.plot_histogram_vel_acc()
-    # evaluator.calc_hausdorff()
-
+    evaluator.calc_hausdorff()
 
 
 def evaluate_diff_iterations():
@@ -1647,7 +1565,7 @@ def evaluate_diff_iterations():
             print('rm -rf "%s" complete!' % file_name)
 
     analyze_all_noise = False
-    root_path = '../data/WGAN/'+ file_name
+    root_path = '../data/WGAN/' + file_name
     all_data = {}
     length = None
     for filename in os.listdir(root_path):
@@ -1672,7 +1590,8 @@ def evaluate_diff_iterations():
         evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=True)
         evaluator.plot_linechart_suspicious(mode=mode, judge_close_3pt=False)
     evaluator.plot_histogram_vel_acc()
-    
+
+
 if __name__ == '__main__':
     # data = np.load('../data/FixedFPS5.npy')[-100:]
     # print(data.shape)
@@ -1680,7 +1599,7 @@ if __name__ == '__main__':
     # target_data = np.concatenate([data[:, :, 0:1, :3].reshape([data.shape[0],data.shape[1], 3]), data[:, :, 1:, :2].reshape([data.shape[0],data.shape[1], 20])], axis=-1)
     # np.save('real_data.npy', target_data)
     # np.save('length.npy', len_)
-    
-    # evaluate_new_data()
 
-    evaluate_diff_iterations()
+    evaluate_new_data()
+
+    # evaluate_diff_iterations()
