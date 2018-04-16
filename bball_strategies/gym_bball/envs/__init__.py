@@ -5,3 +5,4 @@ from __future__ import print_function
 from .bball_env import BBallEnv
 from .bball_pretrain_env import BBallPretrainEnv
 from .bball_ndef_env import BBallNDefEnv
+from .bball_ndef_bspeed_env import BBallNDefBSpeedEnv

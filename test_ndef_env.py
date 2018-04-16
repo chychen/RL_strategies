@@ -25,7 +25,7 @@ def ball_looping():
     for i in range(5):
         action = tuple((
             np.array(1),
-            np.array([0.1, 0.1]),
+            np.array([0.5, 0.5]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
             np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
         ))
@@ -124,7 +124,7 @@ def maxspeed():
 
 def ball_stealing():
     global env
-    env = gym.make('bball-v0')
+    env = gym.make('bball-ndef-bspeed-v0')
     init_positions = [
         np.array([45, 40]),
         np.array([
@@ -135,7 +135,8 @@ def ball_stealing():
             [0, 0]
         ], dtype=np.float),
         np.array([
-            [45, 37],
+            # [45, 37],
+            [45, 13],
             [0, 0],
             [0, 0],
             [0, 0],
@@ -153,8 +154,7 @@ def ball_stealing():
     env.render()
     action = tuple((
         np.array(1),
-        np.array([0, -0.1]),
-        np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]),
+        np.array([0, -3.0]),
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
     ))
     _, _, done, _ = env.step(action)
@@ -193,13 +193,14 @@ def move_offense_right():
 
 
 def random_dancing():
-    for _ in range(48):
+    for _ in range(480):
         action = env.action_space.sample()
         _, reward, done, _ = env.step(action)
         env.render()
         if done:
             env.reset()
             env.render()
+            
         print('###################### REWARD ######################', reward)
 
 
@@ -218,7 +219,7 @@ class MonitorWrapper(gym.wrappers.Monitor):
 
 def main():
     global env
-    env = gym.make('bball-ndef-v0')
+    env = gym.make('bball-ndef-bspeed-v0')
     env = MonitorWrapper(env,
                          init_mode=0,
                          if_vis_trajectory=False,

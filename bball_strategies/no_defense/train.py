@@ -12,7 +12,7 @@ from __future__ import print_function
 
 import datetime
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 import gym
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
