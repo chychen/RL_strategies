@@ -153,26 +153,27 @@ class BBallNDefBSpeedEnv(gym.Env):
             elif self.states.status == STATUS_LOOKUP['CAPTURED']:
                 logger.debug(
                     '[GAME OVER], A defender gets possession of the ball')
-                reward -= 1.0
+                reward += 0.0
             elif self.states.status == STATUS_LOOKUP['OOB']:
                 logger.debug('[GAME OVER], The ball is out of bounds.')
                 reward -= 1.0
             elif self.states.status == STATUS_LOOKUP['OOT']:
                 logger.debug(
                     '[GAME OVER], Max time limit for the episode is reached')
-                reward -= 1.0
+                reward += 0.0
         else:
             if self.states.status == STATUS_LOOKUP['SHOOT']:
                 logger.debug('No ball handler or OOB or exist defender...')
-                reward -= 1.0
+                reward += 0.0
             elif self.states.status == STATUS_LOOKUP['CATCH']:
                 logger.debug('[GAME STATUS] Successfully Pass :D')
                 reward += 0.0
             else:
                 if self.any_defense_close_ball_handler():
-                    reward -= 1.0
-                else: # no defender or ball is flying
+                    # be defensed or ball is flying
                     reward += 0.0
+                else: # no defender
+                    reward += 1.0
 
         # update env information
         self.states.end_step()
@@ -678,7 +679,6 @@ class BBallNDefBSpeedEnv(gym.Env):
         if self.states.is_passing or decision == DESICION_LOOKUP['PASS']:
             if decision == DESICION_LOOKUP['PASS']:
                 if self.states.is_passing:
-                    # maybe return negative reward!?
                     logger.debug(
                         '[BALL] You cannot do PASS decision while ball is passing')
                 else:
@@ -811,7 +811,7 @@ class BBallNDefBSpeedEnv(gym.Env):
                 return False
         else:
             # ball is flying
-            return False
+            return True
 
     def not_in_3pt_line(self):
         ball2basket_vec = self.right_basket_pos - self.states.ball_position
