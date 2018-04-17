@@ -81,6 +81,9 @@ class BBallNDefBSpeedEnv(gym.Env):
         self.action_space = self._set_action_space()
         self.observation_space = self._set_observation_space()
 
+        # init dataset
+        self.data = np.load('bball_strategies/data/FrameRate5.npy')
+
         # random seed
         self.seed()
 
@@ -108,7 +111,11 @@ class BBallNDefBSpeedEnv(gym.Env):
             off_pl_dash, self.states.vels, STATE_LOOKUP['OFFENSE'])
         # update ball state
         self._update_ball_state(decision, ball_pass_vel)
-
+        # update formulated defense
+        def_pl_dash = self._formulated_defense_dash(mode=0)
+        self._update_player_state(
+            def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
+        
         if not self.states.done and decision == DESICION_LOOKUP['SHOOT']:
             # if not self.states.done -> might be CAPTURED by defense team
             if self.states.ball_handler_idx is None:
@@ -135,13 +142,8 @@ class BBallNDefBSpeedEnv(gym.Env):
         # OOT
         if self.states.steps + 1 >= self.time_limit:  # zero-based
             self.states.update_status(done=True, status=STATUS_LOOKUP['OOT'])
-
+        
         reward = 0.0
-        if self.any_defense_close_ball_handler():
-            reward -= 1.0
-        else:
-            # no defender or ball is flying
-            reward += 0.0
 
         # termination conditions
         if self.states.done:
@@ -151,25 +153,26 @@ class BBallNDefBSpeedEnv(gym.Env):
             elif self.states.status == STATUS_LOOKUP['CAPTURED']:
                 logger.debug(
                     '[GAME OVER], A defender gets possession of the ball')
-                reward += 0.0
+                reward -= 1.0
             elif self.states.status == STATUS_LOOKUP['OOB']:
                 logger.debug('[GAME OVER], The ball is out of bounds.')
-                reward += 0.0
+                reward -= 1.0
             elif self.states.status == STATUS_LOOKUP['OOT']:
                 logger.debug(
                     '[GAME OVER], Max time limit for the episode is reached')
-                reward += 0.0
+                reward -= 1.0
         else:
-            # update formulated defense
-            def_pl_dash = self._formulated_defense_dash(mode=0)
-            self._update_player_state(
-                def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
             if self.states.status == STATUS_LOOKUP['SHOOT']:
                 logger.debug('No ball handler or OOB or exist defender...')
                 reward -= 1.0
             elif self.states.status == STATUS_LOOKUP['CATCH']:
                 logger.debug('[GAME STATUS] Successfully Pass :D')
                 reward += 0.0
+            else:
+                if self.any_defense_close_ball_handler():
+                    reward -= 1.0
+                else: # no defender or ball is flying
+                    reward += 0.0
 
         # update env information
         self.states.end_step()
@@ -212,12 +215,11 @@ class BBallNDefBSpeedEnv(gym.Env):
             self.states.reset(
                 self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET']:
-            data = np.load('bball_strategies/data/FrameRate5.npy')
             ep_idx = np.floor(self.np_random_generator.uniform(
-                low=0.0, high=data.shape[0])).astype(np.int)
-            ball_pos = data[ep_idx, 0, 0, 0:2]
-            off_positions = data[ep_idx, 0, 1:6, 0:2]
-            def_positions = data[ep_idx, 0, 6:11, 0:2]
+                low=0.0, high=self.data.shape[0])).astype(np.int)
+            ball_pos = self.data[ep_idx, 0, 0, 0:2]
+            off_positions = self.data[ep_idx, 0, 1:6, 0:2]
+            def_positions = self.data[ep_idx, 0, 6:11, 0:2]
             off2ball_vec = off_positions - ball_pos
             ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
             positions = np.array(
@@ -803,7 +805,7 @@ class BBallNDefBSpeedEnv(gym.Env):
             def2ball_vecs = self.states.ball_position - self.states.defense_positions
             def2ball_lens = length(def2ball_vecs, axis=1)
             # if ball handler has defender, return True
-            if np.any(np.where(def2ball_lens < self.eff_def_radius)):
+            if np.any(def2ball_lens < 2*self.eff_def_radius):
                 return True
             else:
                 return False

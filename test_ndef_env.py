@@ -193,7 +193,8 @@ def move_offense_right():
 
 
 def random_dancing():
-    for _ in range(480):
+    for i in range(4800):
+        print(i)
         action = env.action_space.sample()
         _, reward, done, _ = env.step(action)
         env.render()
@@ -221,7 +222,7 @@ def main():
     global env
     env = gym.make('bball-ndef-bspeed-v0')
     env = MonitorWrapper(env,
-                         init_mode=0,
+                         init_mode=1,
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True)
     obs = env.reset()
