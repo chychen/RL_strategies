@@ -82,7 +82,7 @@ class BBallNDefBSpeedEnv(gym.Env):
         self.observation_space = self._set_observation_space()
 
         # init dataset
-        self.data = np.load('bball_strategies/data/FrameRate5.npy')
+        self.data = np.load('bball_strategies/data/FixedFPS5First.npy')
 
         # random seed
         self.seed()
@@ -153,27 +153,27 @@ class BBallNDefBSpeedEnv(gym.Env):
             elif self.states.status == STATUS_LOOKUP['CAPTURED']:
                 logger.debug(
                     '[GAME OVER], A defender gets possession of the ball')
-                reward += 0.0
+                reward -= 1.0
             elif self.states.status == STATUS_LOOKUP['OOB']:
                 logger.debug('[GAME OVER], The ball is out of bounds.')
-                reward -= 1.0
+                reward -= 10.0
             elif self.states.status == STATUS_LOOKUP['OOT']:
                 logger.debug(
                     '[GAME OVER], Max time limit for the episode is reached')
-                reward += 0.0
+                reward -= 1.0
         else:
             if self.states.status == STATUS_LOOKUP['SHOOT']:
                 logger.debug('No ball handler or OOB or exist defender...')
-                reward += 0.0
+                reward -= 1.0
             elif self.states.status == STATUS_LOOKUP['CATCH']:
                 logger.debug('[GAME STATUS] Successfully Pass :D')
-                reward += 0.0
-            else:
-                if self.any_defense_close_ball_handler():
-                    # be defensed or ball is flying
-                    reward += 0.0
-                else: # no defender
-                    reward += 1.0
+                reward += 1.0
+            # else:
+            #     if self.any_defense_close_ball_handler():
+            #         # be defensed or ball is flying
+            #         reward += 0.0
+            #     else: # no defender
+            #         reward += 1.0
 
         # update env information
         self.states.end_step()
@@ -216,11 +216,12 @@ class BBallNDefBSpeedEnv(gym.Env):
             self.states.reset(
                 self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET']:
+            data = copy.deepcopy(self.data)
             ep_idx = np.floor(self.np_random_generator.uniform(
-                low=0.0, high=self.data.shape[0])).astype(np.int)
-            ball_pos = self.data[ep_idx, 0, 0, 0:2]
-            off_positions = self.data[ep_idx, 0, 1:6, 0:2]
-            def_positions = self.data[ep_idx, 0, 6:11, 0:2]
+                low=0.0, high=data.shape[0])).astype(np.int)
+            ball_pos = data[ep_idx, 0, 0, 0:2]
+            off_positions = data[ep_idx, 0, 1:6, 0:2]
+            def_positions = data[ep_idx, 0, 6:11, 0:2]
             off2ball_vec = off_positions - ball_pos
             ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
             positions = np.array(
@@ -323,6 +324,7 @@ class BBallNDefBSpeedEnv(gym.Env):
                 # ball
                 ball = rendering.make_circle(radius=1.)
                 ball.set_color(0, 1, 0)
+            
                 ball_trans = rendering.Transform()
                 self.ball_transform = ball_trans
                 ball.add_attr(ball_trans)
@@ -338,6 +340,16 @@ class BBallNDefBSpeedEnv(gym.Env):
             # ball
             ball_pos = self.states.ball_position
             self.ball_transform.set_translation(ball_pos[0], ball_pos[1])
+
+        # vis the shoot action
+        if self.states.done:
+            shoot_icon = rendering.make_circle(radius=3.)
+            shoot_icon.set_color(0, 1, 0)
+            shoot_icon_trans = rendering.Transform()
+            shoot_icon_pos = self.states.ball_position
+            shoot_icon_trans.set_translation(shoot_icon_pos[0], shoot_icon_pos[1])
+            shoot_icon.add_attr(shoot_icon_trans)
+            self.viewer.add_geom(shoot_icon)
 
         if self.if_vis_trajectory:
             if self.viewer is None:

@@ -53,21 +53,28 @@ def default():
 
     return locals()
 
+
 def v1():
     locals().update(default())
     update_every = 100
     discount = 1.0
-    
+
     return locals()
-    
+
 
 def v2():
     locals().update(default())
     update_every = 100
     discount = 1.0
     env = 'bball-ndef-bspeed-v0'
-    
+
     return locals()
-    
 
 
+def v3():
+    locals().update(default())
+    update_every = 200
+    discount = 1.0
+    env = 'bball-ndef-bspeed-v0'
+
+    return locals()
