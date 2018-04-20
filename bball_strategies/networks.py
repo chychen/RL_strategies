@@ -63,6 +63,7 @@ def _custom_diag_normal_kl(lhs, rhs, name=None):  # pylint: disable=unused-argum
             tf.reduce_sum(logstd1_2, -1) - tf.reduce_sum(logstd0_2, -1) -
             mean0.shape[-1].value)
 
+
 def net(observations, config):
     # observation space = shape=(batch_size, episode_length, 10, 14, 2)
     # action space = shape=(batch, episode_length, 23)
@@ -75,28 +76,29 @@ def net(observations, config):
         scale=1.0, mode='fan_avg', distribution='uniform')
     init_output_weights = tf.variance_scaling_initializer(
         scale=config.init_output_factor, mode='fan_in', distribution='normal')
-    with tf.variable_scope('o_trunk'):
+    # seperate value and policy
+    with tf.variable_scope('o_trunk_policy'):
         conv1 = tf.layers.conv2d(
             inputs=input_,
-            filters=64,
+            filters=128,
             kernel_size=[1, 3],
-            padding='same',
+            padding='valid',
             activation=tf.nn.relu,
             kernel_initializer=init_xavier_weights
         )
         conv2 = tf.layers.conv2d(
             inputs=conv1,
-            filters=64,
-            kernel_size=[1, 3],            
-            padding='same',
+            filters=128,
+            kernel_size=[1, 3],
+            padding='valid',
             activation=tf.nn.relu,
             kernel_initializer=init_xavier_weights,
         )
         flatten = tf.reshape(conv2, shape=[batch_size, episode_len, functools.reduce(
-            operator.mul, conv1.shape.as_list()[2:], 1)])
+            operator.mul, conv2.shape.as_list()[2:], 1)])
         trunk_fc = tf.layers.dense(
             inputs=flatten,
-            units=128,
+            units=256,
             activation=tf.nn.relu,
             kernel_initializer=init_xavier_weights,
         )
@@ -104,35 +106,126 @@ def net(observations, config):
             # offensive
             off_fc = tf.layers.dense(
                 inputs=trunk_fc,
-                units=64,
+                units=128,
                 activation=tf.nn.relu,
                 kernel_initializer=init_xavier_weights,
             )
-            with tf.variable_scope('policy'):
-                with tf.variable_scope('actions'):
-                    off_action_mean = tf.layers.dense(
-                        inputs=off_fc,
-                        units=12,
-                        activation=tf.tanh,  # NOTE tanh is not good?
-                        kernel_initializer=init_output_weights,
-                    )
-                with tf.variable_scope('decision'):
-                    logits = tf.layers.dense(
-                        inputs=off_fc,
-                        units=3,
-                        activation=None,
-                        kernel_initializer=init_output_weights,
-                    )
-            with tf.variable_scope('value'):
-                off_value = tf.layers.dense(
+            with tf.variable_scope('actions'):
+                off_action_mean = tf.layers.dense(
                     inputs=off_fc,
-                    units=1,
+                    units=12,
+                    activation=tf.tanh,  # NOTE tanh is not good?
+                    kernel_initializer=init_output_weights,
+                )
+            with tf.variable_scope('decision'):
+                logits = tf.layers.dense(
+                    inputs=off_fc,
+                    units=3,
                     activation=None,
                     kernel_initializer=init_output_weights,
                 )
-                off_value = tf.reshape(
-                    off_value, shape=[batch_size, episode_len])
-                off_value = tf.check_numerics(off_value, 'off_value')
+
+    with tf.variable_scope('o_trunk_value'):
+        conv1 = tf.layers.conv2d(
+            inputs=input_,
+            filters=128,
+            kernel_size=[1, 3],
+            padding='valid',
+            activation=tf.nn.relu,
+            kernel_initializer=init_xavier_weights
+        )
+        conv2 = tf.layers.conv2d(
+            inputs=conv1,
+            filters=128,
+            kernel_size=[1, 3],
+            padding='valid',
+            activation=tf.nn.relu,
+            kernel_initializer=init_xavier_weights,
+        )
+        flatten = tf.reshape(conv2, shape=[batch_size, episode_len, functools.reduce(
+            operator.mul, conv2.shape.as_list()[2:], 1)])
+        trunk_fc = tf.layers.dense(
+            inputs=flatten,
+            units=256,
+            activation=tf.nn.relu,
+            kernel_initializer=init_xavier_weights,
+        )
+        with tf.variable_scope('o_crown'):
+            # offensive
+            off_fc = tf.layers.dense(
+                inputs=trunk_fc,
+                units=128,
+                activation=tf.nn.relu,
+                kernel_initializer=init_xavier_weights,
+            )
+            off_value = tf.layers.dense(
+                inputs=off_fc,
+                units=1,
+                activation=None,
+                kernel_initializer=init_output_weights,
+            )
+            off_value = tf.reshape(
+                off_value, shape=[batch_size, episode_len])
+            off_value = tf.check_numerics(off_value, 'off_value')
+
+    # with tf.variable_scope('o_trunk'):
+    #     conv1 = tf.layers.conv2d(
+    #         inputs=input_,
+    #         filters=64,
+    #         kernel_size=[1, 3],
+    #         padding='same',
+    #         activation=tf.nn.relu,
+    #         kernel_initializer=init_xavier_weights
+    #     )
+    #     conv2 = tf.layers.conv2d(
+    #         inputs=conv1,
+    #         filters=64,
+    #         kernel_size=[1, 3],
+    #         padding='same',
+    #         activation=tf.nn.relu,
+    #         kernel_initializer=init_xavier_weights,
+    #     )
+    #     flatten = tf.reshape(conv2, shape=[batch_size, episode_len, functools.reduce(
+    #         operator.mul, conv2.shape.as_list()[2:], 1)])
+    #     trunk_fc = tf.layers.dense(
+    #         inputs=flatten,
+    #         units=128,
+    #         activation=tf.nn.relu,
+    #         kernel_initializer=init_xavier_weights,
+    #     )
+    #     with tf.variable_scope('o_crown'):
+    #         # offensive
+    #         off_fc = tf.layers.dense(
+    #             inputs=trunk_fc,
+    #             units=64,
+    #             activation=tf.nn.relu,
+    #             kernel_initializer=init_xavier_weights,
+    #         )
+    #         with tf.variable_scope('policy'):
+    #             with tf.variable_scope('actions'):
+    #                 off_action_mean = tf.layers.dense(
+    #                     inputs=off_fc,
+    #                     units=12,
+    #                     activation=tf.tanh,  # NOTE tanh is not good?
+    #                     kernel_initializer=init_output_weights,
+    #                 )
+    #             with tf.variable_scope('decision'):
+    #                 logits = tf.layers.dense(
+    #                     inputs=off_fc,
+    #                     units=3,
+    #                     activation=None,
+    #                     kernel_initializer=init_output_weights,
+    #                 )
+    #         with tf.variable_scope('value'):
+    #             off_value = tf.layers.dense(
+    #                 inputs=off_fc,
+    #                 units=1,
+    #                 activation=None,
+    #                 kernel_initializer=init_output_weights,
+    #             )
+    #             off_value = tf.reshape(
+    #                 off_value, shape=[batch_size, episode_len])
+    #             off_value = tf.check_numerics(off_value, 'off_value')
 
     with tf.variable_scope('d_trunk'):
         conv1 = tf.layers.conv2d(
@@ -197,6 +290,7 @@ def offense_pretrain(config, observations):
 
     return logits, off_action_mean
 
+
 def defense_pretrain(config, observations):
     """
     """
@@ -209,7 +303,7 @@ def defense_pretrain(config, observations):
 def ndef_gaussian(config, action_space, observations, unused_length, state=None):
     logits, off_action_mean, off_value, _, _ = net(
         observations, config)
-        
+
     with tf.variable_scope('ndef_gaussian'):
         # config
         before_softplus_std_initializer = tf.constant_initializer(
@@ -231,6 +325,7 @@ def ndef_gaussian(config, action_space, observations, unused_length, state=None)
         off_policy = [off_decision, off_actions]
 
     return agents.tools.AttrDict(state=state, policy=off_policy, value=off_value)
+
 
 def two_trunk_gaussian(config, action_space, observations, unused_length, state=None):
     """
