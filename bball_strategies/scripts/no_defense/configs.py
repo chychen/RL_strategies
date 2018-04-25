@@ -9,7 +9,7 @@ import tensorflow as tf
 
 # from agents import algorithms
 from bball_strategies import algorithms
-from bball_strategies.networks import policy_net
+from bball_strategies.networks import ppo_nets
 
 FPS = 5
 
@@ -26,7 +26,7 @@ def default():
     # Environment
 #   normalize_ranges = True
     # Network
-    network = policy_net.ndef_gaussian
+    network = ppo_nets.ndef_gaussian
     weight_summaries = dict(
         all=r'.*', policy=r'.*/policy/.*', value=r'.*/value/.*')
     init_output_factor = 0.1
