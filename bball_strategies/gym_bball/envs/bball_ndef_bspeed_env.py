@@ -341,7 +341,7 @@ class BBallNDefBSpeedEnv(gym.Env):
             ball_pos = self.states.ball_position
             self.ball_transform.set_translation(ball_pos[0], ball_pos[1])
 
-        # vis the shoot action
+        # vis the end position
         if self.states.done:
             shoot_icon = rendering.make_circle(radius=3.)
             shoot_icon.set_color(0, 1, 0)
@@ -349,7 +349,7 @@ class BBallNDefBSpeedEnv(gym.Env):
             shoot_icon_pos = self.states.ball_position
             shoot_icon_trans.set_translation(shoot_icon_pos[0], shoot_icon_pos[1])
             shoot_icon.add_attr(shoot_icon_trans)
-            self.viewer.add_geom(shoot_icon)
+            self.viewer.add_onetime(shoot_icon)
 
         if self.if_vis_trajectory:
             if self.viewer is None:

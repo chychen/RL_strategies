@@ -126,17 +126,17 @@ def ball_stealing():
     global env
     env = gym.make('bball-ndef-bspeed-v0')
     init_positions = [
-        np.array([80, 40]),
+        np.array([45, 40]),
         np.array([
             [45, 10],
-            [80, 40],
+            [45, 40],
             [0, 0],
             [0, 0],
             [0, 0]
         ], dtype=np.float),
         np.array([
             # [45, 37],
-            [45, 0],
+            [50.1, 10],
             [0, 0],
             [0, 0],
             [0, 0],
@@ -153,8 +153,8 @@ def ball_stealing():
     env.reset()
     env.render()
     action = tuple((
-        np.array(0),
-        np.array([0, -3.0]),
+        np.array(1),
+        np.array([0.4, -3.0]),
         np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])
     ))
     _, _, done, _ = env.step(action)
