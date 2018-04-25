@@ -19,9 +19,9 @@ from tensorflow.python import debug as tf_debug
 from agents import tools
 from agents.scripts import utility
 from bball_strategies.gym_bball.envs.bball_pretrain_env import BBallPretrainEnv
-from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
-from bball_strategies.pretrain import configs
-from bball_strategies.pretrain import models
+from bball_strategies.gym_bball.tools import BBallWrapper
+from bball_strategies.scripts.pretrain import configs
+from bball_strategies.algorithms import pretrain_model
 
 
 def norm_obs(env, data):
@@ -206,9 +206,9 @@ def testing(config, off_data, off_label, def_data, def_label, outdir):
     # graph
     tf.reset_default_graph()
     if FLAGS.config == 'offense':
-        model = models.PretrainOffense(config)
+        model = pretrain_model.PretrainOffense(config)
     elif FLAGS.config == 'defense':
-        model = models.PretrainDefense(config)
+        model = pretrain_model.PretrainDefense(config)
     else:
         raise ValueError('{} is not an available config'.format(FLAGS.config))
 

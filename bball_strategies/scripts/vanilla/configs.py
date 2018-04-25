@@ -9,26 +9,27 @@ import tensorflow as tf
 
 # from agents import algorithms
 from bball_strategies import algorithms
-from bball_strategies import networks
+from bball_strategies.networks import policy_net
 
 FPS = 5
-
 
 def default():
     """Default configuration for PPO."""
     # tensorflow
     log_device_placement = False
     # General
-    algorithm = algorithms.NDEF_PPO
+    algorithm = algorithms.TWO_TRUNK_PPO
     num_agents = 20
     eval_episodes = 10
     use_gpu = True
     # Environment
 #   normalize_ranges = True
     # Network
-    network = networks.ndef_gaussian
+    network = policy_net.two_trunk_gaussian
     weight_summaries = dict(
         all=r'.*', policy=r'.*/policy/.*', value=r'.*/value/.*')
+#   policy_layers = 200, 100
+#   value_layers = 200, 100
     init_output_factor = 0.1
     init_std = 0.35
     # Optimization
@@ -47,34 +48,50 @@ def default():
 #   gae_lambda = None
     entropy_regularization = None
     # Environment
-    env = 'bball-ndef-v0'
-    max_length = 24 * FPS
-    steps = 1e10  # 1M
+    env = 'bball-v0'
+    max_length = 24 * FPS * 2
+    steps = 1e6  # 1M
 
     return locals()
 
 
-def v1():
+def example():
     locals().update(default())
-    update_every = 100
-    discount = 1.0
-
     return locals()
 
 
 def v2():
+    """
+    - larger batch size
+    - no repeat epoch
+    - smaller max length (smaller buffer)
+    """
     locals().update(default())
-    update_every = 100
-    discount = 1.0
-    env = 'bball-ndef-bspeed-v0'
-
+    update_every = 500
+    update_epochs = 1
+    max_length = 10 * FPS * 2
+    steps = 1e10  # 1M
     return locals()
 
 
 def v3():
+    """
+    - no repeat epoch
+    - smaller max length (smaller buffer)
+    """
     locals().update(default())
-    update_every = 200
-    discount = 1.0
-    env = 'bball-ndef-bspeed-v0'
+    update_epochs = 1
+    max_length = 10 * FPS * 2
+    steps = 1e10  # 1M
+    return locals()
 
+
+def v4():
+    """
+    - smaller max length (smaller buffer)
+    """
+    locals().update(default())
+    update_epochs = 25
+    max_length = 10 * FPS * 2
+    steps = 1e10  # 1M
     return locals()

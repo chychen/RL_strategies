@@ -17,7 +17,7 @@ import tensorflow as tf
 
 from agents import tools
 from agents.scripts import utility
-from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
+from bball_strategies.gym_bball.tools import BBallWrapper
 
 
 def _create_environment(config, outdir):

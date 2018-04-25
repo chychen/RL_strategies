@@ -12,7 +12,7 @@ from __future__ import print_function
 
 import datetime
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 import gym
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
@@ -20,8 +20,8 @@ from tensorflow.python import debug as tf_debug
 from agents import tools
 from agents.scripts import utility
 from bball_strategies import gym_bball
-from bball_strategies.no_defense import configs
-from bball_strategies.scripts.bball_env_wrapper import BBallWrapper
+from bball_strategies.scripts.vanilla import configs
+from bball_strategies.gym_bball.tools import BBallWrapper
 
 
 def _create_environment(config):
@@ -63,13 +63,27 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
         checkpoint_every=None,
         feed={graph.is_training: True,
               graph.is_optimizing_offense: True})
-    loop.add_phase(
-        'eval_offense', graph.done, graph.score, graph.summary, eval_steps,
-        report_every=eval_steps,
-        log_every=eval_steps,
-        checkpoint_every=10 * eval_steps,
-        feed={graph.is_training: False,
-              graph.is_optimizing_offense: True})
+    # loop.add_phase(
+    #     'train_defense', graph.done, graph.score, graph.summary, train_steps,
+    #     report_every=train_steps,
+    #     log_every=train_steps,
+    #     checkpoint_every=None,
+    #     feed={graph.is_training: True,
+    #           graph.is_optimizing_offense: False})
+    # loop.add_phase(
+    #     'eval_offense', graph.done, graph.score, graph.summary, eval_steps,
+    #     report_every=eval_steps,
+    #     log_every=eval_steps,
+    #     checkpoint_every=10 * eval_steps,
+    #     feed={graph.is_training: False,
+    #           graph.is_optimizing_offense: True})
+    # loop.add_phase(
+    #     'eval_defense', graph.done, graph.score, graph.summary, eval_steps,
+    #     report_every=eval_steps,
+    #     log_every=eval_steps,
+    #     checkpoint_every=10 * eval_steps,
+    #     feed={graph.is_training: False,
+    #           graph.is_optimizing_offense: False})
     return loop
 
 
@@ -136,7 +150,6 @@ def train(config, env_processes, outdir):
                     sess, ui_type=FLAGS.ui_type)
             utility.initialize_variables(
                 sess, saver, config.logdir, resume=FLAGS.resume)
-            print(total_steps)
             for score in loop.run(sess, saver, total_steps):
                 yield score
     batch_env.close()

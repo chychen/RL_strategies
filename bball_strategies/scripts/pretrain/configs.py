@@ -9,8 +9,8 @@ import tensorflow as tf
 
 # from agents import algorithms
 from bball_strategies import algorithms
-from bball_strategies import networks
-from bball_strategies.pretrain import models
+from bball_strategies.networks import policy_net
+from bball_strategies.algorithms import pretrain_model
 
 FPS = 5
 
@@ -42,13 +42,13 @@ def example():
 
 def offense():
     locals().update(default())
-    network = networks.offense_pretrain
-    # model = models.PretrainOffense
+    network = policy_net.offense_pretrain
+    # model = pretrain_model.PretrainOffense
     return locals()
 
 
 def defense():
     locals().update(default())
-    network = networks.defense_pretrain
-    # model = models.PretrainOffense
+    network = policy_net.defense_pretrain
+    # model = pretrain_model.PretrainOffense
     return locals()
