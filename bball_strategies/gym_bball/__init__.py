@@ -25,3 +25,8 @@ register(
     id='bball-ndef-bspeed-v0',
     entry_point='bball_strategies.gym_bball.envs:BBallNDefBSpeedEnv',
 )
+
+register(
+    id='bball_gail_def-v0',
+    entry_point='bball_strategies.gym_bball.envs:BBallGailDefEnv',
+)

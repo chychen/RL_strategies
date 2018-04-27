@@ -256,8 +256,8 @@ def state_2_action(data, data_len):
 
 def main():
     # 1. data IO
-    data = np.load('../../data/FixedFPS5.npy')
-    data_len = np.load('../../data/FixedFPS5Length.npy')
+    data = np.load('FixedFPS5.npy')
+    data_len = np.load('FixedFPS5Length.npy')
     print(data.shape)
     print(data_len.shape)
     # 2. state_2_action : shoot, pass, dash

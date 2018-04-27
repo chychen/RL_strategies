@@ -30,6 +30,8 @@ x_idx, y_idx, z_idx, player_pos_idx = range(0, 4)
 mse_threshold = 10
 FPS = 5
 
+WINGSPAN_RADIUS = 3.5 + 0.5
+
 
 def get_length(a, b, axis=-1):
     vec = a-b
@@ -49,6 +51,44 @@ def dist_squared(p0, p1):
 #     for player_idx in defense_idx:
 #         plt.scatter(frame_data[player_idx][x_idx], frame_data[player_idx][y_idx], c='b', marker='o')
 #     plt.show()
+
+def remove_ball_height_n_dribble(data, data_len):
+    """
+    data : shape=[num_data, max_lenght, 11, 4]
+        11 = 1 + 5 + 5
+        4 = x,y,z,player position
+    """
+    # assign 0 to ball's height
+    data[:, :, 0, 2] = 0.0
+
+    # find who is dibbling the ball by checking [t, t+1, t+2], distance(t) < WINGSPAN_RADIUS
+    # at t, the MAN who close enough to the ball
+    # at t+1, whether the ball is no longer close enought to the MAN
+    # at t+2, whether the ball is no longer close enought to the MAN
+    # if [t, t+1, t+2] == [True, False, False], ball is passed.
+    # else, ball id dribbled by the MAN
+    for i in range(data.shape[0]):
+        is_passing = False
+        for t in range(0, data_len[i]-2, 1):
+            ball = data[i, t, 0:1, 0:2]
+            off_players = data[i, t, 1:6, 0:2]
+            dist_2_ball = get_length(ball, off_players)
+            closest_player_idx = np.argmin(dist_2_ball, axis=-1)
+            closest_player = off_players[closest_player_idx]
+            judgement = [get_length(data[i, next_t, 1+closest_player_idx, 0:2], data[i, next_t, 0, 0:2]) <
+                         WINGSPAN_RADIUS for next_t in range(t, t+3, 1)]
+            if judgement != [True, False, False]:  # dribbled
+                if is_passing:
+                    if judgement==[True, True, True]:
+                        is_passing = False
+                        data[i, t, 0, 0:2] = closest_player
+                else:
+                    data[i, t, 0, 0:2] = closest_player
+            else: # start flying
+                is_passing = True
+
+    return data
+
 
 def get_analysis(data, data_len):
     """
@@ -255,7 +295,7 @@ def main():
 
     # print preprocessed data id
     print("Data removed:")
-    input("exceed_threshold_arr: {}".format(exceed_threshold_arr))
+    print("exceed_threshold_arr: {}".format(exceed_threshold_arr))
     print("frame_discontinuous: {}", frame_discontinuous_arr)
     print("ball_stolen: {}", ball_stolen_arr)
     print("start_outside: {}", start_outside_arr)
@@ -275,11 +315,14 @@ def main():
         indices) if j not in remove_indices]
     data = data[remain_indices]
     data_len = data_len[remain_indices]
+
+    data = remove_ball_height_n_dribble(data, data_len)
+
+    max_length = np.amax(data_len)
+    np.save('FixedFPS5.npy', data[:,:max_length])
+    np.save('FixedFPS5Length.npy', data_len)
     print(data.shape)
     print(data_len.shape)
-
-    np.save('FixedFPS5.npy', data)
-    np.save('FixedFPS5Length.npy', data_len)
     print('Remains {} tranisions'.format(np.sum(data_len)))
 
 
