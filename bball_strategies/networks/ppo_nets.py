@@ -26,7 +26,9 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import layers
 import agents
-from custom_distribution import CustomKLDiagNormal
+from .custom_distribution import CustomKLDiagNormal
+
+tfd = tf.contrib.distributions
 
 
 def net(observations, config):

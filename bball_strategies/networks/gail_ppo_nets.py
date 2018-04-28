@@ -15,7 +15,6 @@ from .custom_distribution import CustomKLDiagNormal
 def gail_def_gaussian(config, action_space, observations, unused_length, state=None):
     # observation space = shape=(batch_size, episode_length, 10, 14, 2)
     # action space = shape=(batch, episode_length, 23)
-
     with tf.variable_scope('defense'):
         batch_size = tf.shape(observations)[0]
         episode_len = tf.shape(observations)[1]

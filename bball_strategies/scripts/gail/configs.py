@@ -51,7 +51,7 @@ def default():
     # Environment
     env = 'bball_gail_def-v0'
     steps = 1e10  # 1M
-
+    max_length = 50
     # wgan
     wgan_penalty_lambda = 10.0
 

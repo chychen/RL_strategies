@@ -117,19 +117,18 @@ class GAIL_DEF_PPO(object):
 
             # policy
             sample_ = tf.concat([
-                tf.zeros(shape=[observ.shape[0], 1, 1]),
-                tf.zeros(shape=[observ.shape[0], 1, 11]),
+                tf.zeros(shape=[observ.shape[0], 1, 13]),
                 output.policy[ACT['DEF_DASH']].sample()], axis=2)
             mode_ = tf.concat([
-                tf.zeros(shape=[observ.shape[0], 1, 1]),
-                tf.zeros(shape=[observ.shape[0], 1, 11]),
+                tf.zeros(shape=[observ.shape[0], 1, 13]),
                 output.policy[ACT['DEF_DASH']].mode()], axis=2)
             action = tf.where(
                 self._is_training, sample_, mode_)
-            logprob = output.policy.log_prob(action)[:, 0]
+            logprob = output.policy[ACT['DEF_DASH']].log_prob(action[:, :, 13:23])[
+                :, 0]
             # pylint: disable=g-long-lambda
             summary = tf.cond(self._should_log, lambda: tf.summary.merge([
-                tf.summary.histogram('mode', mode_[:, 0]),
+                tf.summary.histogram('mode', mode_[:, 0, 13:23]),
                 tf.summary.histogram('DEF_DASH', action[:, 0, 13:23]),
                 tf.summary.histogram('logprob', logprob)
             ]), str)
@@ -191,7 +190,8 @@ class GAIL_DEF_PPO(object):
     def _define_experience(self, agent_indices, observ, action, reward, turn_info):
         """Implement the branch of experience() entered during training."""
         # omit env reward!!! use discriminator as reward insteaded!!!
-        reward = Discriminator().get_rewards(observ)
+        with tf.device('/gpu:0'):
+            reward = Discriminator().get_rewards(observ)
 
         update_filters = tf.summary.merge([
             self._observ_filter.update(observ),
@@ -288,9 +288,7 @@ class GAIL_DEF_PPO(object):
 
         Args:
           policy_params: Nested tuple of policy parametres with all dimensions set.
-          policy_params[0]: offense dicision
-          policy_params[1]: offense dash
-          policy_params[2]: defense dash
+          policy_params[0]: defense dash
 
         Initializes the attributes `self._current_episodes`,
         `self._finished_episodes`, and `self._num_finished_episodes`. The episodes
@@ -514,11 +512,8 @@ class GAIL_DEF_PPO(object):
             # action.shape=(batch_size,episode_len,11,2)
             batch_size = tf.shape(action)[0]
             episode_len = action.shape.as_list()[1]
-            off_action_policy_format = action[:, :, :13]
             def_dash_policy_format = action[:, :, 13:]
             action_policy_format = []
-            action_policy_format.append(off_action_policy_format[:, :, 0])
-            action_policy_format.append(off_action_policy_format[:, :, 1:])
             action_policy_format.append(def_dash_policy_format)
 
             def get_policy_gradient(category):

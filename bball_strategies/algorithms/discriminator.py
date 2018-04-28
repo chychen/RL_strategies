@@ -39,42 +39,45 @@ class Discriminator(object):
             print("Instance Exists! :D")
         return Discriminator.__instance
 
-    def __init__(self, config, env):
+    def __init__(self, config=None, env=None):
         """
         state is composed of offense(condition) and defense
         """
-        self._global_steps = tf.train.get_or_create_global_step()
-        with tf.variable_scope('Discriminator', reuse=tf.AUTO_REUSE):
-            self.__steps = tf.get_variable('D_steps', shape=[
-            ], dtype=tf.int32, initializer=tf.zeros_initializer(dtype=tf.int32), trainable=False)
-            # state shape = [batch_size, buffer_size, 14, 2]
-            self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
+        if self.__instance is not None and config is not None:
+            # first init the class
+            self._global_steps = tf.train.get_or_create_global_step()
+            with tf.variable_scope('Discriminator', reuse=tf.AUTO_REUSE):
+                self.__steps = tf.get_variable('D_steps', shape=[
+                ], dtype=tf.int32, initializer=tf.zeros_initializer(dtype=tf.int32), trainable=False)
+                # state shape = [batch_size, buffer_size, 14, 2]
+                self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
+                                                None]+list(env.observation_space.shape))
+                self._agent_s = tf.placeholder(dtype=tf.float32, shape=[
                                             None]+list(env.observation_space.shape))
-            self._agent_s = tf.placeholder(dtype=tf.float32, shape=[
-                                           None]+list(env.observation_space.shape))
-            self._batch_size = tf.shape(self._expert_s)[0]
-            self._config = config
-            self._loss = self.__loss_function()
-            with tf.name_scope('optimizer'):
-                theta = get_var_list('Discriminator')
-                # Discriminator train one iteration, step++
-                assign_add_ = tf.assign_add(self.__steps, 1)
-                with tf.control_dependencies([assign_add_]):
-                    optimizer = self._config.optimizer(
-                        learning_rate=self._config.learning_rate)  # TODO beta1=0.5, beta2=0.9
-                    grads = tf.gradients(self._loss, theta)
-                    grads = list(zip(grads, theta))
-                    self.__train_op = optimizer.apply_gradients(
-                        grads_and_vars=grads, global_step=self._global_steps)
-        # summary
-        log_path = os.path.join(self._config.logdir, 'Discriminator')
-        self._summary_op = tf.summary.merge(tf.get_collection('D'))
-        self._summary_valid_op = tf.summary.merge(
-            tf.get_collection('D_valid'))
-        self.summary_writer = tf.summary.FileWriter(
-            log_path + '/D')
-        self.valid_summary_writer = tf.summary.FileWriter(
-            log_path + '/D_valid')
+                self._batch_size = tf.shape(self._expert_s)[0]
+                self._config = config
+                self._loss = self.__loss_function()
+                with tf.name_scope('optimizer'):
+                    theta = get_var_list('Discriminator')
+                    # Discriminator train one iteration, step++
+                    assign_add_ = tf.assign_add(self.__steps, 1)
+                    with tf.control_dependencies([assign_add_]):
+                        optimizer = self._config.optimizer(
+                            learning_rate=self._config.learning_rate)  # TODO beta1=0.5, beta2=0.9
+                        grads = tf.gradients(self._loss, theta)
+                        grads = list(zip(grads, theta))
+                        self._train_op = optimizer.apply_gradients(
+                            grads_and_vars=grads, global_step=self._global_steps)
+                self._ppo_reward = self._config.d_network
+            # summary
+            log_path = os.path.join(self._config.logdir, 'Discriminator')
+            self._summary_op = tf.summary.merge(tf.get_collection('D'))
+            self._summary_valid_op = tf.summary.merge(
+                tf.get_collection('D_valid'))
+            self.summary_writer = tf.summary.FileWriter(
+                log_path + '/D')
+            self.valid_summary_writer = tf.summary.FileWriter(
+                log_path + '/D_valid')
 
     def __loss_function(self):
         with tf.name_scope('wgan_gp_loss'):
@@ -86,11 +89,7 @@ class Discriminator(object):
             X_inter = epsilon * self._expert_s + (1.0-epsilon) * self._agent_s
             # add back the conditions
             X_inter = tf.concat(
-                [self._expert_s[:, :-1], X_inter[:, -1:]], axis=1)
-            print(X_inter)
-            X_inter = tf.concat(
-                [self._expert_s[:, :, 0:1], X_inter[:, :, 1:6], self._expert_s[:, :, 6:]], axis=2)
-            print(X_inter)
+                [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:]], axis=2)
             grad = tf.gradients(self._config.d_network(
                 X_inter, reuse=False), [X_inter])[0]
             sum_ = tf.reduce_sum(tf.square(grad), axis=0)
@@ -115,14 +114,28 @@ class Discriminator(object):
 
             return loss
 
-    def train(self):
-        pass
+    def train(self, agent_s, expert_s):
+        feed_dict = {
+            self._expert_s: expert_s,
+            self._agent_s: agent_s
+        }
+        global_step, _, summary = tf.get_default_session().run(
+            [self._global_steps, self._train_op, self._summary_op], feed_dict=feed_dict)
+        self.summary_writer.add_summary(summary, global_step=global_step)
+        return
 
-    def validate(self):
+    def validate(self, agent_s, expert_s):
+        feed_dict = {
+            self._expert_s: expert_s,
+            self._agent_s: agent_s
+        }
+        global_step, summary = tf.get_default_session().run(
+            [self._global_steps, self._summary_valid_op], feed_dict=feed_dict)
+        self.valid_summary_writer.add_summary(summary, global_step=global_step)
         pass
 
     def get_rewards(self, state):
-        return 0
+        return self._ppo_reward(state)
 
 
 def main():
@@ -136,7 +149,10 @@ def main():
         config.logdir = 'test'
     env = gym.make(config.env)
     D1 = Discriminator(config, env)
-    D2 = Discriminator(config, env)
+    D2 = Discriminator()
+    dummy = tf.ones(shape=[128, 10, 14, 2])
+    r = D2.get_rewards(dummy)
+    print(r)
 
 
 if __name__ == '__main__':
