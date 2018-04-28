@@ -52,5 +52,8 @@ def default():
     env = 'bball_gail_def-v0'
     steps = 1e10  # 1M
 
+    # wgan
+    wgan_penalty_lambda = 10.0
+
     return locals()
 

@@ -18,7 +18,7 @@ import tensorflow as tf
 from agents import parts
 from agents import tools
 from agents.algorithms.ppo import utility
-from disciminator import Discriminator
+from .discriminator import Discriminator
 
 
 class GAIL_DEF_PPO(object):

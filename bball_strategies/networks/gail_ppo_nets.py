@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import layers
 import agents
-from custom_distribution import CustomKLDiagNormal
+from .custom_distribution import CustomKLDiagNormal
 
 
 def gail_def_gaussian(config, action_space, observations, unused_length, state=None):
