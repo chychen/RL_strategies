@@ -135,7 +135,7 @@ def train(config, env_processes, outdir):
             while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
                 # train Discriminator
                 for _ in range(config.train_d_per_ppo):
-                print('train Discriminator')
+                    print('train Discriminator')
                     batch_fake_states = []
                     batch_real_states = expert_data[episode_idx:episode_idx +
                                                     config.episodes_per_batch]
