@@ -547,11 +547,13 @@ class GAIL_DEF_PPO(object):
                     (kl - cutoff_threshold) ** 2)
             policy_loss = surrogate_loss + kl_penalty + kl_cutoff
 
+            # def get_entropy(category):
+            #     return policy[category].entropy()
+            # TODO shape mismatched!!!!!!!!!!! between entropy(?,?) and policy_loss(?), bugs in original code?
             def get_entropy(category):
-                return policy[category].entropy()
+                return tf.reduce_mean(policy[category].entropy(), axis=1)
             entropy = get_entropy(ACT['DEF_DASH'])
             if self._config.entropy_regularization:
-                # TODO shape mismatched!!!!!!!!!!! between entropy and policy_loss
                 policy_loss -= self._config.entropy_regularization * entropy
             summary = tf.summary.merge([
                 tf.summary.histogram('entropy', entropy),
