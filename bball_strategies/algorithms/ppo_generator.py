@@ -16,9 +16,8 @@ class PPOPolicy(object):
         with tf.name_scope('ppo_generator'):
             self._obs = tf.placeholder(dtype=tf.float32, shape=[
                                        None, None]+list(env.observation_space.shape))
-            # tf.get_variable_scope().reuse_variables()
             dict_ = gail_ppo_nets.gail_def_gaussian(
-                config, None, self._obs, None)
+                config, None, self._obs, None, reuse=True)
 
             self._act_sample = dict_.policy[0].sample()
             self._act_mode = dict_.policy[0].mode()
@@ -67,7 +66,7 @@ def main():
     config = agents.tools.AttrDict(configs.default())
     env = gym.make(config.env)
     env = MonitorWrapper(env,
-                         init_mode=1,  # init from dataset
+                         init_mode=3,  # init from dataset in order
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True)
     obs = env.reset()

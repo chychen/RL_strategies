@@ -34,8 +34,8 @@ def default():
     init_output_factor = 0.1
     init_std = 0.35
     # Optimization
-    update_every = 200
-    update_epochs = 25
+    update_every = 60
+    update_epochs = 20
     optimizer = tf.train.AdamOptimizer
     learning_rate = 1e-4
 #   batch_size = 20
@@ -47,13 +47,16 @@ def default():
     kl_cutoff_coef = 1000
     kl_init_penalty = 1
 #   gae_lambda = None # TODO
-    # entropy_regularization = 0.1 # TODO
+    entropy_regularization = 0.1 # TODO
     # Environment
     env = 'bball_gail_def-v0'
-    steps = 1e10  # 1M
+    steps = 1e5
     max_length = 50
     # wgan
     wgan_penalty_lambda = 10.0
+    episodes_per_batch = 1
+    d_batch_size = max_length * episodes_per_batch
+    train_d_per_ppo = 5
 
     return locals()
 

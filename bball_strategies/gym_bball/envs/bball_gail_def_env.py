@@ -137,16 +137,17 @@ class BBallGailDefEnv(gym.Env):
         14 : ball(1) + offense(5) + defense(5) + basket(1) + ball_boundry(2)
         2 : x and y positions
         """
-        obs = np.empty(shape=(self.buffer_size, 14, 2), dtype=np.float32)
+        obs = np.empty(shape=(self.buffer_size, 11, 2), dtype=np.float32)
         for i in range(self.buffer_size):
             obs[i] = np.concatenate([
                 np.expand_dims(
                     self.states.buffer_positions[i, STATE_LOOKUP['BALL']], axis=0),
                 self.states.buffer_positions[i, STATE_LOOKUP['OFFENSE']],
-                self.states.buffer_positions[i, STATE_LOOKUP['DEFENSE']],
-                np.expand_dims(self.right_basket_pos, axis=0),
-                np.expand_dims([self.court_length / 2, 0], axis=0),
-                np.expand_dims([self.court_length, self.court_width], axis=0)
+                self.states.buffer_positions[i, STATE_LOOKUP['DEFENSE']]
+                # ,
+                # np.expand_dims(self.right_basket_pos, axis=0),
+                # np.expand_dims([self.court_length / 2, 0], axis=0),
+                # np.expand_dims([self.court_length, self.court_width], axis=0)
             ], axis=0)
         return obs
 
@@ -166,10 +167,23 @@ class BBallGailDefEnv(gym.Env):
             self.states.reset(
                 self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET']:
-            # ep_idx = np.floor(self.np_random_generator.uniform(
-            #     low=0.0, high=self.data.shape[0])).astype(np.int)
-            self.current_cond = copy.deepcopy(self.data[self.episode_index])
-            print('self.episode_index::::::::::::::::::::', self.episode_index)
+            ep_idx = np.floor(self.np_random_generator.uniform(
+                low=0.0, high=self.data.shape[0])).astype(np.int)
+            self.current_cond = copy.deepcopy(self.data[ep_idx])
+            ball_pos = self.current_cond[0, 0, 0:2]
+            off_positions = self.current_cond[0, 1:6, 0:2]
+            def_positions = self.current_cond[0, 6:11, 0:2]
+            off2ball_vec = off_positions - ball_pos
+            ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
+            positions = np.array(
+                [off_positions[ball_handler_idx], off_positions, def_positions])
+            vels = np.array([np.zeros_like(ball_pos, dtype=np.float32), np.zeros_like(
+                off_positions, dtype=np.float32), np.zeros_like(def_positions, dtype=np.float32)])
+            self.states.reset(positions, ball_handler_idx,
+                              buffer_size=self.buffer_size)
+        elif self.init_mode == INIT_LOOKUP['DATASET_ORDERED']:
+            self.current_cond = copy.deepcopy(self.data[self.episode_index%self.data.shape[0]])
+            # print('self.episode_index::::::::::::::::::::', self.episode_index)
             self.episode_index += 1
             ball_pos = self.current_cond[0, 0, 0:2]
             off_positions = self.current_cond[0, 1:6, 0:2]
@@ -416,9 +430,9 @@ class BBallGailDefEnv(gym.Env):
         2 : x and y positions
         """
         low_ = np.array([self.states.x_low_bound, self.states.y_low_bound]) * \
-            np.ones(shape=[self.buffer_size, 14, 2])
+            np.ones(shape=[self.buffer_size, 11, 2])
         high_ = np.array([self.states.x_high_bound, self.states.y_high_bound]) * \
-            np.ones(shape=[self.buffer_size, 14, 2])
+            np.ones(shape=[self.buffer_size, 11, 2])
         return spaces.Box(low=low_, high=high_, dtype=np.float32)
 
     def _formulated_defense_dash(self, mode=0):
@@ -886,5 +900,6 @@ DESICION_LOOKUP = {
 INIT_LOOKUP = {
     'DEFAULT': 0,
     'DATASET': 1,
-    'INPUT': 2
+    'INPUT': 2,
+    'DATASET_ORDERED': 3
 }

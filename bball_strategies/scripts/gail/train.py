@@ -15,6 +15,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 import gym
 import tensorflow as tf
+import numpy as np
 from tensorflow.python import debug as tf_debug
 
 from agents import tools
@@ -23,6 +24,7 @@ from bball_strategies import gym_bball
 from bball_strategies.scripts.gail import configs
 from bball_strategies.gym_bball.tools import BBallWrapper
 from bball_strategies.algorithms.discriminator import Discriminator
+from bball_strategies.algorithms.ppo_generator import PPOPolicy
 
 
 def _create_environment(config):
@@ -91,7 +93,7 @@ def train(config, env_processes, outdir):
     score : Evaluation scores.
     """
     tf.reset_default_graph()
-    d = Discriminator(config, gym.make(config.env))
+    D = Discriminator(config, gym.make(config.env))
     if config.update_every % config.num_agents:
         tf.logging.warn('Number of agents should divide episodes per update.')
     with tf.device('/cpu:0'):
@@ -113,29 +115,63 @@ def train(config, env_processes, outdir):
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
-
-
-    # train Discriminator
-    
-
-    # train PPO
-
-
-
-
-
-
-
-
-
-
+    # env to generate fake state
+    env = gym.make(config.env)
+    # init_mode=3 : init from dataset in order
+    env = BBallWrapper(env, init_mode=3, fps=config.FPS,
+                       time_limit=config.max_length)
+    # agent to genrate acttion
+    ppo_policy = PPOPolicy(config, env)
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=False)
-        print(total_steps)
-        for score in loop.run(sess, saver, total_steps):
-            yield score
+        # GAIL
+        expert_data = np.load('bball_strategies/data/GAILTransitionData.npy')
+        print(expert_data.shape)
+        while True:
+            perm_idx = np.random.permutation(expert_data.shape[0])
+            expert_data = expert_data[perm_idx]
+            episode_idx = 0
+            while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
+                # train Discriminator
+                for _ in range(config.train_d_per_ppo):
+                print('train Discriminator')
+                    batch_fake_states = []
+                    batch_real_states = expert_data[episode_idx:episode_idx +
+                                                    config.episodes_per_batch]
+                    batch_real_states = np.concatenate(
+                        batch_real_states, axis=0)
+                    for _ in range(config.episodes_per_batch):
+                        # align the conditions with env
+                        conditions = expert_data[episode_idx:episode_idx+1, :, -1]
+                        env.data = conditions
+                        obs_state = env.reset()
+                        for _ in range(conditions.shape[1]):
+                            act = ppo_policy.act(
+                                np.array(obs_state)[None, None])
+                            transformed_act = [
+                                # Discrete(3) must be int
+                                int(0),
+                                # Box(2,)
+                                np.array([0.0, 0.0], dtype=np.float32),
+                                # Box(5, 2)
+                                np.zeros(shape=[5, 2], dtype=np.float32),
+                                # Box(5, 2)
+                                np.reshape(act, [5, 2])
+                            ]
+                            obs_state, reward, done, info = env.step(
+                                transformed_act)
+                            batch_fake_states.append(obs_state)
+                        episode_idx += 1
+                    assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
+                        batch_real_states.shape[0], len(batch_fake_states))
+                    D.train(batch_fake_states, batch_real_states)
+                # train PPO
+                print('train PPO')
+                for score in loop.run(sess, saver, total_steps):
+                    yield score
     batch_env.close()
+    env.close()
 
 
 def main(_):
@@ -153,7 +189,7 @@ def main(_):
         raise KeyError('You must specify a configuration.')
     config = tools.AttrDict(getattr(configs, FLAGS.config)())
     config = utility.save_config(config, logdir)
-    
+
     # train ppo
     for score in train(config, FLAGS.env_processes, outdir):
         tf.logging.info('Score {}.'.format(score))

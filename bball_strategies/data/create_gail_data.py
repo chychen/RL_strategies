@@ -29,7 +29,6 @@ def main():
     np.save('GAILEnvData.npy', gail_env_data)
     print('GAILEnvData', gail_env_data.shape)
 
-
     # GAIL Transition Data
     # padding by duplicating first frame
     pad = np.concatenate([data[:, 0:1]
@@ -38,9 +37,12 @@ def main():
     pad_data_len = data_len + OBSERVATION_LENGTH-1
     gail_tran_data = []
     for i in range(pad_data.shape[0]):
-        for len_idx in range(0, pad_data_len[i]-OBSERVATION_LENGTH, 1):
-            temp = pad_data[i, len_idx: len_idx+OBSERVATION_LENGTH, :, 0:2]
-            gail_tran_data.append(temp)
+        for chunk_idx in range(0, pad_data_len[i]-ENV_CONDITION_LENGTH-OBSERVATION_LENGTH, NON_OVERLAP_LENGTH):
+            chunk = []
+            for k in range(chunk_idx, chunk_idx+ENV_CONDITION_LENGTH, 1):
+                buffer = pad_data[i, k:k+OBSERVATION_LENGTH, :, 0:2]
+                chunk.append(buffer)
+            gail_tran_data.append(chunk)
     gail_tran_data = np.array(gail_tran_data)
     np.save('GAILTransitionData.npy', gail_tran_data)
     print('GAILTransitionData', gail_tran_data.shape)

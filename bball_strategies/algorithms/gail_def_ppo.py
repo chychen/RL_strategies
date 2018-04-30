@@ -44,7 +44,7 @@ class GAIL_DEF_PPO(object):
         self._config = config
         # NOTE: clipping!!!!!!!!!
         self._observ_filter = parts.StreamingNormalize(
-            self._batch_env.observ[0], center=True, scale=True, clip=5,
+            self._batch_env.observ[0], center=False, scale=False, clip=None,
             name='normalize_observ')
         self._reward_filter = parts.StreamingNormalize(
             self._batch_env.reward[0], center=False, scale=True, clip=None,
