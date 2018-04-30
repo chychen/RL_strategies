@@ -25,7 +25,6 @@ def network(state, reuse=False):
             scale=1.0, mode='fan_avg', distribution='uniform')
         init_output_weights = tf.variance_scaling_initializer(
             scale=0.1, mode='fan_in', distribution='normal')
-
         conv1 = tf.layers.conv1d(
             inputs=input_,
             filters=128,

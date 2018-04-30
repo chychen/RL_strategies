@@ -1,30 +1,36 @@
-class WrapperEnv(object):
+def test(fn, aaa=1):
+    fn(111)
+    print(aaa)
 
-    def __init__(self, env):
-        self._env = env
+test(lambda _1: print(_1), 22)
 
-    @property
-    def my_attr(self):
-        return 'changed'
+# class WrapperEnv(object):
 
-    def show(self):
-        print(self._env.my_attr)
-        # print(self.my_attr)
+#     def __init__(self, env):
+#         self._env = env
 
-class Env(object):
+#     @property
+#     def my_attr(self):
+#         return 'changed'
 
-    def __init__(self):
-        pass
+#     def show(self):
+#         print(self._env.my_attr)
+#         # print(self.my_attr)
 
-    @property
-    def my_attr(self):
-        return 'my_attr'
+# class Env(object):
 
-env = Env()
-print(env.my_attr)
-env = WrapperEnv(env)
-print(env.my_attr)
-env.show()
+#     def __init__(self):
+#         pass
+
+#     @property
+#     def my_attr(self):
+#         return 'my_attr'
+
+# env = Env()
+# print(env.my_attr)
+# env = WrapperEnv(env)
+# print(env.my_attr)
+# env.show()
 
 #########################################################
 # gather：根據一個list來取用目標

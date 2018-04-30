@@ -9,8 +9,6 @@ import time
 import shutil
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib import rnn
-from tensorflow.contrib import layers
 
 
 def get_var_list(prefix):
@@ -68,7 +66,6 @@ class Discriminator(object):
                         grads = list(zip(grads, theta))
                         self._train_op = optimizer.apply_gradients(
                             grads_and_vars=grads, global_step=self._global_steps)
-                self._ppo_reward = self._config.d_network
             # summary
             log_path = os.path.join(self._config.logdir, 'Discriminator')
             self._summary_op = tf.summary.merge(tf.get_collection('D'))
@@ -135,7 +132,8 @@ class Discriminator(object):
         pass
 
     def get_rewards(self, state):
-        return self._ppo_reward(state)
+        with tf.variable_scope('Discriminator'):
+            return self._config.d_network(state, reuse=True)
 
 
 def main():

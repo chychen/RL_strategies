@@ -117,10 +117,10 @@ class GAIL_DEF_PPO(object):
 
             # policy
             sample_ = tf.concat([
-                tf.zeros(shape=[observ.shape[0], 1, 13]),
+                tf.zeros(shape=[observ.shape[0], 1, 13], dtype=tf.float32),
                 output.policy[ACT['DEF_DASH']].sample()], axis=2)
             mode_ = tf.concat([
-                tf.zeros(shape=[observ.shape[0], 1, 13]),
+                tf.zeros(shape=[observ.shape[0], 1, 13], dtype=tf.float32),
                 output.policy[ACT['DEF_DASH']].mode()], axis=2)
             action = tf.where(
                 self._is_training, sample_, mode_)
@@ -551,6 +551,7 @@ class GAIL_DEF_PPO(object):
                 return policy[category].entropy()
             entropy = get_entropy(ACT['DEF_DASH'])
             if self._config.entropy_regularization:
+                # TODO shape mismatched!!!!!!!!!!! between entropy and policy_loss
                 policy_loss -= self._config.entropy_regularization * entropy
             summary = tf.summary.merge([
                 tf.summary.histogram('entropy', entropy),

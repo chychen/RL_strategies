@@ -91,6 +91,8 @@ def train(config, env_processes, outdir):
     score : Evaluation scores.
     """
     tf.reset_default_graph()
+    d = Discriminator(config, gym.make(config.env))
+    
     if config.update_every % config.num_agents:
         tf.logging.warn('Number of agents should divide episodes per update.')
     with tf.device('/cpu:0'):
@@ -137,7 +139,6 @@ def main(_):
     config = tools.AttrDict(getattr(configs, FLAGS.config)())
     config = utility.save_config(config, logdir)
     
-    d = Discriminator(config, gym.make(config.env))
     # train ppo
     for score in train(config, FLAGS.env_processes, outdir):
         tf.logging.info('Score {}.'.format(score))
