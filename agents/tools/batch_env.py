@@ -92,9 +92,9 @@ class BatchEnv(object):
         # Extended
         # transform action back to customized tuple
         if actions.shape[1] == 13:
-            actions = tools.NDefActTuple(None).back_to_act_tuple(actions)
+            actions = tools.NDefActTuple.back_to_act_tuple(actions)
         else:
-            actions = tools.ActTuple(None).back_to_act_tuple(actions)
+            actions = tools.ActTuple.back_to_act_tuple(actions)
         if self._blocking:
             transitions = [
                 env.step(action)

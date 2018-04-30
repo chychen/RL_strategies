@@ -82,6 +82,7 @@ class BBallGailDefEnv(gym.Env):
         self.observation_space = self._set_observation_space()
 
         # init dataset
+        self.episode_index = 0
         self.data = np.load('bball_strategies/data/GAILEnvData.npy')
         self.current_cond = None
         self.time_limit = self.data.shape[1]
@@ -165,9 +166,11 @@ class BBallGailDefEnv(gym.Env):
             self.states.reset(
                 self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET']:
-            ep_idx = np.floor(self.np_random_generator.uniform(
-                low=0.0, high=self.data.shape[0])).astype(np.int)
-            self.current_cond = copy.deepcopy(self.data[ep_idx])
+            # ep_idx = np.floor(self.np_random_generator.uniform(
+            #     low=0.0, high=self.data.shape[0])).astype(np.int)
+            self.current_cond = copy.deepcopy(self.data[self.episode_index])
+            print('self.episode_index::::::::::::::::::::', self.episode_index)
+            self.episode_index += 1
             ball_pos = self.current_cond[0, 0, 0:2]
             off_positions = self.current_cond[0, 1:6, 0:2]
             def_positions = self.current_cond[0, 6:11, 0:2]

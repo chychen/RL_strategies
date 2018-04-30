@@ -92,7 +92,6 @@ def train(config, env_processes, outdir):
     """
     tf.reset_default_graph()
     d = Discriminator(config, gym.make(config.env))
-    
     if config.update_every % config.num_agents:
         tf.logging.warn('Number of agents should divide episodes per update.')
     with tf.device('/cpu:0'):
@@ -114,6 +113,22 @@ def train(config, env_processes, outdir):
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
+
+
+    # train Discriminator
+    
+
+    # train PPO
+
+
+
+
+
+
+
+
+
+
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=False)

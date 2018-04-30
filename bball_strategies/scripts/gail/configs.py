@@ -47,7 +47,7 @@ def default():
     kl_cutoff_coef = 1000
     kl_init_penalty = 1
 #   gae_lambda = None # TODO
-    entropy_regularization = 0.1 # TODO
+    # entropy_regularization = 0.1 # TODO
     # Environment
     env = 'bball_gail_def-v0'
     steps = 1e10  # 1M

@@ -65,7 +65,8 @@ class ActTuple(Space):
     def len(self):
         return 3
 
-    def back_to_act_tuple(self, inputs):
+    @classmethod
+    def back_to_act_tuple(cls, inputs):
         """
         Args
         ----
@@ -151,7 +152,8 @@ class NDefActTuple(Space):
     def len(self):
         return 2
 
-    def back_to_act_tuple(self, inputs):
+    @classmethod
+    def back_to_act_tuple(cls, inputs):
         """
         Args
         ----
