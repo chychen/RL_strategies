@@ -189,10 +189,6 @@ class GAIL_DEF_PPO(object):
 
     def _define_experience(self, agent_indices, observ, action, reward, turn_info):
         """Implement the branch of experience() entered during training."""
-        # omit env reward!!! use discriminator as reward insteaded!!!
-        with tf.device('/gpu:0'):
-            reward = Discriminator().get_rewards(observ)
-
         update_filters = tf.summary.merge([
             self._observ_filter.update(observ),
             self._reward_filter.update(reward)])

@@ -22,6 +22,7 @@ import gym
 import tensorflow as tf
 # Extended
 from bball_strategies.gym_bball import tools
+from bball_strategies.algorithms.discriminator import Discriminator
 
 
 class InGraphBatchEnv(object):
@@ -104,6 +105,8 @@ class InGraphBatchEnv(object):
             #     [observ_dtype, tf.float32, tf.bool], name='step')
             observ = tf.check_numerics(observ, 'observ')
             reward = tf.check_numerics(reward, 'reward')
+
+
             return tf.group(
                 self._observ.assign(observ),
                 self._action.assign(action),
@@ -149,7 +152,12 @@ class InGraphBatchEnv(object):
     @property
     def reward(self):
         """Access the variable holding the current reward."""
-        return self._reward
+        # omit env reward!!! use discriminator as reward insteaded!!!
+        with tf.device('/gpu:0'):
+            reward = Discriminator().get_rewards(self._observ)
+        return reward
+        # NOTE: modified
+        # return self._reward
 
     @property
     def done(self):
