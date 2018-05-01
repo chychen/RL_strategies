@@ -76,6 +76,17 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
     return loop
 
 
+class MonitorWrapper(gym.wrappers.Monitor):
+    # init_mode 0 : init by default
+    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None):
+        super(MonitorWrapper, self).__init__(env=env, directory='./test/',
+                                                video_callable=lambda count: count % 1 == 0, force=True)
+        env.init_mode = init_mode
+        env.if_vis_trajectory = if_vis_trajectory
+        env.if_vis_visual_aid = if_vis_visual_aid
+        env.init_positions = init_positions
+        env.init_ball_handler_idx = init_ball_handler_idx
+
 def train(config, env_processes, outdir):
     """ Training and evaluation entry point yielding scores.
 
@@ -120,6 +131,11 @@ def train(config, env_processes, outdir):
     # init_mode=3 : init from dataset in order
     env = BBallWrapper(env, init_mode=3, fps=config.FPS,
                        time_limit=config.max_length)
+
+    env = MonitorWrapper(env,
+                         init_mode=3,  # init from dataset in order
+                         if_vis_trajectory=False,
+                         if_vis_visual_aid=True)
     # agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
     with tf.Session(config=sess_config) as sess:
@@ -128,6 +144,7 @@ def train(config, env_processes, outdir):
         # GAIL
         expert_data = np.load('bball_strategies/data/GAILTransitionData.npy')
         print(expert_data.shape)
+        cumulate_steps = 0
         while True:
             perm_idx = np.random.permutation(expert_data.shape[0])
             expert_data = expert_data[perm_idx]
@@ -146,6 +163,7 @@ def train(config, env_processes, outdir):
                         conditions = expert_data[episode_idx:episode_idx+1, :, -1]
                         env.data = conditions
                         obs_state = env.reset()
+                        env.render()
                         for _ in range(conditions.shape[1]):
                             act = ppo_policy.act(
                                 np.array(obs_state)[None, None])
@@ -162,13 +180,15 @@ def train(config, env_processes, outdir):
                             obs_state, reward, done, info = env.step(
                                 transformed_act)
                             batch_fake_states.append(obs_state)
+                            env.render()
                         episode_idx += 1
                     assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
                         batch_real_states.shape[0], len(batch_fake_states))
                     D.train(batch_fake_states, batch_real_states)
                 # train PPO
                 print('train PPO')
-                for score in loop.run(sess, saver, total_steps):
+                cumulate_steps += total_steps
+                for score in loop.run(sess, saver, cumulate_steps):
                     yield score
     batch_env.close()
     env.close()

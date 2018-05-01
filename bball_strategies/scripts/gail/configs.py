@@ -50,13 +50,13 @@ def default():
     entropy_regularization = 0.1 # TODO
     # Environment
     env = 'bball_gail_def-v0'
-    steps = 1e5
+    steps = 1e4
     max_length = 50
     # wgan
     wgan_penalty_lambda = 10.0
     episodes_per_batch = 1
     d_batch_size = max_length * episodes_per_batch
-    train_d_per_ppo = 5
+    train_d_per_ppo = 1
 
     return locals()
 
