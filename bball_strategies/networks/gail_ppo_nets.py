@@ -34,7 +34,6 @@ def gail_def_gaussian(config, action_space, observations, unused_length, state=N
                 activation=tf.nn.relu,
                 kernel_initializer=init_xavier_weights,
             )
-            print(conv1)
             conv2 = tf.layers.conv2d(
                 inputs=conv1,
                 filters=128,

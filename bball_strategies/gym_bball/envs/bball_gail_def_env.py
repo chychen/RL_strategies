@@ -84,8 +84,9 @@ class BBallGailDefEnv(gym.Env):
         # init dataset
         self.episode_index = 0
         self.data = np.load('bball_strategies/data/GAILEnvData.npy')
+        # self.data = None
         self.current_cond = None
-        self.time_limit = self.data.shape[1]
+        self.time_limit = 49
 
         # random seed
         self.seed()
@@ -93,15 +94,15 @@ class BBallGailDefEnv(gym.Env):
     def _update_offense_from_real_data(self):
         if self.states.steps+1 == self.time_limit:
             self.states.update_status(done=True, status=STATUS_LOOKUP['OOT'])
-        self.states.positions[STATE_LOOKUP['BALL']
-                              ] = self.current_cond[self.states.steps, 0]
-        self.states.positions[STATE_LOOKUP['OFFENSE']
-                              ] = self.current_cond[self.states.steps, 1:6]
+        else:
+            self.states.positions[STATE_LOOKUP['BALL']
+                                  ] = self.current_cond[self.states.steps+1, 0]
+            self.states.positions[STATE_LOOKUP['OFFENSE']
+                                  ] = self.current_cond[self.states.steps+1, 1:6]
 
     def step(self, action):
         """
         offense team is just part of env. in the returned observation, offense state always one step lead than defense state. 
-        observation: off(t+1),def(t) -> defense_policy -> step(defense_action) -> observation: off(t+2),def(t+1)
         Inputs
         ------
         action : list
@@ -120,13 +121,13 @@ class BBallGailDefEnv(gym.Env):
         off_pl_dash = action[ACTION_LOOKUP['OFF_DASH']]  # should be zeros
         def_pl_dash = action[ACTION_LOOKUP['DEF_DASH']]
 
+        # then offense to t+1
+        self._update_offense_from_real_data()
         # first update defense to t+1
         self._update_player_state(
             def_pl_dash, self.states.vels, STATE_LOOKUP['DEFENSE'])
-        # then offense to t+2
-        self._update_offense_from_real_data()
 
-        # update env information
+        # update env information, steps++
         self.states.end_step()
 
         return self._get_obs(), 0, self.states.done, dict(turn=0)
@@ -151,9 +152,9 @@ class BBallGailDefEnv(gym.Env):
                 # np.expand_dims([self.court_length, self.court_width], axis=0)
             ], axis=0)
 
-        # correct back the defense
+        # correct back the defense t+1
         self.states.positions[STATE_LOOKUP['DEFENSE']
-                              ] = self.current_cond[self.states.steps-1, 6:11]
+                              ] = self.current_cond[self.states.steps, 6:11]  # step have been ++
         return obs
 
     def reset(self):
@@ -187,10 +188,7 @@ class BBallGailDefEnv(gym.Env):
             self.states.reset(positions, ball_handler_idx,
                               buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET_ORDERED']:
-            self.current_cond = copy.deepcopy(
-                self.data[self.episode_index % self.data.shape[0]])
-            # print('self.episode_index::::::::::::::::::::', self.episode_index)
-            self.episode_index += 1
+            self.current_cond = copy.deepcopy(self.data[0])
             ball_pos = self.current_cond[0, 0, 0:2]
             off_positions = self.current_cond[0, 1:6, 0:2]
             def_positions = self.current_cond[0, 6:11, 0:2]

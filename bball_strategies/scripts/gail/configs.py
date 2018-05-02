@@ -47,10 +47,11 @@ def default():
     kl_cutoff_coef = 1000
     kl_init_penalty = 1
 #   gae_lambda = None # TODO
-    entropy_regularization = 0.1 # TODO
+    entropy_regularization = 0.1  # TODO
     # Environment
     env = 'bball_gail_def-v0'
-    max_length = 50
+    # data only have 50 length, if we step 50 times, cant find 51-th conidtion in data
+    max_length = 49
     steps_per_ppo_iter = update_every*max_length
     steps = steps_per_ppo_iter*3
     # wgan
@@ -60,4 +61,3 @@ def default():
     train_d_per_ppo = 1
 
     return locals()
-

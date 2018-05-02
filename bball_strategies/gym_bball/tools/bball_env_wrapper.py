@@ -44,6 +44,14 @@ class BBallWrapper(object):
     def reset(self):
         return self._env.reset()
 
+    @property
+    def data(self):
+        return self._env.data
+
+    @data.setter
+    def data(self, value):
+        self._env.data = value
+
 
 class ClipAction(object):
     """Clip out of range actions to the action space of the environment."""
@@ -68,6 +76,14 @@ class ClipAction(object):
                 raise ValueError(
                     'action space is not defined, {}'.format(action[i]))
         return self._env.step(action)
+
+    @property
+    def data(self):
+        return self._env.data
+
+    @data.setter
+    def data(self, value):
+        self._env.data = value
 
 
 class RangeNormalize(object):
@@ -168,6 +184,14 @@ class RangeNormalize(object):
                 ) and np.isfinite(space[i].high).all()  # Box
         return check
 
+    @property
+    def data(self):
+        return self._env.data
+
+    @data.setter
+    def data(self, value):
+        self._env.data = value
+
 
 class ConvertTo32Bit(object):
     """Convert data types of an OpenAI Gym environment to 32 bit."""
@@ -253,3 +277,11 @@ class ConvertTo32Bit(object):
         if not np.isfinite(reward).all():
             raise ValueError('Infinite reward encountered.')
         return np.array(reward, dtype=np.float32)
+
+    @property
+    def data(self):
+        return self._env.data
+
+    @data.setter
+    def data(self, value):
+        self._env.data = value

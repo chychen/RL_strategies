@@ -1,8 +1,56 @@
-def test(fn, aaa=1):
-    fn(111)
-    print(aaa)
+class test(object):
+    def __init__(self):
+        self.data = 1
 
-test(lambda _1: print(_1), 22)
+    def show(self):
+        print(self.data)
+
+
+class wrapper1(object):
+    def __init__(self, env):
+        self._env = env
+
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+
+    @property
+    def data(self):
+        return self._env.data
+
+    @data.setter
+    def data(self, value):
+        self._env.data = value
+
+
+class wrapper2(object):
+    def __init__(self, env):
+        self._env = env
+
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+
+    @property
+    def data(self):
+        return self._env.data
+
+    @data.setter
+    def data(self, value):
+        self._env.data = value
+
+t = test()
+w1t = wrapper1(t)
+w2t = wrapper2(w1t)
+print(w2t.data)
+
+w2t.data = 1000
+w2t.show()
+
+
+# def test(fn, aaa=1):
+#     fn(111)
+#     print(aaa)
+
+# test(lambda _1: print(_1), 22)
 
 # class WrapperEnv(object):
 

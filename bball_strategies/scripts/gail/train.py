@@ -80,12 +80,26 @@ class MonitorWrapper(gym.wrappers.Monitor):
     # init_mode 0 : init by default
     def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None):
         super(MonitorWrapper, self).__init__(env=env, directory='./test/',
-                                                video_callable=lambda count: count % 1 == 0, force=True)
-        env.init_mode = init_mode
-        env.if_vis_trajectory = if_vis_trajectory
-        env.if_vis_visual_aid = if_vis_visual_aid
-        env.init_positions = init_positions
-        env.init_ball_handler_idx = init_ball_handler_idx
+                                             video_callable=lambda count: count % 1 == 0, force=True)
+        self._env = env
+        self._env.init_mode = init_mode
+        self._env.if_vis_trajectory = if_vis_trajectory
+        self._env.if_vis_visual_aid = if_vis_visual_aid
+        self._env.init_positions = init_positions
+        self._env.init_ball_handler_idx = init_ball_handler_idx
+
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+
+    @property
+    def data(self):
+        return self._env.data
+
+    @data.setter
+    def data(self, value):
+        self._env.data = value
+
+
 
 def train(config, env_processes, outdir):
     """ Training and evaluation entry point yielding scores.
@@ -103,6 +117,13 @@ def train(config, env_processes, outdir):
     ------
     score : Evaluation scores.
     """
+    vanilla_env = gym.make(config.env)
+    def normalize_observ(observ):
+        min_ = vanilla_env.observation_space.low
+        max_ = vanilla_env.observation_space.high
+        observ = 2 * (observ - min_) / (max_ - min_) - 1
+        return observ
+
     tf.reset_default_graph()
     D = Discriminator(config, gym.make(config.env))
     if config.update_every % config.num_agents:
@@ -131,11 +152,9 @@ def train(config, env_processes, outdir):
     # init_mode=3 : init from dataset in order
     env = BBallWrapper(env, init_mode=3, fps=config.FPS,
                        time_limit=config.max_length)
-
     env = MonitorWrapper(env,
-                         init_mode=3,  # init from dataset in order
-                         if_vis_trajectory=False,
-                         if_vis_visual_aid=True)
+                         # init from dataset in order
+                         init_mode=3)
     # agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
     with tf.Session(config=sess_config) as sess:
@@ -155,16 +174,17 @@ def train(config, env_processes, outdir):
                     print('train Discriminator')
                     batch_fake_states = []
                     batch_real_states = expert_data[episode_idx:episode_idx +
-                                                    config.episodes_per_batch]
+                                                    config.episodes_per_batch, 1:] # frame 0 is condition
                     batch_real_states = np.concatenate(
                         batch_real_states, axis=0)
                     for _ in range(config.episodes_per_batch):
                         # align the conditions with env
+                        # -1 : newest state
                         conditions = expert_data[episode_idx:episode_idx+1, :, -1]
                         env.data = conditions
                         obs_state = env.reset()
                         env.render()
-                        for _ in range(conditions.shape[1]):
+                        for _ in range(config.max_length):
                             act = ppo_policy.act(
                                 np.array(obs_state)[None, None])
                             transformed_act = [
@@ -184,6 +204,8 @@ def train(config, env_processes, outdir):
                         episode_idx += 1
                     assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
                         batch_real_states.shape[0], len(batch_fake_states))
+                    batch_fake_states = np.array(batch_fake_states)
+                    batch_real_states = normalize_observ(batch_real_states)
                     D.train(batch_fake_states, batch_real_states)
                 # train PPO
                 print('train PPO')

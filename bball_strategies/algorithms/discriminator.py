@@ -93,8 +93,8 @@ class Discriminator(object):
             grad_norm = tf.sqrt(sum_)
             grad_pen = self._config.wgan_penalty_lambda * tf.reduce_mean(
                 tf.square(grad_norm - 1.0))
-            real_scores = self._config.d_network(self._expert_s, reuse=True)
             fake_scores = self._config.d_network(self._agent_s, reuse=True)
+            real_scores = self._config.d_network(self._expert_s, reuse=True)
             f_fake = tf.reduce_mean(fake_scores)
             f_real = tf.reduce_mean(real_scores)
             em_distance = f_real - f_fake
