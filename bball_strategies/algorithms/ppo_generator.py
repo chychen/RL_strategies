@@ -16,8 +16,10 @@ class PPOPolicy(object):
         with tf.name_scope('ppo_generator'):
             self._obs = tf.placeholder(dtype=tf.float32, shape=[
                                        None, None]+list(env.observation_space.shape))
-            dict_ = gail_ppo_nets.gail_def_gaussian(
-                config, None, self._obs, None, reuse=True)
+            
+            with tf.variable_scope('network', reuse=True):
+                dict_ = gail_ppo_nets.gail_def_gaussian(
+                    config, None, self._obs, None)
 
             self._act_sample = dict_.policy[0].sample()
             self._act_mode = dict_.policy[0].mode()

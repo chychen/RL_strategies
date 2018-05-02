@@ -12,7 +12,7 @@ import agents
 from .custom_distribution import CustomKLDiagNormal
 
 
-def gail_def_gaussian(config, action_space, observations, unused_length, state=None, reuse=False):
+def gail_def_gaussian(config, action_space, observations, unused_length, state=None):
     # observation space = shape=(batch_size, episode_length, 10, 14, 2)
     # action space = shape=(batch, episode_length, 23)
     with tf.variable_scope('defense'):
@@ -34,6 +34,7 @@ def gail_def_gaussian(config, action_space, observations, unused_length, state=N
                 activation=tf.nn.relu,
                 kernel_initializer=init_xavier_weights,
             )
+            print(conv1)
             conv2 = tf.layers.conv2d(
                 inputs=conv1,
                 filters=128,

@@ -114,6 +114,7 @@ class BBallGailDefEnv(gym.Env):
         done (boolean) : whether the episode has ended, in which case further step() calls will return undefined results
         info (dict) : contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
+        self.states.before_step()
         decision = action[ACTION_LOOKUP['DECISION']]  # should be zeros
         ball_pass_vel = action[ACTION_LOOKUP['BALL']]  # should be zeros
         off_pl_dash = action[ACTION_LOOKUP['OFF_DASH']]  # should be zeros
@@ -149,6 +150,10 @@ class BBallGailDefEnv(gym.Env):
                 # np.expand_dims([self.court_length / 2, 0], axis=0),
                 # np.expand_dims([self.court_length, self.court_width], axis=0)
             ], axis=0)
+
+        # correct back the defense
+        self.states.positions[STATE_LOOKUP['DEFENSE']
+                              ] = self.current_cond[self.states.steps-1, 6:11]
         return obs
 
     def reset(self):
@@ -182,7 +187,8 @@ class BBallGailDefEnv(gym.Env):
             self.states.reset(positions, ball_handler_idx,
                               buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET_ORDERED']:
-            self.current_cond = copy.deepcopy(self.data[self.episode_index%self.data.shape[0]])
+            self.current_cond = copy.deepcopy(
+                self.data[self.episode_index % self.data.shape[0]])
             # print('self.episode_index::::::::::::::::::::', self.episode_index)
             self.episode_index += 1
             ball_pos = self.current_cond[0, 0, 0:2]
@@ -434,63 +440,6 @@ class BBallGailDefEnv(gym.Env):
         high_ = np.array([self.states.x_high_bound, self.states.y_high_bound]) * \
             np.ones(shape=[self.buffer_size, 11, 2])
         return spaces.Box(low=low_, high=high_, dtype=np.float32)
-
-    def _formulated_defense_dash(self, mode=0):
-        """ get the formulated defense
-        mode 0 : man to man defense
-        mode 1 : zone defense
-        * for off_player in offense_team_in_order_by_who_has_ball_or_closer_to_the_basket:
-            * for havent_matched_def_player in havent_matched_defense_palyers:
-                * find the closet havent_matched_def_player to off_payer
-                * calculate the acceleration (next def pos is in between the basket and offense you defense
-
-        Return
-        ------
-        def_pl_dash : float, shape=(5,2)
-        """
-        def_pl_dash = np.empty([5, 2], dtype=np.float32)
-        off_positions = self.states.positions[STATE_LOOKUP['OFFENSE']]
-
-        def update_best_defender():
-            def_positions = copy.deepcopy(
-                self.states.positions[STATE_LOOKUP['DEFENSE']])
-            off_order = []
-            if self.states.ball_handler_idx is not None:
-                off_order.append(self.states.ball_handler_idx)
-            off2basket_lens = length(
-                self.right_basket_pos - off_positions, axis=1)
-            len_order = np.argsort(off2basket_lens)
-            for i in len_order:
-                if i not in off_order:
-                    off_order.append(i)
-            for i, off_pos in enumerate(off_positions[off_order]):
-                def2off_len = length(def_positions-off_pos, axis=1)
-                best_defenser_idx = np.argmin(def2off_len)
-                self.states.off_pair_def[off_order[i]] = best_defenser_idx
-                def_positions[best_defenser_idx] = np.inf
-
-        def update_pl_dash():
-            def_positions = self.states.positions[STATE_LOOKUP['DEFENSE']]
-            for i, off_pos in enumerate(off_positions):
-                best_defenser_idx = self.states.off_pair_def[i]
-                # find best defensive pos for offense player
-                off2basket = self.right_basket_pos - off_pos
-                off2basket_len = length(off2basket, axis=0)
-                next_best_def_pos = off_pos + \
-                    off2basket * self.eff_def_radius / off2basket_len
-                def_vel = self.states.vels[STATE_LOOKUP['DEFENSE']
-                                           ][best_defenser_idx]
-                def_pl_dash[best_defenser_idx] = next_best_def_pos - \
-                    def_vel - def_positions[best_defenser_idx]
-
-        if mode == 0:  # man to man defense
-            if self.states.steps == 0:
-                update_best_defender()
-            update_pl_dash()
-        elif mode == 1:  # zone defense
-            update_best_defender()
-            update_pl_dash()
-        return def_pl_dash
 
     def _update_player_state(self, pl_dash, vels, state_idx):
         """ Update the player's movement following the physics limitation predefined
@@ -801,6 +750,14 @@ class States(object):
         # update
         self.positions[team_id][pl_idx] = position
         self.vels[team_id][pl_idx] = vel
+
+    def before_step(self):
+        """
+        update
+        """
+        for key in STATE_LOOKUP:
+            self.vels[STATE_LOOKUP[key]] = self.buffer_positions[-1][STATE_LOOKUP[key]
+                                                                     ] - self.buffer_positions[-2][STATE_LOOKUP[key]]
 
     def end_step(self):
         """
