@@ -12,6 +12,9 @@ DEMO/
 # vscode
 .vscode/
 *.DS_Store
+# gail
+gail_state/
+gail_episode/
 
 
 # Byte-compiled / optimized / DLL files

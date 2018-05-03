@@ -1,25 +1,40 @@
-import objgraph
-import tensorflow as tf
+import numpy as np
 from pympler.tracker import SummaryTracker
 tracker = SummaryTracker()
 
-a = tf.zeros([3,4,5])
-sess = tf.Session()
+a = np.zeros([3,4,5])
 
 def leak_version():
-    return sess.run(a[0,0]) 
+    return a[0,0]
 
-def safe_version():
-    return sess.run(a)[0,0] 
 
 for i in range(10):
     tracker.print_diff()
-    # b = safe_version()
     b = leak_version()
-    objgraph.show_backrefs([b], max_depth=5, filename='output2.png')
-    exit()
-    
 
+
+###########################################################
+
+# import objgraph
+# import tensorflow as tf
+# from pympler.tracker import SummaryTracker
+# tracker = SummaryTracker()
+
+# a = tf.zeros([3,4,5])
+# sess = tf.Session()
+
+# def leak_version():
+#     return sess.run(a[0,0]) 
+
+# def safe_version():
+#     return sess.run(a)[0,0] 
+
+# for i in range(10):
+#     tracker.print_diff()
+#     # b = safe_version()
+#     b = leak_version()
+#     objgraph.show_backrefs([b], max_depth=5, filename='output2.png')
+#     exit()
 
 ##################################################
 # class test(object):

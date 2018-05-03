@@ -45,6 +45,7 @@ class BBallGailDefEnv(gym.Env):
         self.init_positions = None  # if_init_by_input
         self.if_vis_trajectory = False
         self.if_vis_visual_aid = False
+        self.if_back_real = True
         # for render()
         self.viewer = None
         self.def_pl_transforms = []
@@ -101,10 +102,11 @@ class BBallGailDefEnv(gym.Env):
                                   ] = self.current_cond[self.states.steps+1, 1:6]
     def before_step(self):
         # correct back the defense t-1
-        self.states.positions[STATE_LOOKUP['DEFENSE']
-                              ] = self.current_cond[self.states.steps-1, 6:11]
-        self.states.buffer_positions[-1][STATE_LOOKUP['DEFENSE']
-                                    ] = copy.deepcopy(self.states.positions[STATE_LOOKUP['DEFENSE']])
+        if self.if_back_real:
+            self.states.positions[STATE_LOOKUP['DEFENSE']
+                                ] = self.current_cond[self.states.steps-1, 6:11]
+            self.states.buffer_positions[-1][STATE_LOOKUP['DEFENSE']
+                                        ] = copy.deepcopy(self.states.positions[STATE_LOOKUP['DEFENSE']])
         self.states.before_step()
 
     def step(self, action):
@@ -758,8 +760,6 @@ class States(object):
         """
         update
         """
-        # correct buffer
-        # TODO
         # correct vel
         for key in STATE_LOOKUP:
             self.vels[STATE_LOOKUP[key]] = self.buffer_positions[-1][STATE_LOOKUP[key]

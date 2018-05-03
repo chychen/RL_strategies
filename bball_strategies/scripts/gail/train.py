@@ -76,17 +76,26 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
     return loop
 
 
+def capped_video_schedule_100(episode_id):
+    return episode_id % 100 == 0
+
+
+def capped_video_schedule_1(episode_id):
+    return episode_id % 1 == 0
+
+
 class MonitorWrapper(gym.wrappers.Monitor):
     # init_mode 0 : init by default
-    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None):
-        super(MonitorWrapper, self).__init__(env=env, directory='./test/',
-                                             video_callable=lambda count: count % 1 == 0, force=True)
+    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./gail_state/', if_back_real=True, video_callable=capped_video_schedule_100):
+        super(MonitorWrapper, self).__init__(env=env, directory=directory,
+                                             video_callable=video_callable, force=True)
         self._env = env
         self._env.init_mode = init_mode
         self._env.if_vis_trajectory = if_vis_trajectory
         self._env.if_vis_visual_aid = if_vis_visual_aid
         self._env.init_positions = init_positions
         self._env.init_ball_handler_idx = init_ball_handler_idx
+        self._env.if_back_real = if_back_real
 
     def __getattr__(self, name):
         return getattr(self._env, name)
@@ -98,7 +107,6 @@ class MonitorWrapper(gym.wrappers.Monitor):
     @data.setter
     def data(self, value):
         self._env.data = value
-
 
 
 def train(config, env_processes, outdir):
@@ -117,12 +125,20 @@ def train(config, env_processes, outdir):
     ------
     score : Evaluation scores.
     """
+    dummy_env = gym.make(config.env)
     vanilla_env = gym.make(config.env)
+
     def normalize_observ(observ):
-        min_ = vanilla_env.observation_space.low
-        max_ = vanilla_env.observation_space.high
+        min_ = dummy_env.observation_space.low
+        max_ = dummy_env.observation_space.high
         observ = 2 * (observ - min_) / (max_ - min_) - 1
         return observ
+
+    vanilla_env = BBallWrapper(vanilla_env, init_mode=3, fps=config.FPS, if_back_real=False,
+                               time_limit=config.max_length)
+    vanilla_env = MonitorWrapper(vanilla_env, directory='./gail_episode/', if_back_real=False, video_callable=capped_video_schedule_1,
+                                 # init from dataset in order
+                                 init_mode=3)
 
     tf.reset_default_graph()
     D = Discriminator(config, gym.make(config.env))
@@ -168,25 +184,42 @@ def train(config, env_processes, outdir):
             perm_idx = np.random.permutation(expert_data.shape[0])
             expert_data = expert_data[perm_idx]
             episode_idx = 0
+            # testing
+            vanilla_obs = vanilla_env.reset()
+            for _ in range(config.max_length):
+                vanilla_act = ppo_policy.act(
+                    np.array(vanilla_obs)[None, None], stochastic=False)
+                vanilla_trans_act = [
+                    # Discrete(3) must be int
+                    int(0),
+                    # Box(2,)
+                    np.array([0.0, 0.0], dtype=np.float32),
+                    # Box(5, 2)
+                    np.zeros(shape=[5, 2], dtype=np.float32),
+                    # Box(5, 2)
+                    np.reshape(vanilla_act, [5, 2])
+                ]
+                vanilla_obs, _, _, _ = vanilla_env.step(
+                    vanilla_trans_act)
+
             while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
                 # train Discriminator
                 for _ in range(config.train_d_per_ppo):
                     print('train Discriminator')
                     batch_fake_states = []
                     batch_real_states = expert_data[episode_idx:episode_idx +
-                                                    config.episodes_per_batch, 1:] # frame 0 is condition
+                                                    config.episodes_per_batch, 1:]  # frame 0 is condition
                     batch_real_states = np.concatenate(
                         batch_real_states, axis=0)
                     for _ in range(config.episodes_per_batch):
                         # align the conditions with env
                         # -1 : newest state
-                        conditions = expert_data[episode_idx:episode_idx+1, :, -1]
-                        env.data = conditions
-                        obs_state = env.reset()
-                        env.render()
-                        for _ in range(config.max_length):
+                        conditions = expert_data[episode_idx:episode_idx+1, :, :]
+                        env.data = conditions[:, :, -1]
+                        _ = env.reset()
+                        for len_idx in range(config.max_length):
                             act = ppo_policy.act(
-                                np.array(obs_state)[None, None])
+                                np.array(conditions[:, len_idx:len_idx+1, :]))
                             transformed_act = [
                                 # Discrete(3) must be int
                                 int(0),
@@ -197,10 +230,9 @@ def train(config, env_processes, outdir):
                                 # Box(5, 2)
                                 np.reshape(act, [5, 2])
                             ]
-                            obs_state, reward, done, info = env.step(
+                            obs_state, _, _, _ = env.step(
                                 transformed_act)
                             batch_fake_states.append(obs_state)
-                            env.render()
                         episode_idx += 1
                     assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
                         batch_real_states.shape[0], len(batch_fake_states))
@@ -213,6 +245,7 @@ def train(config, env_processes, outdir):
                 for score in loop.run(sess, saver, cumulate_steps):
                     yield score
     batch_env.close()
+    vanilla_env.close()
     env.close()
 
 
