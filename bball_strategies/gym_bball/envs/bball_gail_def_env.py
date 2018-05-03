@@ -99,6 +99,13 @@ class BBallGailDefEnv(gym.Env):
                                   ] = self.current_cond[self.states.steps+1, 0]
             self.states.positions[STATE_LOOKUP['OFFENSE']
                                   ] = self.current_cond[self.states.steps+1, 1:6]
+    def before_step(self):
+        # correct back the defense t-1
+        self.states.positions[STATE_LOOKUP['DEFENSE']
+                              ] = self.current_cond[self.states.steps-1, 6:11]
+        self.states.buffer_positions[-1][STATE_LOOKUP['DEFENSE']
+                                    ] = copy.deepcopy(self.states.positions[STATE_LOOKUP['DEFENSE']])
+        self.states.before_step()
 
     def step(self, action):
         """
@@ -115,7 +122,7 @@ class BBallGailDefEnv(gym.Env):
         done (boolean) : whether the episode has ended, in which case further step() calls will return undefined results
         info (dict) : contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
-        self.states.before_step()
+        self.before_step()
         decision = action[ACTION_LOOKUP['DECISION']]  # should be zeros
         ball_pass_vel = action[ACTION_LOOKUP['BALL']]  # should be zeros
         off_pl_dash = action[ACTION_LOOKUP['OFF_DASH']]  # should be zeros
@@ -151,10 +158,8 @@ class BBallGailDefEnv(gym.Env):
                 # np.expand_dims([self.court_length / 2, 0], axis=0),
                 # np.expand_dims([self.court_length, self.court_width], axis=0)
             ], axis=0)
-
-        # correct back the defense t+1
-        self.states.positions[STATE_LOOKUP['DEFENSE']
-                              ] = self.current_cond[self.states.steps, 6:11]  # step have been ++
+        # self.states.positions[STATE_LOOKUP['DEFENSE']
+        #                       ] = self.current_cond[self.states.steps, 6:11]  # step have been ++
         return obs
 
     def reset(self):
@@ -753,6 +758,9 @@ class States(object):
         """
         update
         """
+        # correct buffer
+        # TODO
+        # correct vel
         for key in STATE_LOOKUP:
             self.vels[STATE_LOOKUP[key]] = self.buffer_positions[-1][STATE_LOOKUP[key]
                                                                      ] - self.buffer_positions[-2][STATE_LOOKUP[key]]

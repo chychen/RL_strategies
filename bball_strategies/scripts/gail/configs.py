@@ -56,8 +56,8 @@ def default():
     steps = steps_per_ppo_iter*3
     # wgan
     wgan_penalty_lambda = 10.0
-    episodes_per_batch = 1
+    episodes_per_batch = 5
     d_batch_size = max_length * episodes_per_batch
-    train_d_per_ppo = 1
+    train_d_per_ppo = 5
 
     return locals()
