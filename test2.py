@@ -1,49 +1,73 @@
-class test(object):
-    def __init__(self):
-        self.data = 1
+import objgraph
+import tensorflow as tf
+from pympler.tracker import SummaryTracker
+tracker = SummaryTracker()
 
-    def show(self):
-        print(self.data)
+a = tf.zeros([3,4,5])
+sess = tf.Session()
+
+def leak_version():
+    return sess.run(a[0,0]) 
+
+def safe_version():
+    return sess.run(a)[0,0] 
+
+for i in range(10):
+    tracker.print_diff()
+    # b = safe_version()
+    b = leak_version()
+    objgraph.show_backrefs([b], max_depth=5, filename='output2.png')
+    exit()
+    
 
 
-class wrapper1(object):
-    def __init__(self, env):
-        self._env = env
+##################################################
+# class test(object):
+#     def __init__(self):
+#         self.data = 1
 
-    def __getattr__(self, name):
-        return getattr(self._env, name)
-
-    @property
-    def data(self):
-        return self._env.data
-
-    @data.setter
-    def data(self, value):
-        self._env.data = value
+#     def show(self):
+#         print(self.data)
 
 
-class wrapper2(object):
-    def __init__(self, env):
-        self._env = env
+# class wrapper1(object):
+#     def __init__(self, env):
+#         self._env = env
 
-    def __getattr__(self, name):
-        return getattr(self._env, name)
+#     def __getattr__(self, name):
+#         return getattr(self._env, name)
 
-    @property
-    def data(self):
-        return self._env.data
+#     @property
+#     def data(self):
+#         return self._env.data
 
-    @data.setter
-    def data(self, value):
-        self._env.data = value
+#     @data.setter
+#     def data(self, value):
+#         self._env.data = value
 
-t = test()
-w1t = wrapper1(t)
-w2t = wrapper2(w1t)
-print(w2t.data)
 
-w2t.data = 1000
-w2t.show()
+# class wrapper2(object):
+#     def __init__(self, env):
+#         self._env = env
+
+#     def __getattr__(self, name):
+#         return getattr(self._env, name)
+
+#     @property
+#     def data(self):
+#         return self._env.data
+
+#     @data.setter
+#     def data(self, value):
+#         self._env.data = value
+
+# t = test()
+# w1t = wrapper1(t)
+# w2t = wrapper2(w1t)
+# print(w2t.data)
+
+# w2t.data = 1000
+# w2t.show()
 
 
 # def test(fn, aaa=1):
