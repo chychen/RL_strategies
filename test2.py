@@ -1,18 +1,34 @@
+import tensorflow as tf 
 import numpy as np
-from pympler.tracker import SummaryTracker
-tracker = SummaryTracker()
+tf.enable_eager_execution()
 
-a = np.zeros([3,4,5])
+elems = np.array([1.0, 2, 3, 4, 5, 6], dtype=np.float32)
+initer = np.array(1.0, dtype=np.float32)
+sum_ = tf.scan(lambda _1, _2: 123.0, elems, initer)
+# sum == [1, 3, 6, 10, 15, 21]
 
-def leak_version():
-    return a[0,0]
-
-
-for i in range(10):
-    tracker.print_diff()
-    b = leak_version()
+print(sum_)
 
 
+
+
+
+
+
+###########################################################
+#  import numpy as np
+# from pympler.tracker import SummaryTracker
+# tracker = SummaryTracker()
+
+# a = np.zeros([3,4,5])
+
+# def leak_version():
+#     return a[0,0]
+
+
+# for i in range(10):
+#     tracker.print_diff()
+#     b = leak_version()
 ###########################################################
 
 # import objgraph

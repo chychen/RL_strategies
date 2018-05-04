@@ -22,7 +22,7 @@ def default():
     # General
     algorithm = algorithms.GAIL_DEF_PPO
     num_agents = 20
-    eval_episodes = 10
+    eval_episodes = 20
     use_gpu = True
     # Environment
 #   normalize_ranges = True

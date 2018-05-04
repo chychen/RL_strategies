@@ -25,7 +25,7 @@ from bball_strategies.scripts.gail import configs
 from bball_strategies.gym_bball.tools import BBallWrapper
 from bball_strategies.algorithms.discriminator import Discriminator
 from bball_strategies.algorithms.ppo_generator import PPOPolicy
-
+from tensorboard.plugins.beholder import Beholder
 
 def _create_environment(config):
     """Constructor for an instance of the environment.
@@ -125,6 +125,7 @@ def train(config, env_processes, outdir):
     ------
     score : Evaluation scores.
     """
+
     dummy_env = gym.make(config.env)
     vanilla_env = gym.make(config.env)
 
@@ -173,19 +174,21 @@ def train(config, env_processes, outdir):
     #                      init_mode=3)
     # agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
+    beholder = Beholder(config.logdir)
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
         # GAIL
         expert_data = np.load('bball_strategies/data/GAILTransitionData.npy')
         print(expert_data.shape)
-        cumulate_steps = 0
+        cumulate_steps = sess.run(graph.step)
         while True:
             perm_idx = np.random.permutation(expert_data.shape[0])
             expert_data = expert_data[perm_idx]
             episode_idx = 0
 
             while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
+                beholder.update(session=sess)
                 # testing
                 vanilla_obs = vanilla_env.reset()
                 for _ in range(config.max_length):

@@ -51,8 +51,9 @@ class Discriminator(object):
                 self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
                                                 None]+list(env.observation_space.shape))
                 self._agent_s = tf.placeholder(dtype=tf.float32, shape=[
-                                            None]+list(env.observation_space.shape))
+                                               None]+list(env.observation_space.shape))
                 self._batch_size = tf.shape(self._expert_s)[0]
+                self._buffer_size = list(env.observation_space.shape)[0]
                 self._config = config
                 self._loss = self.__loss_function()
                 with tf.name_scope('optimizer'):
@@ -86,7 +87,10 @@ class Discriminator(object):
             X_inter = epsilon * self._expert_s + (1.0-epsilon) * self._agent_s
             # add back the conditions
             X_inter = tf.concat(
-                [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:]], axis=2)
+                [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11]], axis=2)
+            # if transition-based
+            X_inter = tf.concat(
+                [self._expert_s[:, :self._buffer_size-1, :], X_inter[:, -1:, :]], axis=1)
             grad = tf.gradients(self._config.d_network(
                 X_inter, reuse=False), [X_inter])[0]
             sum_ = tf.reduce_sum(tf.square(grad), axis=0)
