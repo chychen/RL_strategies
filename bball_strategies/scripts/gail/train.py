@@ -27,6 +27,7 @@ from bball_strategies.algorithms.discriminator import Discriminator
 from bball_strategies.algorithms.ppo_generator import PPOPolicy
 from tensorboard.plugins.beholder import Beholder
 
+
 def _create_environment(config):
     """Constructor for an instance of the environment.
 
@@ -74,6 +75,100 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
         feed={graph.is_training: False,
               graph.is_optimizing_offense: True})
     return loop
+
+
+def train_Discriminator(episode_idx, config, expert_data, env, ppo_policy, D, normalize_observ):
+    episode_counter = episode_idx
+    for _ in range(config.train_d_per_ppo):
+        print('train Discriminator')
+        batch_fake_states = []
+        batch_real_states = expert_data[episode_counter:episode_counter +
+                                        config.episodes_per_batch, 1:]  # frame 0 is condition
+        batch_real_states = np.concatenate(
+            batch_real_states, axis=0)
+        for _ in range(config.episodes_per_batch):
+            # align the conditions with env
+            # -1 : newest state
+            conditions = expert_data[episode_counter:episode_counter+1, :, :]
+            env.data = conditions[:, :, -1]
+            _ = env.reset()
+            for len_idx in range(config.max_length):
+                act = ppo_policy.act(
+                    np.array(conditions[:, len_idx:len_idx+1, :]))
+                transformed_act = [
+                    # Discrete(3) must be int
+                    int(0),
+                    # Box(2,)
+                    np.array([0.0, 0.0], dtype=np.float32),
+                    # Box(5, 2)
+                    np.zeros(shape=[5, 2], dtype=np.float32),
+                    # Box(5, 2)
+                    np.reshape(act, [5, 2])
+                ]
+                obs_state, _, _, _ = env.step(
+                    transformed_act)
+                batch_fake_states.append(obs_state)
+            episode_counter += 1
+        assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
+            batch_real_states.shape[0], len(batch_fake_states))
+        batch_fake_states = np.array(batch_fake_states)
+        batch_real_states = normalize_observ(batch_real_states)
+        D.train(batch_fake_states, batch_real_states)
+
+
+def valid_Discriminator(episode_idx, config, expert_data, env, ppo_policy, D, normalize_observ):
+    print('Validate Discriminator')
+    batch_fake_states = []
+    batch_real_states = expert_data[episode_idx:episode_idx +
+                                    config.episodes_per_batch, 1:]  # frame 0 is condition
+    batch_real_states = np.concatenate(
+        batch_real_states, axis=0)
+    for _ in range(config.episodes_per_batch):
+        # align the conditions with env
+        # -1 : newest state
+        conditions = expert_data[episode_idx:episode_idx+1, :, :]
+        env.data = conditions[:, :, -1]
+        _ = env.reset()
+        for len_idx in range(config.max_length):
+            act = ppo_policy.act(
+                np.array(conditions[:, len_idx:len_idx+1, :]))
+            transformed_act = [
+                # Discrete(3) must be int
+                int(0),
+                # Box(2,)
+                np.array([0.0, 0.0], dtype=np.float32),
+                # Box(5, 2)
+                np.zeros(shape=[5, 2], dtype=np.float32),
+                # Box(5, 2)
+                np.reshape(act, [5, 2])
+            ]
+            obs_state, _, _, _ = env.step(
+                transformed_act)
+            batch_fake_states.append(obs_state)
+    assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
+        batch_real_states.shape[0], len(batch_fake_states))
+    batch_fake_states = np.array(batch_fake_states)
+    batch_real_states = normalize_observ(batch_real_states)
+    D.validate(batch_fake_states, batch_real_states)
+
+
+def test_policy(config, vanilla_env, ppo_policy):
+    vanilla_obs = vanilla_env.reset()
+    for _ in range(config.max_length):
+        vanilla_act = ppo_policy.act(
+            np.array(vanilla_obs)[None, None], stochastic=False)
+        vanilla_trans_act = [
+            # Discrete(3) must be int
+            int(0),
+            # Box(2,)
+            np.array([0.0, 0.0], dtype=np.float32),
+            # Box(5, 2)
+            np.zeros(shape=[5, 2], dtype=np.float32),
+            # Box(5, 2)
+            np.reshape(vanilla_act, [5, 2])
+        ]
+        vanilla_obs, _, _, _ = vanilla_env.step(
+            vanilla_trans_act)
 
 
 def capped_video_schedule_100(episode_id):
@@ -125,9 +220,8 @@ def train(config, env_processes, outdir):
     ------
     score : Evaluation scores.
     """
-
+    # env to get config
     dummy_env = gym.make(config.env)
-    vanilla_env = gym.make(config.env)
 
     def normalize_observ(observ):
         min_ = dummy_env.observation_space.low
@@ -135,14 +229,23 @@ def train(config, env_processes, outdir):
         observ = 2 * (observ - min_) / (max_ - min_) - 1
         return observ
 
+    # env to testing
+    vanilla_env = gym.make(config.env)
     vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=config.max_length)
     vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_episode/'), if_back_real=False,
                                  # init from dataset
                                  init_mode=1)
+    # env to generate fake state
+    env = gym.make(config.env)
+    env = BBallWrapper(env, init_mode=3, fps=config.FPS,
+                       time_limit=config.max_length)
+    # env = MonitorWrapper(env,directory=os.path.join(config.logdir, 'gail_state/'),
+    #                      # init from dataset in order
+    #                      init_mode=3)
 
     tf.reset_default_graph()
-    D = Discriminator(config, gym.make(config.env))
+    # PPO graph
     if config.update_every % config.num_agents:
         tf.logging.warn('Number of agents should divide episodes per update.')
     with tf.device('/cpu:0'):
@@ -158,90 +261,42 @@ def train(config, env_processes, outdir):
         total_steps = int(
             config.steps / config.update_every *
             (config.update_every + config.eval_episodes))
-    # Exclude episode related variables since the Python state of environments is
-    # not checkpointed and thus new episodes start after resuming.
+    # Discriminator graph
+    D = Discriminator(config, gym.make(config.env))
+    # Agent to genrate acttion
+    ppo_policy = PPOPolicy(config, env)
+    beholder = Beholder(config.logdir)
+    # Data
+    all_data = np.load('bball_strategies/data/GAILTransitionData.npy')
+    expert_data, valid_expert_data = np.split(all_data, [all_data.shape[0]*9//10])
+    print(expert_data.shape)
+    print(valid_expert_data.shape)
+    # TF Session
     saver = utility.define_saver(exclude=(r'.*_temporary.*',))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
-    # env to generate fake state
-    env = gym.make(config.env)
-    # init_mode=3 : init from dataset in order
-    env = BBallWrapper(env, init_mode=3, fps=config.FPS,
-                       time_limit=config.max_length)
-    # env = MonitorWrapper(env,directory=os.path.join(config.logdir, 'gail_state/'),
-    #                      # init from dataset in order
-    #                      init_mode=3)
-    # agent to genrate acttion
-    ppo_policy = PPOPolicy(config, env)
-    beholder = Beholder(config.logdir)
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
         # GAIL
-        expert_data = np.load('bball_strategies/data/GAILTransitionData.npy')
-        print(expert_data.shape)
         cumulate_steps = sess.run(graph.step)
+        valid_episode_idx = 0
         while True:
             perm_idx = np.random.permutation(expert_data.shape[0])
             expert_data = expert_data[perm_idx]
             episode_idx = 0
-
             while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
                 beholder.update(session=sess)
                 # testing
-                vanilla_obs = vanilla_env.reset()
-                for _ in range(config.max_length):
-                    vanilla_act = ppo_policy.act(
-                        np.array(vanilla_obs)[None, None], stochastic=False)
-                    vanilla_trans_act = [
-                        # Discrete(3) must be int
-                        int(0),
-                        # Box(2,)
-                        np.array([0.0, 0.0], dtype=np.float32),
-                        # Box(5, 2)
-                        np.zeros(shape=[5, 2], dtype=np.float32),
-                        # Box(5, 2)
-                        np.reshape(vanilla_act, [5, 2])
-                    ]
-                    vanilla_obs, _, _, _ = vanilla_env.step(
-                        vanilla_trans_act)
+                test_policy(config, vanilla_env, ppo_policy)
                 # train Discriminator
-                for _ in range(config.train_d_per_ppo):
-                    print('train Discriminator')
-                    batch_fake_states = []
-                    batch_real_states = expert_data[episode_idx:episode_idx +
-                                                    config.episodes_per_batch, 1:]  # frame 0 is condition
-                    batch_real_states = np.concatenate(
-                        batch_real_states, axis=0)
-                    for _ in range(config.episodes_per_batch):
-                        # align the conditions with env
-                        # -1 : newest state
-                        conditions = expert_data[episode_idx:episode_idx+1, :, :]
-                        env.data = conditions[:, :, -1]
-                        _ = env.reset()
-                        for len_idx in range(config.max_length):
-                            act = ppo_policy.act(
-                                np.array(conditions[:, len_idx:len_idx+1, :]))
-                            transformed_act = [
-                                # Discrete(3) must be int
-                                int(0),
-                                # Box(2,)
-                                np.array([0.0, 0.0], dtype=np.float32),
-                                # Box(5, 2)
-                                np.zeros(shape=[5, 2], dtype=np.float32),
-                                # Box(5, 2)
-                                np.reshape(act, [5, 2])
-                            ]
-                            obs_state, _, _, _ = env.step(
-                                transformed_act)
-                            batch_fake_states.append(obs_state)
-                        episode_idx += 1
-                    assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
-                        batch_real_states.shape[0], len(batch_fake_states))
-                    batch_fake_states = np.array(batch_fake_states)
-                    batch_real_states = normalize_observ(batch_real_states)
-                    D.train(batch_fake_states, batch_real_states)
+                train_Discriminator(
+                    episode_idx, config, expert_data, env, ppo_policy, D, normalize_observ)
+                valid_Discriminator(
+                    valid_episode_idx % valid_expert_data.shape[0], config, valid_expert_data, env, ppo_policy, D, normalize_observ)
+                episode_idx += config.episodes_per_batch*config.train_d_per_ppo
+                valid_episode_idx += config.episodes_per_batch
                 # train PPO
                 print('train PPO')
                 cumulate_steps += total_steps
