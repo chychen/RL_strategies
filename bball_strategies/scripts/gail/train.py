@@ -220,6 +220,7 @@ def train(config, env_processes, outdir):
     ------
     score : Evaluation scores.
     """
+    tf.reset_default_graph()
     # env to get config
     dummy_env = gym.make(config.env)
 
@@ -243,8 +244,8 @@ def train(config, env_processes, outdir):
     # env = MonitorWrapper(env,directory=os.path.join(config.logdir, 'gail_state/'),
     #                      # init from dataset in order
     #                      init_mode=3)
-
-    tf.reset_default_graph()
+    # Discriminator graph
+    D = Discriminator(config, dummy_env)
     # PPO graph
     if config.update_every % config.num_agents:
         tf.logging.warn('Number of agents should divide episodes per update.')
@@ -261,14 +262,14 @@ def train(config, env_processes, outdir):
         total_steps = int(
             config.steps / config.update_every *
             (config.update_every + config.eval_episodes))
-    # Discriminator graph
-    D = Discriminator(config, gym.make(config.env))
     # Agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
+    # Tensorboard
     beholder = Beholder(config.logdir)
     # Data
     all_data = np.load('bball_strategies/data/GAILTransitionData.npy')
-    expert_data, valid_expert_data = np.split(all_data, [all_data.shape[0]*9//10])
+    expert_data, valid_expert_data = np.split(
+        all_data, [all_data.shape[0]*9//10])
     print(expert_data.shape)
     print(valid_expert_data.shape)
     # TF Session
