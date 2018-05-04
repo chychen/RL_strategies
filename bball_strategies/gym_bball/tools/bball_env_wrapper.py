@@ -12,7 +12,7 @@ from bball_strategies.gym_bball import tools
 
 class BBallWrapper(object):
 
-    def __init__(self, env, if_clip=True, if_norm_obs=True, if_norm_act=True, init_mode=1, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, fps=5, time_limit=240, if_back_real=True):
+    def __init__(self, env, if_clip=True, if_norm_obs=True, if_norm_act=True, init_mode=1, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, fps=5, time_limit=240, if_back_real=False):
         """
         Args
         ----
