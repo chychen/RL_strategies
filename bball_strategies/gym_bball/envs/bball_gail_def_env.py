@@ -45,7 +45,7 @@ class BBallGailDefEnv(gym.Env):
         self.init_positions = None  # if_init_by_input
         self.if_vis_trajectory = False
         self.if_vis_visual_aid = False
-        self.if_back_real = True
+        self.if_back_real = False
         # for render()
         self.viewer = None
         self.def_pl_transforms = []

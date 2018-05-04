@@ -134,11 +134,11 @@ def train(config, env_processes, outdir):
         observ = 2 * (observ - min_) / (max_ - min_) - 1
         return observ
 
-    vanilla_env = BBallWrapper(vanilla_env, init_mode=2, fps=config.FPS, if_back_real=False,
+    vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=config.max_length)
     vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_episode/'), if_back_real=False,
                                  # init from dataset
-                                 init_mode=2)
+                                 init_mode=1)
 
     tf.reset_default_graph()
     D = Discriminator(config, gym.make(config.env))
