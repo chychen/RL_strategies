@@ -88,9 +88,9 @@ class Discriminator(object):
             # add back the conditions
             X_inter = tf.concat(
                 [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11]], axis=2)
-            # if transition-based
-            X_inter = tf.concat(
-                [self._expert_s[:, :self._buffer_size-1, :], X_inter[:, -1:, :]], axis=1)
+            if self._config.if_back_real:
+                X_inter = tf.concat(
+                    [self._expert_s[:, :self._buffer_size-1, :], X_inter[:, -1:, :]], axis=1)
             grad = tf.gradients(self._config.d_network(
                 X_inter, reuse=False), [X_inter])[0]
             sum_ = tf.reduce_sum(tf.square(grad), axis=0)
