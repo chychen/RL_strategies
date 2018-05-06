@@ -41,13 +41,13 @@ def default():
 #   batch_size = 20
 #   chunk_length = 50
     # Losses
-    discount = 0.99
+    discount = 0.995
     kl_target = 1e-2
     kl_cutoff_factor = 2
     kl_cutoff_coef = 1000
     kl_init_penalty = 1
 #   gae_lambda = None # TODO
-    entropy_regularization = 0.1  # TODO
+    # entropy_regularization = 0.1  # TODO
     # Environment
     env = 'bball_gail_def-v0'
     # data only have 50 length, if we step 50 times, cant find 51-th conidtion in data

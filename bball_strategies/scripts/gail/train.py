@@ -234,16 +234,16 @@ def train(config, env_processes, outdir):
     vanilla_env = gym.make(config.env)
     vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=config.max_length)
-    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_episode/'), if_back_real=False,
+    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing/'), if_back_real=False,
                                  # init from dataset
                                  init_mode=1)
     # env to generate fake state
     env = gym.make(config.env)
-    env = BBallWrapper(env, init_mode=3, fps=config.FPS,if_back_real=config.if_back_real,
+    env = BBallWrapper(env, init_mode=3, fps=config.FPS, if_back_real=config.if_back_real,
                        time_limit=config.max_length)
-    # env = MonitorWrapper(env,directory=os.path.join(config.logdir, 'gail_state/'),
-    #                      # init from dataset in order
-    #                      init_mode=3)
+    env = MonitorWrapper(env, directory=os.path.join(config.logdir, 'gail_training/'), if_back_real=config.if_back_real,
+                         # init from dataset in order
+                         init_mode=3)
     # Discriminator graph
     D = Discriminator(config, dummy_env)
     # PPO graph
@@ -295,7 +295,7 @@ def train(config, env_processes, outdir):
                 train_Discriminator(
                     episode_idx, config, expert_data, env, ppo_policy, D, normalize_observ)
                 valid_Discriminator(
-                    valid_episode_idx % valid_expert_data.shape[0], config, valid_expert_data, env, ppo_policy, D, normalize_observ)
+                    valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch), config, valid_expert_data, env, ppo_policy, D, normalize_observ)
                 episode_idx += config.episodes_per_batch*config.train_d_per_ppo
                 valid_episode_idx += config.episodes_per_batch
                 # train PPO
