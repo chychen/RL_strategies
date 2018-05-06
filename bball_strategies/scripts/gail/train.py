@@ -93,10 +93,12 @@ def train_Discriminator(episode_idx, config, expert_data, env, ppo_policy, D, no
             env.data = conditions[:, :, -1]
             obs_state = env.reset()
             for len_idx in range(config.max_length):
-                act = ppo_policy.act(
-                    np.array(obs_state)[None, None], stochastic=True)
-                # act = ppo_policy.act(
-                #     np.array(conditions[:, len_idx:len_idx+1, :]))
+                if config.if_back_real:
+                    act = ppo_policy.act(
+                        np.array(conditions[:, len_idx:len_idx+1, :]), stochastic=True)
+                else:
+                    act = ppo_policy.act(
+                        np.array(obs_state)[None, None], stochastic=True)
                 transformed_act = [
                     # Discrete(3) must be int
                     int(0),
@@ -132,10 +134,12 @@ def valid_Discriminator(episode_idx, config, expert_data, env, ppo_policy, D, no
         env.data = conditions[:, :, -1]
         obs_state = env.reset()
         for len_idx in range(config.max_length):
-            act = ppo_policy.act(
-                np.array(obs_state)[None, None], stochastic=True)
-            # act = ppo_policy.act(
-            #     np.array(conditions[:, len_idx:len_idx+1, :]))
+            if config.if_back_real:
+                act = ppo_policy.act(
+                    np.array(conditions[:, len_idx:len_idx+1, :]), stochastic=True)
+            else:
+                act = ppo_policy.act(
+                    np.array(obs_state)[None, None], stochastic=True)
             transformed_act = [
                 # Discrete(3) must be int
                 int(0),

@@ -100,13 +100,14 @@ class BBallGailDefEnv(gym.Env):
                                   ] = self.current_cond[self.states.steps+1, 0]
             self.states.positions[STATE_LOOKUP['OFFENSE']
                                   ] = self.current_cond[self.states.steps+1, 1:6]
+
     def before_step(self):
         # correct back the defense t-1
         if self.if_back_real:
             self.states.positions[STATE_LOOKUP['DEFENSE']
-                                ] = self.current_cond[self.states.steps-1, 6:11]
-            self.states.buffer_positions[-1][STATE_LOOKUP['DEFENSE']
-                                        ] = copy.deepcopy(self.states.positions[STATE_LOOKUP['DEFENSE']])
+                                  ] = self.current_cond[self.states.steps-1, 6:11]
+            self.states.buffer_positions[-1, STATE_LOOKUP['DEFENSE']
+                                             ] = copy.deepcopy(self.states.positions[STATE_LOOKUP['DEFENSE']])
         self.states.before_step()
 
     def step(self, action):
@@ -762,8 +763,8 @@ class States(object):
         """
         # correct vel
         for key in STATE_LOOKUP:
-            self.vels[STATE_LOOKUP[key]] = self.buffer_positions[-1][STATE_LOOKUP[key]
-                                                                     ] - self.buffer_positions[-2][STATE_LOOKUP[key]]
+            self.vels[STATE_LOOKUP[key]] = self.buffer_positions[-1, STATE_LOOKUP[key]
+                                                                     ] - self.buffer_positions[-2, STATE_LOOKUP[key]]
 
     def end_step(self):
         """
@@ -771,10 +772,11 @@ class States(object):
         t : index of frame
         """
         for key in STATE_LOOKUP:
-            self.buffer_positions[:-1][STATE_LOOKUP[key]
-                                       ] = copy.deepcopy(self.buffer_positions[1:][STATE_LOOKUP[key]])
-            self.buffer_positions[-1][STATE_LOOKUP[key]
-                                      ] = copy.deepcopy(self.positions[STATE_LOOKUP[key]])
+            self.buffer_positions[:-1, STATE_LOOKUP[key]
+                                  ] = copy.deepcopy(self.buffer_positions[1:, STATE_LOOKUP[key]])
+            self.buffer_positions[-1, STATE_LOOKUP[key]
+                                  ] = copy.deepcopy(self.positions[STATE_LOOKUP[key]])
+
         self.steps = self.steps + 1
         self.update_closest_map()
         self.status = None
