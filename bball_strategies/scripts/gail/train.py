@@ -185,7 +185,7 @@ def capped_video_schedule_10(episode_id):
 
 class MonitorWrapper(gym.wrappers.Monitor):
     # init_mode 0 : init by default
-    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./test/', if_back_real=False, video_callable=capped_video_schedule_10):
+    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./test/', if_back_real=False, video_callable=capped_video_schedule_100):
         super(MonitorWrapper, self).__init__(env=env, directory=directory,
                                              video_callable=video_callable, force=True)
         self._env = env
