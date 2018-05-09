@@ -260,7 +260,7 @@ class PPO(object):
         """Initialize temporary and permanent memory.
 
         Args:
-          policy_params: Nested tuple of policy parametres with all dimensions set.
+          policy_params: Nested tuple of policy parameters with all dimensions set.
 
         Initializes the attributes `self._current_episodes`,
         `self._finished_episodes`, and `self._num_finished_episodes`. The episodes
@@ -316,7 +316,7 @@ class PPO(object):
                     data = self._finished_episodes.data()
                 (observ, action, old_policy_params, reward), length = data
                 # We set padding frames of the parameters to ones to prevent Gaussians
-                # with zero variance. This would result in an inifite KL divergence,
+                # with zero variance. This would result in an infinite KL divergence,
                 # which, even if masked out, would result in NaN gradients.
                 old_policy_params = tools.nested.map(
                     lambda param: self._mask(param, length, 1), old_policy_params)
@@ -407,24 +407,16 @@ class PPO(object):
         network = self._network(observ, length)
         policy_loss, policy_summary = self._policy_loss(
             old_policy, network.policy, action, advantage, length)
-        value_gradients, value_variables = (
-            zip(*self._optimizer.compute_gradients(value_loss)))
-        policy_gradients, policy_variables = (
-            zip(*self._optimizer.compute_gradients(policy_loss)))
-        all_gradients = value_gradients + policy_gradients
-        all_variables = value_variables + policy_variables
+        loss = policy_loss + value_loss + network.get('loss', 0)
+        gradients, variables = (
+            zip(*self._optimizer.compute_gradients(loss)))
         optimize = self._optimizer.apply_gradients(
-            zip(all_gradients, all_variables))
+            zip(gradients, variables))
         summary = tf.summary.merge([
             value_summary, policy_summary,
-            tf.summary.scalar(
-                'value_gradient_norm', tf.global_norm(value_gradients)),
-            tf.summary.scalar(
-                'policy_gradient_norm', tf.global_norm(policy_gradients)),
-            utility.gradient_summaries(
-                zip(value_gradients, value_variables), dict(value=r'.*')),
-            utility.gradient_summaries(
-                zip(policy_gradients, policy_variables), dict(policy=r'.*'))])
+            tf.summary.histogram('network_loss', network.get('loss', 0)),
+            tf.summary.scalar('gradient_norm', tf.global_norm(gradients)),
+            utility.gradient_summaries(zip(gradients, variables))])
         with tf.control_dependencies([optimize]):
             return [tf.identity(x) for x in (value_loss, policy_loss, summary)]
 
@@ -500,11 +492,11 @@ class PPO(object):
                     tf.cast(kl > cutoff_threshold, tf.float32) *
                     (kl - cutoff_threshold) ** 2)
             policy_loss = surrogate_loss + kl_penalty + kl_cutoff
-            entropy = policy.entropy()
+            entropy = tf.reduce_mean(policy.entropy(), axis=1)
             if self._config.entropy_regularization:
                 policy_loss -= self._config.entropy_regularization * entropy
             summary = tf.summary.merge([
-                tf.summary.histogram('entropy', policy.entropy()),
+                tf.summary.histogram('entropy', entropy),
                 tf.summary.histogram('kl', kl),
                 tf.summary.histogram('surrogate_loss', surrogate_loss),
                 tf.summary.histogram('kl_penalty', kl_penalty),
@@ -571,7 +563,7 @@ class PPO(object):
         Args:
           tensor: Tensor of sequences.
           length: Batch of sequence lengths.
-          padding_value: Value to write into padding elemnts.
+          padding_value: Value to write into padding elements.
 
         Returns:
           Masked sequences.

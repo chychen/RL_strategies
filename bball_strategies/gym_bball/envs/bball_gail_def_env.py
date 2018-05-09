@@ -95,11 +95,10 @@ class BBallGailDefEnv(gym.Env):
     def _update_offense_from_real_data(self):
         if self.states.steps+1 == self.time_limit:
             self.states.update_status(done=True, status=STATUS_LOOKUP['OOT'])
-        else:
-            self.states.positions[STATE_LOOKUP['BALL']
-                                  ] = self.current_cond[self.states.steps+1, 0]
-            self.states.positions[STATE_LOOKUP['OFFENSE']
-                                  ] = self.current_cond[self.states.steps+1, 1:6]
+        self.states.positions[STATE_LOOKUP['BALL']
+                                ] = self.current_cond[self.states.steps+1, 0]
+        self.states.positions[STATE_LOOKUP['OFFENSE']
+                                ] = self.current_cond[self.states.steps+1, 1:6]
 
     def before_step(self):
         # correct back the defense t-1

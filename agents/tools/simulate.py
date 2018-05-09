@@ -24,30 +24,30 @@ from agents.tools import streaming_mean
 
 
 def simulate(batch_env, algo, log=True, reset=False):
-    """Simulation step of a vecrotized algorithm with in-graph environments.
+    """Simulation step of a vectorized algorithm with in-graph environments.
 
-    Integrates the operations implemented by the algorithm and the environments
-    into a combined operation.
+      Integrates the operations implemented by the algorithm and the environments
+      into a combined operation.
 
-    Args:
-      batch_env: In-graph batch environment.
-      algo: Algorithm instance implementing required operations.
-      log: Tensor indicating whether to compute and return summaries.
-      reset: Tensor causing all environments to reset.
+      Args:
+        batch_env: In-graph batch environment.
+        algo: Algorithm instance implementing required operations.
+        log: Tensor indicating whether to compute and return summaries.
+        reset: Tensor causing all environments to reset.
 
-    Returns:
-      Tuple of tensors containing done flags for the current episodes, possibly
-      intermediate scores for the episodes, and a summary tensor.
-    """
+      Returns:
+        Tuple of tensors containing done flags for the current episodes, possibly
+        intermediate scores for the episodes, and a summary tensor.
+      """
 
     def _define_begin_episode(agent_indices):
         """Reset environments, intermediate scores and durations for new episodes.
 
         Args:
-          agent_indices: Tensor containing batch indices starting an episode.
+            agent_indices: Tensor containing batch indices starting an episode.
 
         Returns:
-          Summary tensor.
+            Summary tensor.
         """
         assert agent_indices.shape.ndims == 1
         zero_scores = tf.zeros_like(agent_indices, tf.float32)
@@ -60,22 +60,25 @@ def simulate(batch_env, algo, log=True, reset=False):
             return algo.begin_episode(agent_indices)
 
     def _define_step():
-        """ (Extended) Request actions from the algorithm and apply them to the environments.
+        """Request actions from the algorithm and apply them to the environments.
 
         Increments the lengths of all episodes and increases their scores by the
         current reward. After stepping the environments, provides the full
         transition tuple to the algorithm.
 
         Returns:
-          Summary tensor.
+            Summary tensor.
         """
-        prevob = batch_env.observ + 0  # Ensure a copy of the variable value.
+        prevob = batch_env.observ + \
+            0  # Ensure a copy of the variable value.
         agent_indices = tf.range(len(batch_env))
-        action, step_summary = algo.perform(agent_indices, prevob, turn_info=batch_env.turn_info)
+        action, step_summary = algo.perform(
+            agent_indices, prevob, turn_info=batch_env.turn_info)
         action.set_shape(batch_env.action.shape)
         with tf.control_dependencies([batch_env.simulate(action)]):
             add_score = score.assign_add(batch_env.reward)
-            inc_length = length.assign_add(tf.ones(len(batch_env), tf.int32))
+            inc_length = length.assign_add(
+                tf.ones(len(batch_env), tf.int32))
         with tf.control_dependencies([add_score, inc_length]):
             agent_indices = tf.range(len(batch_env))
             experience_summary = algo.experience(
@@ -92,10 +95,10 @@ def simulate(batch_env, algo, log=True, reset=False):
         Also updates the mean score and length counters used for summaries.
 
         Args:
-          agent_indices: Tensor holding batch indices that end their episodes.
+            agent_indices: Tensor holding batch indices that end their episodes.
 
         Returns:
-          Summary tensor.
+            Summary tensor.
         """
         assert agent_indices.shape.ndims == 1
         submit_score = mean_score.submit(tf.gather(score, agent_indices))
@@ -108,7 +111,7 @@ def simulate(batch_env, algo, log=True, reset=False):
         """Reset the average score and duration, and return them as summary.
 
         Returns:
-          Summary string.
+            Summary string.
         """
         score_summary = tf.cond(
             tf.logical_and(log, tf.cast(mean_score.count, tf.bool)),
@@ -123,9 +126,11 @@ def simulate(batch_env, algo, log=True, reset=False):
         reset = tf.convert_to_tensor(reset)
         with tf.variable_scope('simulate_temporary'):
             score = tf.Variable(
-                tf.zeros(len(batch_env), dtype=tf.float32), False, name='score')
+                lambda: tf.zeros(len(batch_env), dtype=tf.float32),
+                trainable=False, name='score')
             length = tf.Variable(
-                tf.zeros(len(batch_env), dtype=tf.int32), False, name='length')
+                lambda: tf.zeros(len(batch_env), dtype=tf.int32),
+                trainable=False, name='length')
         mean_score = streaming_mean.StreamingMean((), tf.float32)
         mean_length = streaming_mean.StreamingMean((), tf.float32)
         agent_indices = tf.cond(
@@ -138,7 +143,8 @@ def simulate(batch_env, algo, log=True, reset=False):
         with tf.control_dependencies([begin_episode]):
             step = _define_step()
         with tf.control_dependencies([step]):
-            agent_indices = tf.cast(tf.where(batch_env.done)[:, 0], tf.int32)
+            agent_indices = tf.cast(
+                tf.where(batch_env.done)[:, 0], tf.int32)
             end_episode = tf.cond(
                 tf.cast(tf.shape(agent_indices)[0], tf.bool),
                 lambda: _define_end_episode(agent_indices), str)

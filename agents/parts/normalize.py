@@ -1,4 +1,3 @@
-
 # Copyright 2017 The TensorFlow Agents Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,19 +42,6 @@ class StreamingNormalize(object):
         self._scale = scale
         self._clip = clip
         self._name = name
-        # with tf.variable_scope(name):
-        #     self._count = tf.constant(0, shape=[])
-        #     print(self._count)
-        #     self._mean = tf.constant(0.0, shape=template.shape.as_list(), dtype=tf.float32)
-        #     self._var_sum = tf.constant(0.0, shape=template.shape.as_list(), dtype=tf.float32)
-        # with tf.variable_scope(name):
-        #     self._count = tf.get_variable('normalize_count', shape=[], initializer=tf.zeros_initializer(
-        #         dtype=tf.int32), trainable=False, dtype=tf.int32)
-        #     print(self._count)
-        #     self._mean = tf.get_variable('normalize_mean', shape=template.shape.as_list(), initializer=tf.zeros_initializer(
-        #         dtype=tf.float32), trainable=False)
-        #     self._var_sum = tf.get_variable('normalize_var_sum', shape=template.shape.as_list(), initializer=tf.zeros_initializer(
-        #         dtype=tf.float32), trainable=False)
         with tf.name_scope(name):
             self._count = tf.Variable(0, False)
             self._mean = tf.Variable(tf.zeros_like(template), False)
@@ -85,7 +71,6 @@ class StreamingNormalize(object):
                 value /= tf.cond(
                     self._count > 1, lambda: self._std() + 1e-8,
                     lambda: tf.ones_like(self._var_sum))[None]
-                # value /= tf.ones_like(self._var_sum)[None]
             if self._clip:
                 value = tf.clip_by_value(value, -self._clip, self._clip)
             # Remove batch dimension if necessary.
