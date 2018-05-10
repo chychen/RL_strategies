@@ -25,7 +25,6 @@ from bball_strategies.scripts.gail import configs
 from bball_strategies.gym_bball.tools import BBallWrapper
 from bball_strategies.algorithms.discriminator import Discriminator
 from bball_strategies.algorithms.ppo_generator import PPOPolicy
-from tensorboard.plugins.beholder import Beholder
 
 
 def _create_environment(config):
@@ -77,15 +76,19 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
     return loop
 
 
-def train_Discriminator(episode_idx, config, expert_data, env, ppo_policy, D, normalize_observ):
+def train_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ):
     episode_counter = episode_idx
     for _ in range(config.train_d_per_ppo):
         print('train Discriminator')
         batch_fake_states = []
+        fake_action = []
         batch_real_states = expert_data[episode_counter:episode_counter +
                                         config.episodes_per_batch, 1:]  # frame 0 is condition
+        real_action = expert_action[episode_counter:
+                                    episode_counter + config.episodes_per_batch, :-1]
         batch_real_states = np.concatenate(
             batch_real_states, axis=0)
+        real_action = np.concatenate(real_action, axis=0)
         for _ in range(config.episodes_per_batch):
             # align the conditions with env
             # -1 : newest state
@@ -112,21 +115,29 @@ def train_Discriminator(episode_idx, config, expert_data, env, ppo_policy, D, no
                 obs_state, _, _, _ = env.step(
                     transformed_act)
                 batch_fake_states.append(obs_state)
+                fake_action.append(act.reshape([5, 2]))
             episode_counter += 1
         assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
             batch_real_states.shape[0], len(batch_fake_states))
+        assert real_action.shape[0] == len(fake_action), "real: {}, fake: {}".format(
+            real_action.shape[0], len(fake_action))
         batch_fake_states = np.array(batch_fake_states)
+        fake_action = np.array(fake_action)
         batch_real_states = normalize_observ(batch_real_states)
-        D.train(batch_fake_states, batch_real_states)
+        D.train(batch_fake_states, batch_real_states, fake_action, real_action)
 
 
-def valid_Discriminator(episode_idx, config, expert_data, env, ppo_policy, D, normalize_observ):
+def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ):
     print('Validate Discriminator')
     batch_fake_states = []
+    fake_action = []
     batch_real_states = expert_data[episode_idx:episode_idx +
                                     config.episodes_per_batch, 1:]  # frame 0 is condition
+    real_action = expert_action[episode_idx:
+                                episode_idx + config.episodes_per_batch, :-1]
     batch_real_states = np.concatenate(
         batch_real_states, axis=0)
+    real_action = np.concatenate(real_action, axis=0)
     for _ in range(config.episodes_per_batch):
         # align the conditions with env
         # -1 : newest state
@@ -153,11 +164,15 @@ def valid_Discriminator(episode_idx, config, expert_data, env, ppo_policy, D, no
             obs_state, _, _, _ = env.step(
                 transformed_act)
             batch_fake_states.append(obs_state)
+            fake_action.append(act.reshape([5, 2]))
     assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
         batch_real_states.shape[0], len(batch_fake_states))
+    assert real_action.shape[0] == len(fake_action), "real: {}, fake: {}".format(
+        real_action.shape[0], len(fake_action))
     batch_fake_states = np.array(batch_fake_states)
+    fake_action = np.array(fake_action)
     batch_real_states = normalize_observ(batch_real_states)
-    D.validate(batch_fake_states, batch_real_states)
+    D.validate(batch_fake_states, batch_real_states, fake_action, real_action)
 
 
 def test_policy(config, vanilla_env, ppo_policy):
@@ -253,7 +268,8 @@ def train(config, env_processes, outdir):
                          # init from dataset in order
                          init_mode=3)
     # Discriminator graph
-    D = Discriminator(config, dummy_env)
+    with tf.device('/gpu:0'):
+        D = Discriminator(config, dummy_env)
     # PPO graph
     if config.update_every % config.num_agents:
         tf.logging.warn('Number of agents should divide episodes per update.')
@@ -272,14 +288,16 @@ def train(config, env_processes, outdir):
             (config.update_every + config.eval_episodes))
     # Agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
-    # Tensorboard
-    beholder = Beholder(config.logdir)
     # Data
-    all_data = np.load('bball_strategies/data/GAILTransitionData.npy')
+    all_data = np.load('bball_strategies/data/GAILTransitionData.npy').item()
     expert_data, valid_expert_data = np.split(
-        all_data, [all_data.shape[0]*9//10])
-    print(expert_data.shape)
-    print(valid_expert_data.shape)
+        all_data['OBS'], [all_data['OBS'].shape[0]*9//10])
+    expert_action, valid_expert_action = np.split(
+        all_data['DEF_ACT'], [all_data['DEF_ACT'].shape[0]*9//10])
+    print('expert_data', expert_data.shape)
+    print('valid_expert_data', valid_expert_data.shape)
+    print('expert_action', expert_action.shape)
+    print('valid_expert_action', valid_expert_action.shape)
     # TF Session
     saver = utility.define_saver(exclude=(r'.*_temporary.*',))
     sess_config = tf.ConfigProto(
@@ -294,16 +312,16 @@ def train(config, env_processes, outdir):
         while True:
             perm_idx = np.random.permutation(expert_data.shape[0])
             expert_data = expert_data[perm_idx]
+            expert_action = expert_action[perm_idx]
             episode_idx = 0
             while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
-                beholder.update(session=sess)
                 # testing
                 test_policy(config, vanilla_env, ppo_policy)
                 # train Discriminator
                 train_Discriminator(
-                    episode_idx, config, expert_data, env, ppo_policy, D, normalize_observ)
+                    episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ)
                 valid_Discriminator(
-                    valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch), config, valid_expert_data, env, ppo_policy, D, normalize_observ)
+                    valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch), config, valid_expert_data, valid_expert_action, env, ppo_policy, D, normalize_observ)
                 episode_idx += config.episodes_per_batch*config.train_d_per_ppo
                 valid_episode_idx += config.episodes_per_batch
                 # train PPO

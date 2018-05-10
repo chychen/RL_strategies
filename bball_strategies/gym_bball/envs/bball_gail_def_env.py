@@ -491,46 +491,46 @@ class BBallGailDefEnv(gym.Env):
             opp_idx = STATE_LOOKUP['DEFENSE']
         opp_positions = self.states.positions[opp_idx]
         for pl_idx, (pl_pos, next_pl_pos, pl_vel) in enumerate(zip(self.states.positions[state_idx], self.states.positions[state_idx] + pl_vels, pl_vels)):
-            zone_idx, mode = self._find_zone_idx(
-                next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius)
-        # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
-            if zone_idx is not None and mode != MODE_LOOKUP['PASS-OUT']:
-                pl_collision_vel = [0, 0]  # TODO
-                logger.debug(
-                    '[COLLISION] mode {}, {}-{} colide into {}-{}'.format(mode, state_idx, pl_idx, opp_idx, zone_idx))
-                if mode == MODE_LOOKUP['IN'] or mode == MODE_LOOKUP['IN-THEN-OUT']:
-                    # if 'IN' or 'IN-THEN-OUT', use collision_speed
-                    collision_speed = self.pl_collision_speed
-                    collision_speed = collision_speed if pl_speed[
-                        pl_idx] >= collision_speed else pl_speed[pl_idx]
-                    pl_collision_vel = collision_speed * \
-                        pl_vels_dir_vec[pl_idx]
-                elif mode == MODE_LOOKUP['COME-THEN-IN']:
-                    # if 'COME-THEN-IN', combine player speed when 'COME' and collision_speed when 'IN'
-                    # a. length between player and opponent
-                    pl2zone_vec = opp_positions[zone_idx] - pl_pos
-                    pl2zone_length = length(pl2zone_vec, axis=0)
-                    # b. length between player and opponent on velocity direction = a dot dir
-                    pl2zone_ondir_length = np.dot(
-                        pl2zone_vec, pl_vels_dir_vec[pl_idx])
-                    # c. legnth from player to circle edge = b - sqrt(rr-(aa-bb))
-                    # zone to end pos
-                    temp = pl2zone_length**2 - pl2zone_ondir_length**2
-                    # edge to end pos
-                    temp2 = self.screen_radius**2 - temp
-                    if temp < 1e-5:
-                        pl2edge_length = abs(
-                            pl2zone_length - self.screen_radius)
-                    else:
-                        pl2edge_length = pl2zone_ondir_length - np.sqrt(temp2)
-                    # d. final velocity = c * direction + sqrt(rr-(aa-bb)) * collision_speed * direction
-                    collision_speed = self.pl_collision_speed if pl_speed[
-                        pl_idx] >= self.pl_collision_speed else pl_speed[pl_idx]
-                    pl_collision_vel = pl2edge_length * pl_vels_dir_vec[pl_idx] + \
-                        (1 - pl2edge_length / pl_speed[pl_idx]) * \
-                        collision_speed * pl_vels_dir_vec[pl_idx]
-                next_pl_pos = pl_pos + pl_collision_vel
-                pl_vel = 0.0  # if collision, velocity = 0
+        #     zone_idx, mode = self._find_zone_idx(
+        #         next_pl_pos, pl_pos, pl_vel, opp_positions, self.screen_radius)
+        # # 3. if any collisions, choose the closest one, calculate the discounted velocity, then update player
+        #     if zone_idx is not None and mode != MODE_LOOKUP['PASS-OUT']:
+        #         pl_collision_vel = [0, 0]  # TODO
+        #         logger.debug(
+        #             '[COLLISION] mode {}, {}-{} colide into {}-{}'.format(mode, state_idx, pl_idx, opp_idx, zone_idx))
+        #         if mode == MODE_LOOKUP['IN'] or mode == MODE_LOOKUP['IN-THEN-OUT']:
+        #             # if 'IN' or 'IN-THEN-OUT', use collision_speed
+        #             collision_speed = self.pl_collision_speed
+        #             collision_speed = collision_speed if pl_speed[
+        #                 pl_idx] >= collision_speed else pl_speed[pl_idx]
+        #             pl_collision_vel = collision_speed * \
+        #                 pl_vels_dir_vec[pl_idx]
+        #         elif mode == MODE_LOOKUP['COME-THEN-IN']:
+        #             # if 'COME-THEN-IN', combine player speed when 'COME' and collision_speed when 'IN'
+        #             # a. length between player and opponent
+        #             pl2zone_vec = opp_positions[zone_idx] - pl_pos
+        #             pl2zone_length = length(pl2zone_vec, axis=0)
+        #             # b. length between player and opponent on velocity direction = a dot dir
+        #             pl2zone_ondir_length = np.dot(
+        #                 pl2zone_vec, pl_vels_dir_vec[pl_idx])
+        #             # c. legnth from player to circle edge = b - sqrt(rr-(aa-bb))
+        #             # zone to end pos
+        #             temp = pl2zone_length**2 - pl2zone_ondir_length**2
+        #             # edge to end pos
+        #             temp2 = self.screen_radius**2 - temp
+        #             if temp < 1e-5:
+        #                 pl2edge_length = abs(
+        #                     pl2zone_length - self.screen_radius)
+        #             else:
+        #                 pl2edge_length = pl2zone_ondir_length - np.sqrt(temp2)
+        #             # d. final velocity = c * direction + sqrt(rr-(aa-bb)) * collision_speed * direction
+        #             collision_speed = self.pl_collision_speed if pl_speed[
+        #                 pl_idx] >= self.pl_collision_speed else pl_speed[pl_idx]
+        #             pl_collision_vel = pl2edge_length * pl_vels_dir_vec[pl_idx] + \
+        #                 (1 - pl2edge_length / pl_speed[pl_idx]) * \
+        #                 collision_speed * pl_vels_dir_vec[pl_idx]
+        #         next_pl_pos = pl_pos + pl_collision_vel
+        #         pl_vel = 0.0  # if collision, velocity = 0
         # 4. if none collisions, update with velocity
             self.states.update_player(state_idx, pl_idx, next_pl_pos, pl_vel)
 

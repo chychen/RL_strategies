@@ -10,10 +10,11 @@ import tensorflow as tf
 from tensorflow.contrib import layers
 
 
-def network(state, reuse=False):
+def network(state, action, reuse=False):
     """
     network structure is alike the value estimation in ppo
     state : shape=[batch_size, buffer_size, 14, 2]
+    action : shape=[batch_size, 5, 2]
 
     """
     with tf.variable_scope('network', reuse=reuse):
@@ -43,8 +44,11 @@ def network(state, reuse=False):
         )
         flatten = tf.reshape(conv2, shape=[batch_size, functools.reduce(
             operator.mul, conv2.shape.as_list()[1:], 1)])
+        # concat with action
+        action_ = tf.reshape(action, shape=[batch_size, 10])
+        concat_act_obs = tf.concat([flatten, action_], axis=1)
         trunk_fc = tf.layers.dense(
-            inputs=flatten,
+            inputs=concat_act_obs,
             units=128,
             activation=tf.nn.relu,
             kernel_initializer=init_xavier_weights,

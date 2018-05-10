@@ -55,12 +55,12 @@ def default():
     # make transitions buffer back to real
     if_back_real = False
     steps_per_ppo_iter = update_every*max_length
-    steps = steps_per_ppo_iter*15
+    steps = steps_per_ppo_iter*5
     # wgan
     wgan_penalty_lambda = 10.0
     episodes_per_batch = 5
     d_batch_size = max_length * episodes_per_batch
-    train_d_per_ppo = 5
+    train_d_per_ppo = 2
 
     return locals()
 

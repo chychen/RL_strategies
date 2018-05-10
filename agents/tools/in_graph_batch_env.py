@@ -106,7 +106,6 @@ class InGraphBatchEnv(object):
             observ = tf.check_numerics(observ, 'observ')
             reward = tf.check_numerics(reward, 'reward')
 
-
             return tf.group(
                 self._observ.assign(observ),
                 self._action.assign(action),
@@ -131,7 +130,7 @@ class InGraphBatchEnv(object):
         observ = tf.check_numerics(observ, 'observ')
         reward = tf.zeros_like(indices, tf.float32)
         done = tf.zeros_like(indices, tf.bool)
-        turn_info = tf.zeros_like(indices, tf.int8) # offense is next
+        turn_info = tf.zeros_like(indices, tf.int8)  # offense is next
         with tf.control_dependencies([
                 tf.scatter_update(self._observ, indices, observ),
                 tf.scatter_update(self._reward, indices, reward),
@@ -153,8 +152,10 @@ class InGraphBatchEnv(object):
     def reward(self):
         """Access the variable holding the current reward."""
         # omit env reward!!! use discriminator as reward insteaded!!!
+        def_action = tf.reshape(self._action[:, 13:23], shape=[
+                                len(self._batch_env), 5, 2])
         with tf.device('/gpu:0'):
-            reward = Discriminator().get_rewards(self._observ)
+            reward = Discriminator().get_rewards(self._observ, def_action)
         return reward
         # NOTE: modified
         # return self._reward

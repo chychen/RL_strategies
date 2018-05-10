@@ -18,7 +18,6 @@ import tensorflow as tf
 from agents import parts
 from agents import tools
 from agents.algorithms.ppo import utility
-from .discriminator import Discriminator
 
 
 class GAIL_DEF_PPO(object):
@@ -69,10 +68,11 @@ class GAIL_DEF_PPO(object):
                     self._last_state = tools.nested.map(var_like, state)
         # Remember the action and policy parameters to write into the memory.
         with tf.variable_scope('ppo_temporary'):
-            self._last_action = tf.Variable(
-                tf.zeros_like(self._batch_env.action), False, name='last_action')
-            self._last_policy = tools.nested.map(
-                lambda x: tf.Variable(tf.zeros_like(x[:, 0], optimize=False)), policy_params)
+            with tf.device('/gpu:0'):
+                self._last_action = tf.Variable(
+                    tf.zeros_like(self._batch_env.action), False, name='last_action')
+                self._last_policy = tools.nested.map(
+                    lambda x: tf.Variable(tf.zeros_like(x[:, 0], optimize=False)), policy_params)
 
     def begin_episode(self, agent_indices):
         """Reset the recurrent states and stored episode.
@@ -299,8 +299,9 @@ class GAIL_DEF_PPO(object):
             tools.nested.map(lambda x: x[0, 0], policy_params),
             self._batch_env.reward[0])
         with tf.variable_scope('ppo_temporary'):
-            self._current_episodes = parts.EpisodeMemory(
-                template, len(self._batch_env), self._config.max_length, 'episodes')
+            with tf.device('/gpu:0'):
+                self._current_episodes = parts.EpisodeMemory(
+                    template, len(self._batch_env), self._config.max_length, 'episodes')
         self._finished_episodes = parts.EpisodeMemory(
             template, self._config.update_every, self._config.max_length, 'memory')
         self._num_finished_episodes = tf.Variable(0, False)

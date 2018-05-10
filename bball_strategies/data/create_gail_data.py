@@ -28,6 +28,7 @@ def main():
     gail_env_data = np.array(gail_env_data)
     np.save('GAILEnvData.npy', gail_env_data)
     print('GAILEnvData', gail_env_data.shape)
+    print('Saved')
 
     # GAIL Transition Data
     # padding by duplicating first frame
@@ -44,8 +45,36 @@ def main():
                 chunk.append(buffer)
             gail_tran_data.append(chunk)
     gail_tran_data = np.array(gail_tran_data)
-    np.save('GAILTransitionData.npy', gail_tran_data)
-    print('GAILTransitionData', gail_tran_data.shape)
+    print('gail_tran_data', gail_tran_data.shape)  # (25796, 50, 10, 11, 2)
+
+    gail_def_vel = []
+    for i in range(gail_tran_data.shape[0]):
+        temp = []
+        for j in range(gail_tran_data.shape[1]-1):
+            def_velocity = gail_tran_data[i, j, -1, 6:,
+                                          :] - gail_tran_data[i, j+1, -1, 6:, :]
+            temp.append(def_velocity)
+        temp.append(def_velocity)  # padding
+        gail_def_vel.append(temp)
+    gail_def_vel = np.array(gail_def_vel)
+
+    gail_def_action = []
+    for i in range(gail_def_vel.shape[0]):
+        temp = []
+        for j in range(gail_def_vel.shape[1]-1):
+            def_acc = gail_def_vel[i, j] - gail_def_vel[i, j+1]
+            temp.append(def_acc)
+        temp.append(def_acc)  # padding
+        gail_def_action.append(temp)
+    gail_def_action = np.array(gail_def_action)
+    print('gail_def_action', gail_def_action.shape)  # (25796, 50, 10, 11, 2)
+
+    # store
+    dict_ = {}
+    dict_['OBS'] = gail_tran_data
+    dict_['DEF_ACT'] = gail_def_action
+    np.save('GAILTransitionData.npy', dict_)
+    print('Saved')
 
 
 if __name__ == '__main__':

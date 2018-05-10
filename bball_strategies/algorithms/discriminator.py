@@ -52,6 +52,10 @@ class Discriminator(object):
                                                 None]+list(env.observation_space.shape))
                 self._agent_s = tf.placeholder(dtype=tf.float32, shape=[
                                                None]+list(env.observation_space.shape))
+                self._expert_a = tf.placeholder(dtype=tf.float32, shape=[
+                                                None, 5, 2])
+                self._agent_a = tf.placeholder(dtype=tf.float32, shape=[
+                    None, 5, 2])
                 self._batch_size = tf.shape(self._expert_s)[0]
                 self._buffer_size = list(env.observation_space.shape)[0]
                 self._config = config
@@ -85,20 +89,28 @@ class Discriminator(object):
             # only defense part is different, others are conditions
             # conditions part might be canceled out to 0
             X_inter = epsilon * self._expert_s + (1.0-epsilon) * self._agent_s
+            X_act_inter = epsilon[:, 0] * self._expert_a + \
+                (1.0-epsilon[:, 0]) * self._agent_a
             # add back the conditions
             X_inter = tf.concat(
                 [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11]], axis=2)
             if self._config.if_back_real:
                 X_inter = tf.concat(
                     [self._expert_s[:, :self._buffer_size-1, :], X_inter[:, -1:, :]], axis=1)
-            grad = tf.gradients(self._config.d_network(
-                X_inter, reuse=False), [X_inter])[0]
+            grad_obs, grad_act = tf.gradients(self._config.d_network(
+                X_inter, X_act_inter, reuse=False), [X_inter, X_act_inter])
+            grad_obs = tf.reshape(grad_obs, shape=[self._batch_size, -1])
+            grad_act = tf.reshape(grad_act, shape=[self._batch_size, -1])
+            grad = tf.concat([grad_obs, grad_act], axis=1)
+            
             sum_ = tf.reduce_sum(tf.square(grad), axis=0)
             grad_norm = tf.sqrt(sum_)
             grad_pen = self._config.wgan_penalty_lambda * tf.reduce_mean(
                 tf.square(grad_norm - 1.0))
-            fake_scores = self._config.d_network(self._agent_s, reuse=True)
-            real_scores = self._config.d_network(self._expert_s, reuse=True)
+            fake_scores = self._config.d_network(
+                self._agent_s, self._agent_a, reuse=True)
+            real_scores = self._config.d_network(
+                self._expert_s, self._expert_a, reuse=True)
             f_fake = tf.reduce_mean(fake_scores)
             f_real = tf.reduce_mean(real_scores)
             em_distance = f_real - f_fake
@@ -115,29 +127,33 @@ class Discriminator(object):
 
             return loss
 
-    def train(self, agent_s, expert_s):
+    def train(self, agent_s, expert_s, agent_a, expert_a):
         feed_dict = {
             self._expert_s: expert_s,
-            self._agent_s: agent_s
+            self._agent_s: agent_s,
+            self._expert_a: expert_a,
+            self._agent_a: agent_a
         }
         global_step, _, summary = tf.get_default_session().run(
             [self._global_steps, self._train_op, self._summary_op], feed_dict=feed_dict)
         self.summary_writer.add_summary(summary, global_step=global_step)
         return
 
-    def validate(self, agent_s, expert_s):
+    def validate(self, agent_s, expert_s, agent_a, expert_a):
         feed_dict = {
             self._expert_s: expert_s,
-            self._agent_s: agent_s
+            self._agent_s: agent_s,
+            self._expert_a: expert_a,
+            self._agent_a: agent_a
         }
         global_step, summary = tf.get_default_session().run(
             [self._global_steps, self._summary_valid_op], feed_dict=feed_dict)
         self.valid_summary_writer.add_summary(summary, global_step=global_step)
         pass
 
-    def get_rewards(self, state):
+    def get_rewards(self, state, action):
         with tf.variable_scope('Discriminator'):
-            return self._config.d_network(state, reuse=True)
+            return self._config.d_network(state, action, reuse=True)
 
 
 def main():
