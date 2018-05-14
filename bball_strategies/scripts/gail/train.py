@@ -177,7 +177,7 @@ def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
 
 def test_policy(config, vanilla_env, ppo_policy):
     vanilla_obs = vanilla_env.reset()
-    for _ in range(config.max_length):
+    for _ in range(vanilla_env.time_limit):
         vanilla_act = ppo_policy.act(
             np.array(vanilla_obs)[None, None], stochastic=False)
         vanilla_trans_act = [
@@ -194,17 +194,13 @@ def test_policy(config, vanilla_env, ppo_policy):
             vanilla_trans_act)
 
 
-def capped_video_schedule_100(episode_id):
-    return episode_id % 100 == 0
-
-
-def capped_video_schedule_10(episode_id):
-    return episode_id % 10 == 0
+def capped_video_schedule(episode_id):
+    return episode_id % 1000 == 0
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
     # init_mode 0 : init by default
-    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./test/', if_back_real=False, video_callable=capped_video_schedule_100):
+    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./test/', if_back_real=False, video_callable=capped_video_schedule):
         super(MonitorWrapper, self).__init__(env=env, directory=directory,
                                              video_callable=video_callable, force=True)
         self._env = env
@@ -256,10 +252,11 @@ def train(config, env_processes, outdir):
     # env to testing
     vanilla_env = gym.make(config.env)
     vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
-                               time_limit=config.max_length)
+                               time_limit=50)
     vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing/'), if_back_real=False,
                                  # init from dataset
                                  init_mode=1)
+    vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
     # env to generate fake state
     env = gym.make(config.env)
     env = BBallWrapper(env, init_mode=3, fps=config.FPS, if_back_real=config.if_back_real,
@@ -289,7 +286,7 @@ def train(config, env_processes, outdir):
     # Agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
     # Data
-    all_data = np.load('bball_strategies/data/GAILTransitionData.npy').item()
+    all_data = np.load('bball_strategies/data/GAILTransitionData_11.npy').item()
     expert_data, valid_expert_data = np.split(
         all_data['OBS'], [all_data['OBS'].shape[0]*9//10])
     expert_action, valid_expert_action = np.split(

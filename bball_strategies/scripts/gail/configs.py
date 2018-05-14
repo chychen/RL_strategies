@@ -51,7 +51,7 @@ def default():
     # Environment
     env = 'bball_gail_def-v0'
     # data only have 50 length, if we step 50 times, cant find 51-th conidtion in data
-    max_length = 49
+    max_length = 11-1
     # make transitions buffer back to real
     if_back_real = False
     steps_per_ppo_iter = update_every*max_length
@@ -60,8 +60,20 @@ def default():
     wgan_penalty_lambda = 10.0
     episodes_per_batch = 5
     d_batch_size = max_length * episodes_per_batch
-    train_d_per_ppo = 2
+    train_d_per_ppo = 3
 
+    return locals()
+
+def episode_len_11():
+    locals().update(default())
+    max_length = 11-1
+    # ppo
+    update_every = 100
+    steps_per_ppo_iter = update_every*max_length
+    # wgan
+    wgan_penalty_lambda = 10.0
+    episodes_per_batch = 20
+    d_batch_size = max_length * episodes_per_batch
     return locals()
 
 def server_40cpu():

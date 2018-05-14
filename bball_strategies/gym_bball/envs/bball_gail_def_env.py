@@ -36,7 +36,7 @@ class BBallGailDefEnv(gym.Env):
     """
     metadata = {
         'render.modes': ['human', 'rgb_array'],
-        'video.frames_per_second': FPS * 2.0
+        'video.frames_per_second': FPS
     }
 
     def __init__(self):
@@ -84,7 +84,7 @@ class BBallGailDefEnv(gym.Env):
 
         # init dataset
         self.episode_index = 0
-        self.data = np.load('bball_strategies/data/GAILEnvData.npy')
+        self.data = np.load('bball_strategies/data/GAILEnvData_11.npy')
         # self.data = None
         self.current_cond = None
         self.time_limit = 49

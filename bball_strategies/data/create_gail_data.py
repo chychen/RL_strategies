@@ -9,7 +9,7 @@ FPS = 5
 OBSERVATION_LENGTH = 10
 
 NON_OVERLAP_LENGTH = 10
-ENV_CONDITION_LENGTH = 50
+ENV_CONDITION_LENGTH = 11
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
             temp = data[i, len_idx: len_idx+ENV_CONDITION_LENGTH, :, 0:2]
             gail_env_data.append(temp)
     gail_env_data = np.array(gail_env_data)
-    np.save('GAILEnvData.npy', gail_env_data)
+    np.save('GAILEnvData_'+str(ENV_CONDITION_LENGTH)+'.npy', gail_env_data)
     print('GAILEnvData', gail_env_data.shape)
     print('Saved')
 
@@ -73,7 +73,7 @@ def main():
     dict_ = {}
     dict_['OBS'] = gail_tran_data
     dict_['DEF_ACT'] = gail_def_action
-    np.save('GAILTransitionData.npy', dict_)
+    np.save('GAILTransitionData_'+str(ENV_CONDITION_LENGTH)+'.npy', dict_)
     print('Saved')
 
 
