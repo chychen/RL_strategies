@@ -1,0 +1,115 @@
+
+<LoadDialog>:
+    id: my_widget
+    RelativeLayout:
+        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+        FloatLayout:
+            FileChooserListView:
+                id: filechooser
+                size_hint: (1.0, 0.8)
+                pos_hint: {'x':0.0, 'y':0.2}
+            Button
+                text: "cancel"
+                size_hint: (0.5, 0.2)
+                pos_hint: {'x':0.0, 'y':0.0}
+                on_release: root.cancel()
+            Button
+                text: "open"
+                size_hint: (0.5, 0.2)
+                pos_hint: {'x':0.5, 'y':0.0}
+                on_release: root.load(filechooser.path, filechooser.selection)
+
+<Cursor>:
+    rgb: 1., 1., 1.
+    canvas:
+        Color:
+            rgb: self.rgb
+        Rectangle:
+            pos: self.pos
+            size: 10 ,20
+
+<SlideBar>
+    canvas.before:
+        Color: 
+            rgba: .4, .4, .4, .4
+        Rectangle:
+            size: self.size
+            pos: 0.0, 0.0
+        Color: 
+            rgba: .8, .8, .8, .8
+        Rectangle:
+            size: self.width, 10.0
+            pos: 0.0, self.height/2-5.0
+
+
+<BBallCourt>:
+    canvas.before:
+        Rectangle:
+            pos: self.pos
+            size: self.size
+            source: 'fullcourt.jpg'
+
+<AppEngine>:
+    court: court
+    last_button: last_button
+    play_pause_button: play_pause_button
+    reset_button: reset_button
+    next_button: next_button
+    slide_bar: slide_bar
+    frame_cursor: frame_cursor
+    label: label
+
+    FloatLayout:
+        Button:
+            id: last_button
+            text: "Last"
+            size_hint: (.3, .1)
+            pos_hint: {'x':0, 'y':.9}
+            background_color: (0, 1, 1, 1)
+
+        Button:
+            id: play_pause_button
+            text: "Play/Pause"
+            size_hint: (.2, .1)
+            pos_hint: {'x':0.3, 'y':.9}
+            background_color: (0, 1, 1, 1)
+
+        Button:
+            id: reset_button
+            text: "Reset"
+            size_hint: (.2, .1)
+            pos_hint: {'x':0.5, 'y':.9}
+            background_color: (0, 1, 1, 1)
+
+        Button:
+            id: next_button
+            text: "Next"
+            size_hint: (.3, .1)
+            pos_hint: {'x':.7, 'y':.9}
+            background_color: (0, 1, 1, 1)
+        
+        Label:
+            id: label
+            text: "[size=32]" + "(frame) " + root.frame_idx_str + " / " + root.episode_len_str + " (total) [/size]"
+            markup: True
+            size_hint: (1.0, 0.1)
+            pos_hint: {'x': 0.0, 'y': 0.8}
+        
+        RelativeLayout:
+            size_hint: (None, None)
+            size: 940, 500
+            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+            pos: self.center_x-940/2, self.center_y-500/2
+            BBallCourt:
+                id: court
+
+        RelativeLayout:
+            size_hint: (1.0, 0.1)
+            size: self.width, self.height
+            pos_hint: {'x': 0.0, 'y': 0.0}
+            pos: 0.0, 0.0
+            SlideBar:
+                id: slide_bar
+            Cursor:
+                id: frame_cursor
+                pos: 0.0 - 5.0, self.height/2 - 10.0

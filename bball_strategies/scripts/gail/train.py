@@ -310,6 +310,10 @@ def train(config, env_processes, outdir):
             perm_idx = np.random.permutation(expert_data.shape[0])
             expert_data = expert_data[perm_idx]
             expert_action = expert_action[perm_idx]
+            if valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch) == 0:
+                valid_perm_idx = np.random.permutation(valid_expert_data.shape[0])
+                valid_expert_data = valid_expert_data[valid_perm_idx]
+                valid_expert_action = valid_expert_action[valid_perm_idx]
             episode_idx = 0
             while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
                 # testing
