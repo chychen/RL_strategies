@@ -19,7 +19,7 @@ from kivy.properties import NumericProperty, ObjectProperty, StringProperty
 from kivy.config import Config
 from kivy.uix.popup import Popup
 import kivy
-kivy.require('1.8.0')
+kivy.require('1.9.0')
 Config.set('graphics', 'width', '1800')
 Config.set('graphics', 'height', '800')
 
@@ -124,20 +124,20 @@ class AppEngine(FloatLayout):
         self.next_button.opacity = 0.0
         content = LoadDialog(load=self.load, cancel=self.dismiss_popup)
         self._popup = Popup(title="Load file",
-                            content=content, size_hint=(0.9, 0.9),
+                            content=content, size_hint=(0.5, 0.5),
                             auto_dismiss=False)
         self._popup.open()
 
     def load(self, path, filename):
         # show
-        self.label.opacity = 255.0
-        self.court.opacity = 255.0
-        self.slide_bar.opacity = 255.0
-        self.frame_cursor.opacity = 255.0
-        self.last_button.opacity = 255.0
-        self.play_pause_button.opacity = 255.0
-        self.reset_button.opacity = 255.0
-        self.next_button.opacity = 255.0
+        self.label.opacity = 1.0
+        self.court.opacity = 1.0
+        self.slide_bar.opacity = 1.0
+        self.frame_cursor.opacity = 1.0
+        self.last_button.opacity = 1.0
+        self.play_pause_button.opacity = 1.0
+        self.reset_button.opacity = 1.0
+        self.next_button.opacity = 1.0
         self.is_init = True
         filepath = os.path.join(path, filename[0])
         # data to vis
