@@ -56,38 +56,54 @@ class BBallCourt(Widget):
     def __init__(self, *args, **kwargs):
         super(BBallCourt, self).__init__(*args, **kwargs)
         self.FPS = 5.0
-        self.vis_factor = 10.0
-        self.ball_r = 0.4 * self.vis_factor
-        self.player_r = 1.25 * self.vis_factor
+        self.vis_factor_x = 0.0
+        self.vis_factor_y = 0.0
+        self.ball_r = 0.0
+        self.player_r = 0.0
         self.all_players = []
-        with self.canvas.after:
-            # offense
-            Color(1.0, 0.0, 0.0, 1)
-            for i in range(5):
-                self.all_players.append(
-                    Ellipse(pos=[0, 0], size=[self.player_r*2, self.player_r*2]))
-            # defense
-            Color(0.0, 0.0, 1.0, 1)
-            for i in range(5):
-                self.all_players.append(
-                    Ellipse(pos=[0, 0], size=[self.player_r*2, self.player_r*2]))
-            # ball, draw last, show in the front
-            Color(0.0, 1.0, 0.0, 1)
-            self.all_players = [
-                Ellipse(pos=[0, 0], size=[self.ball_r*2, self.ball_r*2])] + self.all_players
+        self.last_pos = None
+        self.bind(width=self.redraw, height=self.redraw)
+
+    def redraw(self, *args):
+        if self.last_pos is not None:
+            self.update_players(self.last_pos)
 
     def update_players(self, players_pos):
         """
         players_pos : shape=(11, 2)
             ball, off*5, def*5
         """
+        self.last_pos = players_pos
+        self.vis_factor_x = 1.0/94.0*self.width
+        self.vis_factor_y = 1.0/50.0*self.height
+        self.ball_r = 0.4
+        self.player_r = 1.25
+        if len(self.all_players) == 0:
+            with self.canvas.after:
+                # offense
+                Color(1.0, 0.0, 0.0, 1)
+                for i in range(5):
+                    self.all_players.append(
+                        Ellipse(pos=[0, 0], size=[self.player_r*2*self.vis_factor_x, self.player_r*2*self.vis_factor_y]))
+                # defense
+                Color(0.0, 0.0, 1.0, 1)
+                for i in range(5):
+                    self.all_players.append(
+                        Ellipse(pos=[0, 0], size=[self.player_r*2*self.vis_factor_x, self.player_r*2*self.vis_factor_y]))
+                # ball, draw last, show in the front
+                Color(0.0, 1.0, 0.0, 1)
+                self.all_players = [
+                    Ellipse(pos=[0, 0], size=[self.ball_r*2*self.vis_factor_x, self.ball_r*2*self.vis_factor_y])] + self.all_players
+        
         for i, pos in enumerate(players_pos):
             if i == 0:  # ball
                 self.all_players[i].pos = [
-                    pos[0]*self.vis_factor-self.ball_r, pos[1]*self.vis_factor-self.ball_r]
+                    (pos[0]-self.ball_r)*self.vis_factor_x, (pos[1]-self.ball_r)*self.vis_factor_y]
+                self.all_players[i].size = [self.ball_r*2*self.vis_factor_x, self.ball_r*2*self.vis_factor_y]
             else:  # players
                 self.all_players[i].pos = [
-                    pos[0]*self.vis_factor-self.player_r, pos[1]*self.vis_factor-self.player_r]
+                    (pos[0]-self.player_r)*self.vis_factor_x, (pos[1]-self.player_r)*self.vis_factor_y]
+                self.all_players[i].size = [self.player_r*2*self.vis_factor_x, self.player_r*2*self.vis_factor_y]
 
 
 class AppEngine(FloatLayout):
@@ -143,6 +159,7 @@ class AppEngine(FloatLayout):
         # data to vis
         data = np.load(filepath)
         self.episode = data[0]
+        assert self.episode.shape[1:] == tuple((11, 2)), "episode shape[1:] {} doesn't match shape [11,2]".format(self.episode.shape[1:])
         self.episode_len = self.episode.shape[0]
         self.is_playing = False
         self.frame_idx = 0
@@ -173,7 +190,7 @@ class AppEngine(FloatLayout):
         unit_len = self.width/(self.episode_len-1)
         self.frame_cursor.x = self.frame_idx * unit_len - 5.0
 
-    def next_button_callback(self, isinstance):
+    def next_button_callback(self, instance):
         if self.is_init:
             if self.frame_idx < self.episode_len-1:
                 self.frame_idx += 1
@@ -182,7 +199,7 @@ class AppEngine(FloatLayout):
                 self.playing_evnet.cancel()
                 self.is_playing = not self.is_playing
 
-    def last_button_callback(self, isinstance):
+    def last_button_callback(self, instance):
         if self.is_init:
             if self.frame_idx > 0:
                 self.frame_idx -= 1
@@ -191,7 +208,7 @@ class AppEngine(FloatLayout):
                 self.playing_evnet.cancel()
                 self.is_playing = not self.is_playing
 
-    def play_pause_callback(self, isinstance):
+    def play_pause_callback(self, instance):
         if self.is_init:
             self.playpause_action()
 
@@ -204,7 +221,7 @@ class AppEngine(FloatLayout):
                 self.playing_evnet.cancel()
                 self.is_playing = not self.is_playing
 
-    def reset_button_callback(self, isinstance):
+    def reset_button_callback(self, instance):
         self.frame_idx = 0
 
     def playing_callback(self, dt):
