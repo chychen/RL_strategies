@@ -286,7 +286,7 @@ def train(config, env_processes, outdir):
     # Agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
     # Data
-    all_data = np.load('bball_strategies/data/GAILTransitionData_11.npy').item()
+    all_data = np.load('bball_strategies/data/GAILTransitionData_21.npy').item()
     expert_data, valid_expert_data = np.split(
         all_data['OBS'], [all_data['OBS'].shape[0]*9//10])
     expert_action, valid_expert_action = np.split(
@@ -296,7 +296,7 @@ def train(config, env_processes, outdir):
     print('expert_action', expert_action.shape)
     print('valid_expert_action', valid_expert_action.shape)
     # TF Session
-    saver = utility.define_saver(exclude=(r'.*_temporary.*',))
+    saver = utility.define_saver(exclude=(r'.*_temporary.*', r'.*memory/.*'))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True

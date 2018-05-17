@@ -57,7 +57,6 @@ def default():
     steps_per_ppo_iter = update_every*max_length
     steps = steps_per_ppo_iter*5
     # wgan
-    wgan_penalty_lambda = 10.0
     episodes_per_batch = 5
     d_batch_size = max_length * episodes_per_batch
     train_d_per_ppo = 3
@@ -67,6 +66,17 @@ def default():
 def episode_len_11():
     locals().update(default())
     max_length = 11-1
+    # ppo
+    update_every = 100
+    steps_per_ppo_iter = update_every*max_length
+    # wgan
+    episodes_per_batch = 20
+    d_batch_size = max_length * episodes_per_batch
+    return locals()
+
+def episode_len_21():
+    locals().update(default())
+    max_length = 21-1
     # ppo
     update_every = 100
     steps_per_ppo_iter = update_every*max_length
