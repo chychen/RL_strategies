@@ -54,12 +54,12 @@ def default():
     max_length = 11-1
     # make transitions buffer back to real
     if_back_real = False
-    steps_per_ppo_iter = update_every*max_length
-    steps = steps_per_ppo_iter*5
+    steps = update_every*max_length
     # wgan
+    wgan_penalty_lambda = 10.0
     episodes_per_batch = 5
     d_batch_size = max_length * episodes_per_batch
-    train_d_per_ppo = 3
+    train_d_per_ppo = 5
 
     return locals()
 
@@ -68,7 +68,7 @@ def episode_len_11():
     max_length = 11-1
     # ppo
     update_every = 100
-    steps_per_ppo_iter = update_every*max_length
+    steps = update_every*max_length
     # wgan
     episodes_per_batch = 20
     d_batch_size = max_length * episodes_per_batch
@@ -79,10 +79,20 @@ def episode_len_21():
     max_length = 21-1
     # ppo
     update_every = 100
-    steps_per_ppo_iter = update_every*max_length
+    steps = update_every*max_length
     # wgan
-    wgan_penalty_lambda = 10.0
-    episodes_per_batch = 20
+    episodes_per_batch = 10
+    d_batch_size = max_length * episodes_per_batch
+    return locals()
+
+def episode_len_51():
+    locals().update(default())
+    max_length = 51-1
+    # ppo
+    update_every = 100
+    steps = update_every*max_length
+    # wgan
+    episodes_per_batch = 4
     d_batch_size = max_length * episodes_per_batch
     return locals()
 
