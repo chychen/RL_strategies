@@ -18,6 +18,7 @@ from kivy.graphics import Ellipse, Color
 from kivy.properties import NumericProperty, ObjectProperty, StringProperty
 from kivy.config import Config
 from kivy.uix.popup import Popup
+from kivy.core.window import Window
 import kivy
 kivy.require('1.9.0')
 Config.set('graphics', 'width', '1800')
@@ -47,6 +48,10 @@ class SlideBar(Widget):
 
     def __init__(self, *args, **kwargs):
         super(SlideBar, self).__init__(*args, **kwargs)
+
+        # voc_lines = Line(points=self.points, width=4)
+        # self.canvas.add(Color(.6, .6, .6, .6))
+        # self.canvas.add(voc_lines)
 
 
 class BBallCourt(Widget):
@@ -79,7 +84,7 @@ class BBallCourt(Widget):
         self.ball_r = 0.4
         self.player_r = 1.25
         if len(self.all_players) == 0:
-            with self.canvas.after:
+            with self.canvas.before:
                 # offense
                 Color(1.0, 0.0, 0.0, 1)
                 for i in range(5):
@@ -121,6 +126,7 @@ class AppEngine(FloatLayout):
     label = ObjectProperty(None)
     frame_idx_str = StringProperty("None")
     episode_len_str = StringProperty("None")
+    reward_str = StringProperty("None")
     # scroll bar
     slide_bar = ObjectProperty(None)
     frame_cursor = ObjectProperty(None)
@@ -129,6 +135,7 @@ class AppEngine(FloatLayout):
 
     def __init__(self, *args, **kwargs):
         super(AppEngine, self).__init__(*args, **kwargs)
+        self.playing_evnet = None
         # hide
         self.label.opacity = 0.0
         self.court.opacity = 0.0
@@ -143,8 +150,19 @@ class AppEngine(FloatLayout):
                             content=content, size_hint=(0.5, 0.5),
                             auto_dismiss=False)
         self._popup.open()
+    
+    def update_file_path(self, filepath):
+        """ function for drag and drop input method
+        """
+        if self.playing_evnet is not None:
+            self.playing_evnet.cancel()
+        self.reset(filepath)
 
     def load(self, path, filename):
+        filepath = os.path.join(path, filename[0])
+        self.reset(filepath)
+    
+    def reset(self, filepath):
         # show
         self.label.opacity = 1.0
         self.court.opacity = 1.0
@@ -155,10 +173,11 @@ class AppEngine(FloatLayout):
         self.reset_button.opacity = 1.0
         self.next_button.opacity = 1.0
         self.is_init = True
-        filepath = os.path.join(path, filename[0])
         # data to vis
-        data = np.load(filepath)
-        self.episode = data[0]
+        data = np.load(filepath.decode("utf-8") )
+        # self.episode = data[0]
+        self.episode = data['STATE']
+        self.rewards = data['REWARD']
         assert self.episode.shape[1:] == tuple((11, 2)), "episode shape[1:] {} doesn't match shape [11,2]".format(self.episode.shape[1:])
         self.episode_len = self.episode.shape[0]
         self.is_playing = False
@@ -167,6 +186,7 @@ class AppEngine(FloatLayout):
         # label
         self.frame_idx_str = str(self.frame_idx)
         self.episode_len_str = str(self.episode_len-1)
+        self.reward_str = str(self.rewards[self.frame_idx])
         # bindings
         self.last_button.bind(on_release=self.last_button_callback)
         self.play_pause_button.bind(on_release=self.play_pause_callback)
@@ -186,9 +206,10 @@ class AppEngine(FloatLayout):
         self.court.update_players(self.episode[self.frame_idx])
         # update label
         self.frame_idx_str = str(self.frame_idx)
+        self.reward_str = str(self.rewards[self.frame_idx])
         # update cursor
         unit_len = self.width/(self.episode_len-1)
-        self.frame_cursor.x = self.frame_idx * unit_len - 5.0
+        self.frame_cursor.x = self.frame_idx * unit_len - 1.0
 
     def next_button_callback(self, instance):
         if self.is_init:
@@ -261,11 +282,16 @@ class PlayerApp(App):
     """
     main app builder
     """
-
+    app = ObjectProperty(None)
+    
     def build(self):
-        app = AppEngine()
-        return app
+        Window.bind(on_dropfile=self._on_file_drop)
+        self.app = AppEngine()
+        return self.app
 
+    def _on_file_drop(self, window, file_path):
+        self.app.update_file_path(file_path)
+        return
 
 if __name__ == '__main__':
     PlayerApp().run()

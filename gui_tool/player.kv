@@ -10,26 +10,26 @@
                 pos_hint: {'x':0.0, 'y':0.2}
             Button
                 text: "cancel"
-                size_hint: (0.5, 0.2)
-                pos_hint: {'x':0.0, 'y':0.0}
+                size_hint: (0.3, 0.1)
+                pos_hint: {'x':0.1, 'y':0.025}
                 on_release: root.cancel()
             Button
                 text: "open"
-                size_hint: (0.5, 0.2)
-                pos_hint: {'x':0.5, 'y':0.0}
+                size_hint: (0.3, 0.1)
+                pos_hint: {'x':0.6, 'y':0.025}
                 on_release: root.load(filechooser.path, filechooser.selection)
 
 <Cursor>:
     rgb: 1., 1., 1.
-    canvas:
+    canvas.after:
         Color:
             rgb: self.rgb
         Rectangle:
             pos: self.pos
-            size: 10 ,20
+            size: 2.0 ,self.height
 
 <SlideBar>
-    canvas.before:
+    canvas.after:
         Color: 
             rgba: .4, .4, .4, .4
         Rectangle:
@@ -38,8 +38,8 @@
         Color: 
             rgba: .8, .8, .8, .8
         Rectangle:
-            size: self.width, 10.0
-            pos: 0.0, self.height/2-5.0
+            size: self.width, 2.0
+            pos: 0.0, self.height/2-1.0
 
 
 <BBallCourt>:
@@ -90,7 +90,7 @@
         
         Label:
             id: label
-            text: "[size=32]" + "(frame) " + root.frame_idx_str + " / " + root.episode_len_str + " (total) [/size]"
+            text: "[size=32]" + "(frame) " + root.frame_idx_str + " / " + root.episode_len_str + " (total)" + " Reward: " + root.reward_str +"[/size]"
             markup: True
             size_hint: (1.0, 0.1)
             pos_hint: {'x': 0.0, 'y': 0.8}
@@ -110,4 +110,4 @@
                 id: slide_bar
             Cursor:
                 id: frame_cursor
-                pos: 0.0 - 5.0, self.height/2 - 10.0
+                pos: 0.0 - 1.0, 0.0
