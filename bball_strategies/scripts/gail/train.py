@@ -76,7 +76,7 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
     return loop
 
 
-def train_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ):
+def train_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action):
     episode_counter = episode_idx
     for _ in range(config.train_d_per_ppo):
         print('train Discriminator')
@@ -124,10 +124,11 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
         batch_fake_states = np.array(batch_fake_states)
         fake_action = np.array(fake_action)
         batch_real_states = normalize_observ(batch_real_states)
-        D.train(batch_fake_states, batch_real_states, fake_action, real_action)
+        D.train(batch_fake_states, batch_real_states,
+                fake_action, normalize_action(real_action))
 
 
-def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ):
+def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action):
     print('Validate Discriminator')
     batch_fake_states = []
     fake_action = []
@@ -172,14 +173,22 @@ def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
     batch_fake_states = np.array(batch_fake_states)
     fake_action = np.array(fake_action)
     batch_real_states = normalize_observ(batch_real_states)
-    D.validate(batch_fake_states, batch_real_states, fake_action, real_action)
+    D.validate(batch_fake_states, batch_real_states,
+               fake_action, normalize_action(real_action))
 
 
-def test_policy(config, vanilla_env, ppo_policy):
+def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
+    """ test policy
+    - draw episode into mpeg video
+    - collect episdoe and each state scores into numpy
+    """
+    numpy_collector = []
+    act_collector = []
     vanilla_obs = vanilla_env.reset()
     for _ in range(vanilla_env.time_limit):
         vanilla_act = ppo_policy.act(
             np.array(vanilla_obs)[None, None], stochastic=False)
+        act_collector.append(vanilla_act.reshape([5, 2]))
         vanilla_trans_act = [
             # Discrete(3) must be int
             int(0),
@@ -192,10 +201,18 @@ def test_policy(config, vanilla_env, ppo_policy):
         ]
         vanilla_obs, _, _, _ = vanilla_env.step(
             vanilla_trans_act)
+    #     numpy_collector.append(denormalize_observ(vanilla_obs))
+    # numpy_collector = np.array(numpy_collector)
+    # act_collector = np.array(act_collector)
+    # reward_collector = D.get_rewards(numpy_collector, act_collector)
+    # reward_collector = np.zeros(shape=[50,])
+    # np.savez(os.path.join(config.logdir, 'gail_testing/episode_{}.npz'.format(steps)), STATE=numpy_collector[:,-1], REWARD=reward_collector)
+    # # np.save(os.path.join(config.logdir, 'gail_testing/STATE_{}.npz'.format(steps)), numpy_collector)
+    # # np.save(os.path.join(config.logdir, 'gail_testing/REWARD_{}.npz'.format(steps)), reward_collector)
 
 
 def capped_video_schedule(episode_id):
-    return episode_id % 1000 == 0
+    return episode_id % 10000 == 0
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
@@ -246,16 +263,30 @@ def train(config, env_processes, outdir):
     def normalize_observ(observ):
         min_ = dummy_env.observation_space.low
         max_ = dummy_env.observation_space.high
-        observ = 2 * (observ - min_) / (max_ - min_) - 1
+        observ = 2.0 * (observ - min_) / (max_ - min_) - 1.0
+        return observ
+
+    def normalize_action(act):
+        min_ = dummy_env.action_space[3].low
+        max_ = dummy_env.action_space[3].high
+        act = 2.0 * (act - min_) / (max_ - min_) - 1.0
+        return act
+
+    def denormalize_observ(observ):
+        min_ = dummy_env.observation_space.low
+        max_ = dummy_env.observation_space.high
+        observ = (observ + 1.0) * (max_ - min_) / 2.0 + min_
         return observ
 
     # env to testing
     vanilla_env = gym.make(config.env)
     vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=50)
-    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing/'), if_back_real=False,
+    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing/'), if_back_real=False, video_callable=lambda _: True,
                                  # init from dataset
                                  init_mode=1)
+    # if not os.path.exists(os.path.join(config.logdir, 'gail_testing')):
+    #     os.makedirs(os.path.join(config.logdir, 'gail_testing'))
     vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
     # env to generate fake state
     env = gym.make(config.env)
@@ -286,7 +317,8 @@ def train(config, env_processes, outdir):
     # Agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
     # Data
-    all_data = np.load('bball_strategies/data/GAILTransitionData_11.npy').item()
+    all_data = np.load(
+        'bball_strategies/data/GAILTransitionData_51.npy').item()
     expert_data, valid_expert_data = np.split(
         all_data['OBS'], [all_data['OBS'].shape[0]*9//10])
     expert_action, valid_expert_action = np.split(
@@ -296,7 +328,7 @@ def train(config, env_processes, outdir):
     print('expert_action', expert_action.shape)
     print('valid_expert_action', valid_expert_action.shape)
     # TF Session
-    saver = utility.define_saver(exclude=(r'.*_temporary.*', r'.*memory/.*'))
+    saver = utility.define_saver(exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0')) #TODO _num_finished_episodes => Variable:0
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
@@ -305,24 +337,28 @@ def train(config, env_processes, outdir):
             sess, saver, config.logdir, resume=FLAGS.resume)
         # GAIL
         cumulate_steps = sess.run(graph.step)
+        d_steps = sess.run(D._global_steps)
         valid_episode_idx = 0
         while True:
             perm_idx = np.random.permutation(expert_data.shape[0])
             expert_data = expert_data[perm_idx]
             expert_action = expert_action[perm_idx]
             if valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch) == 0:
-                valid_perm_idx = np.random.permutation(valid_expert_data.shape[0])
+                valid_perm_idx = np.random.permutation(
+                    valid_expert_data.shape[0])
                 valid_expert_data = valid_expert_data[valid_perm_idx]
                 valid_expert_action = valid_expert_action[valid_perm_idx]
             episode_idx = 0
             while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
                 # testing
-                test_policy(config, vanilla_env, ppo_policy)
+                if valid_episode_idx % (100 * config.episodes_per_batch) == 0:
+                    test_policy(config, vanilla_env, d_steps, ppo_policy,
+                                D, denormalize_observ)
                 # train Discriminator
                 train_Discriminator(
-                    episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ)
+                    episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
                 valid_Discriminator(
-                    valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch), config, valid_expert_data, valid_expert_action, env, ppo_policy, D, normalize_observ)
+                    valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch), config, valid_expert_data, valid_expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
                 episode_idx += config.episodes_per_batch*config.train_d_per_ppo
                 valid_episode_idx += config.episodes_per_batch
                 # train PPO

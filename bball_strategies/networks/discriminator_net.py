@@ -20,8 +20,12 @@ def network(state, action, reuse=False):
     with tf.variable_scope('network', reuse=reuse):
         batch_size = tf.shape(state)[0]
         buffer_size = state.shape[1]
-        input_ = tf.reshape(state, shape=[batch_size, buffer_size, functools.reduce(
-            operator.mul, state.shape.as_list()[2:], 1)])
+        if isinstance(state, np.ndarray):
+            input_ = tf.reshape(state, shape=[batch_size, buffer_size, functools.reduce(
+                operator.mul, state.shape[2:], 1)])
+        else:
+            input_ = tf.reshape(state, shape=[batch_size, buffer_size, functools.reduce(
+                operator.mul, state.shape.as_list()[2:], 1)])
         init_xavier_weights = tf.variance_scaling_initializer(
             scale=1.0, mode='fan_avg', distribution='uniform')
         init_output_weights = tf.variance_scaling_initializer(

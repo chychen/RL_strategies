@@ -9,7 +9,7 @@ FPS = 5
 OBSERVATION_LENGTH = 10
 
 NON_OVERLAP_LENGTH = 10
-ENV_CONDITION_LENGTH = 21
+ENV_CONDITION_LENGTH = 51
 
 
 def main():
@@ -51,8 +51,8 @@ def main():
     for i in range(gail_tran_data.shape[0]):
         temp = []
         for j in range(gail_tran_data.shape[1]-1):
-            def_velocity = gail_tran_data[i, j, -1, 6:,
-                                          :] - gail_tran_data[i, j+1, -1, 6:, :]
+            def_velocity = gail_tran_data[i, j+1, -1, 6:,
+                                          :] - gail_tran_data[i, j, -1, 6:, :]
             temp.append(def_velocity)
         temp.append(def_velocity)  # padding
         gail_def_vel.append(temp)
@@ -62,7 +62,7 @@ def main():
     for i in range(gail_def_vel.shape[0]):
         temp = []
         for j in range(gail_def_vel.shape[1]-1):
-            def_acc = gail_def_vel[i, j] - gail_def_vel[i, j+1]
+            def_acc = gail_def_vel[i, j+1] - gail_def_vel[i, j]
             temp.append(def_acc)
         temp.append(def_acc)  # padding
         gail_def_action.append(temp)

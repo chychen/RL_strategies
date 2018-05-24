@@ -42,9 +42,10 @@ class GAIL_DEF_PPO(object):
         self._should_log = should_log
         self._config = config
         # NOTE: clipping!!!!!!!!!
-        #TODO center=True, scale=True
+        # cant normalize obser, because outside the ppo we never know the current mean and stddev, than we can't normalize the input for outside action generator
+        # TODO maybe we could noralize all obs by dataset's mean and variance
         self._observ_filter = parts.StreamingNormalize(
-            self._batch_env.observ[0], center=True, scale=True, clip=None,
+            self._batch_env.observ[0], center=False, scale=False, clip=None,
             name='normalize_observ')
         # because the Wgan's Critic scale and center will differ from time to time #TODO center=False, scale=False
         self._reward_filter = parts.StreamingNormalize(

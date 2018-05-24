@@ -85,6 +85,17 @@ def episode_len_21():
     d_batch_size = max_length * episodes_per_batch
     return locals()
 
+def episode_len_31():
+    locals().update(default())
+    max_length = 31-1
+    # ppo
+    update_every = 100
+    steps = update_every*max_length
+    # wgan
+    episodes_per_batch = 7
+    d_batch_size = max_length * episodes_per_batch
+    return locals()
+
 def episode_len_51():
     locals().update(default())
     max_length = 51-1
