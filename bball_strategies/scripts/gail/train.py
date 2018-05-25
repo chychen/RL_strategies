@@ -201,14 +201,11 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
         ]
         vanilla_obs, _, _, _ = vanilla_env.step(
             vanilla_trans_act)
-    #     numpy_collector.append(denormalize_observ(vanilla_obs))
-    # numpy_collector = np.array(numpy_collector)
-    # act_collector = np.array(act_collector)
-    # reward_collector = D.get_rewards(numpy_collector, act_collector)
-    # reward_collector = np.zeros(shape=[50,])
-    # np.savez(os.path.join(config.logdir, 'gail_testing/episode_{}.npz'.format(steps)), STATE=numpy_collector[:,-1], REWARD=reward_collector)
-    # # np.save(os.path.join(config.logdir, 'gail_testing/STATE_{}.npz'.format(steps)), numpy_collector)
-    # # np.save(os.path.join(config.logdir, 'gail_testing/REWARD_{}.npz'.format(steps)), reward_collector)
+        numpy_collector.append(denormalize_observ(vanilla_obs))
+    numpy_collector = np.array(numpy_collector)
+    act_collector = np.array(act_collector)
+    reward_collector = D.get_rewards_value(numpy_collector, act_collector)
+    np.savez(os.path.join(config.logdir, 'gail_testing/episode_{}.npz'.format(steps)), STATE=numpy_collector[:,-1], REWARD=reward_collector)
 
 
 def capped_video_schedule(episode_id):
@@ -318,7 +315,7 @@ def train(config, env_processes, outdir):
     ppo_policy = PPOPolicy(config, env)
     # Data
     all_data = np.load(
-        'bball_strategies/data/GAILTransitionData_51.npy').item()
+        'bball_strategies/data/GAILTransitionData_11.npy').item()
     expert_data, valid_expert_data = np.split(
         all_data['OBS'], [all_data['OBS'].shape[0]*9//10])
     expert_action, valid_expert_action = np.split(
@@ -337,7 +334,6 @@ def train(config, env_processes, outdir):
             sess, saver, config.logdir, resume=FLAGS.resume)
         # GAIL
         cumulate_steps = sess.run(graph.step)
-        d_steps = sess.run(D._global_steps)
         valid_episode_idx = 0
         while True:
             perm_idx = np.random.permutation(expert_data.shape[0])
@@ -352,7 +348,7 @@ def train(config, env_processes, outdir):
             while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
                 # testing
                 if valid_episode_idx % (100 * config.episodes_per_batch) == 0:
-                    test_policy(config, vanilla_env, d_steps, ppo_policy,
+                    test_policy(config, vanilla_env, sess.run(D._global_steps), ppo_policy,
                                 D, denormalize_observ)
                 # train Discriminator
                 train_Discriminator(

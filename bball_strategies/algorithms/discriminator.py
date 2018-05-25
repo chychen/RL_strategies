@@ -107,11 +107,11 @@ class Discriminator(object):
             grad_norm = tf.sqrt(sum_)
             grad_pen = self._config.wgan_penalty_lambda * tf.reduce_mean(
                 tf.square(grad_norm - 1.0))
-            fake_scores = self._config.d_network(
+            self.fake_scores = self._config.d_network(
                 self._agent_s, self._agent_a, reuse=True)
             real_scores = self._config.d_network(
                 self._expert_s, self._expert_a, reuse=True)
-            f_fake = tf.reduce_mean(fake_scores)
+            f_fake = tf.reduce_mean(self.fake_scores)
             f_real = tf.reduce_mean(real_scores)
             em_distance = f_real - f_fake
             loss = -em_distance + grad_pen
@@ -137,7 +137,6 @@ class Discriminator(object):
         global_step, _, summary = tf.get_default_session().run(
             [self._global_steps, self._train_op, self._summary_op], feed_dict=feed_dict)
         self.summary_writer.add_summary(summary, global_step=global_step)
-        return
 
     def validate(self, agent_s, expert_s, agent_a, expert_a):
         feed_dict = {
@@ -149,11 +148,17 @@ class Discriminator(object):
         global_step, summary = tf.get_default_session().run(
             [self._global_steps, self._summary_valid_op], feed_dict=feed_dict)
         self.valid_summary_writer.add_summary(summary, global_step=global_step)
-        pass
 
     def get_rewards(self, state, action):
         with tf.variable_scope('Discriminator'):
             return self._config.d_network(state, action, reuse=True)
+    
+    def get_rewards_value(self, state, action):
+        feed_dict = {
+            self._agent_s: state,
+            self._agent_a: action
+        }
+        return tf.get_default_session().run(self.fake_scores, feed_dict=feed_dict)
 
 
 def main():
