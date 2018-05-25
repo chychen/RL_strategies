@@ -131,6 +131,7 @@ class AppEngine(FloatLayout):
 
     def __init__(self, *args, **kwargs):
         super(AppEngine, self).__init__(*args, **kwargs)
+        self.reward_line_chart = None
         self.playing_evnet = None
         # hide
         self.label.opacity = 0.0
@@ -177,7 +178,6 @@ class AppEngine(FloatLayout):
         self.episode_len = self.episode.shape[0]
         # reward from discriminator
         self.rewards = data['REWARD']
-        self.reward_line_chart = None
         self.update_line_chart()
         # status
         self.is_playing = False
