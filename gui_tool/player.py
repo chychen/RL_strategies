@@ -14,7 +14,7 @@ from kivy.clock import Clock
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.widget import Widget
-from kivy.graphics import Ellipse, Color
+from kivy.graphics import Ellipse, Color, Line
 from kivy.properties import NumericProperty, ObjectProperty, StringProperty
 from kivy.config import Config
 from kivy.uix.popup import Popup
@@ -48,10 +48,6 @@ class SlideBar(Widget):
 
     def __init__(self, *args, **kwargs):
         super(SlideBar, self).__init__(*args, **kwargs)
-
-        # voc_lines = Line(points=self.points, width=4)
-        # self.canvas.add(Color(.6, .6, .6, .6))
-        # self.canvas.add(voc_lines)
 
 
 class BBallCourt(Widget):
@@ -177,9 +173,18 @@ class AppEngine(FloatLayout):
         data = np.load(filepath.decode("utf-8") )
         # self.episode = data[0]
         self.episode = data['STATE']
-        self.rewards = data['REWARD']
         assert self.episode.shape[1:] == tuple((11, 2)), "episode shape[1:] {} doesn't match shape [11,2]".format(self.episode.shape[1:])
         self.episode_len = self.episode.shape[0]
+        # reward from discriminator
+        self.rewards = data['REWARD']
+        offset = self.slide_bar.height * 10.0 / 100.0
+        normalized_reward = (self.rewards - np.amin(self.rewards))/(np.amax(self.rewards)-np.amin(self.rewards)) * (self.slide_bar.height-2*offset) + offset
+        unit_len = self.width/(self.episode_len-1)
+        line_chart_pts = np.stack([np.arange(self.episode_len)*unit_len, normalized_reward],axis=1).reshape([-1])
+        with self.canvas.before:
+            Color(0.8, 0.8, 0.0, 0.8)
+            Line(points=list(line_chart_pts), width=3)
+        # status
         self.is_playing = False
         self.frame_idx = 0
         self.court.update_players(self.episode[self.frame_idx])
