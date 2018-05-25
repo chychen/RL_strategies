@@ -14,7 +14,7 @@ from kivy.clock import Clock
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.widget import Widget
-from kivy.graphics import Ellipse, Color
+from kivy.graphics import Ellipse, Color, Line
 from kivy.properties import NumericProperty, ObjectProperty, StringProperty
 from kivy.config import Config
 from kivy.uix.popup import Popup
@@ -48,10 +48,6 @@ class SlideBar(Widget):
 
     def __init__(self, *args, **kwargs):
         super(SlideBar, self).__init__(*args, **kwargs)
-
-        # voc_lines = Line(points=self.points, width=4)
-        # self.canvas.add(Color(.6, .6, .6, .6))
-        # self.canvas.add(voc_lines)
 
 
 class BBallCourt(Widget):
@@ -177,9 +173,13 @@ class AppEngine(FloatLayout):
         data = np.load(filepath.decode("utf-8") )
         # self.episode = data[0]
         self.episode = data['STATE']
-        self.rewards = data['REWARD']
         assert self.episode.shape[1:] == tuple((11, 2)), "episode shape[1:] {} doesn't match shape [11,2]".format(self.episode.shape[1:])
         self.episode_len = self.episode.shape[0]
+        # reward from discriminator
+        self.rewards = data['REWARD']
+        self.reward_line_chart = None
+        self.update_line_chart()
+        # status
         self.is_playing = False
         self.frame_idx = 0
         self.court.update_players(self.episode[self.frame_idx])
@@ -193,11 +193,24 @@ class AppEngine(FloatLayout):
         self.reset_button.bind(on_release=self.reset_button_callback)
         self.next_button.bind(on_release=self.next_button_callback)
         self.bind(frame_idx=self.update_court)
+        self.bind(width=self.update_line_chart, height=self.update_line_chart)
         # playing event
         self.playing_evnet = Clock.schedule_interval(
             self.playing_callback, 1.0/self.court.FPS)
         self.playing_evnet.cancel()
         self._popup.dismiss()
+    
+    def update_line_chart(self, *args):
+        offset = self.slide_bar.height * 10.0 / 100.0
+        normalized_reward = (self.rewards - np.amin(self.rewards))/(np.amax(self.rewards)-np.amin(self.rewards)) * (self.slide_bar.height-2*offset) + offset
+        unit_len = self.width/(self.episode_len-1)
+        line_chart_pts = np.stack([np.arange(self.episode_len)*unit_len, normalized_reward],axis=1).reshape([-1])
+        if self.reward_line_chart is None:
+            with self.canvas.before:
+                Color(0.8, 0.8, 0.0, 0.8)
+                self.reward_line_chart = Line(points=list(line_chart_pts), width=3)
+        else:
+            self.reward_line_chart.points = list(line_chart_pts)
 
     def dismiss_popup(self):
         self._popup.dismiss()
