@@ -114,16 +114,18 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
                 ]
                 obs_state, _, _, _ = env.step(
                     transformed_act)
+                # assert normalize_observ(obs_state) - 
                 batch_fake_states.append(obs_state)
                 fake_action.append(act.reshape([5, 2]))
             episode_counter += 1
-        assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
-            batch_real_states.shape[0], len(batch_fake_states))
-        assert real_action.shape[0] == len(fake_action), "real: {}, fake: {}".format(
-            real_action.shape[0], len(fake_action))
         batch_fake_states = np.array(batch_fake_states)
         fake_action = np.array(fake_action)
         batch_real_states = normalize_observ(batch_real_states)
+        # assert np.all(np.abs(batch_real_states[:, :, :6] - batch_fake_states[:, :, :6])<1e-2)
+        assert batch_real_states.shape[0] == batch_fake_states.shape[0], "real: {}, fake: {}".format(
+            batch_real_states.shape[0], batch_fake_states.shape[0])
+        assert real_action.shape[0] == fake_action.shape[0], "real: {}, fake: {}".format(
+            real_action.shape[0], fake_action.shape[0])
         D.train(batch_fake_states, batch_real_states,
                 fake_action, normalize_action(real_action))
 
@@ -166,13 +168,14 @@ def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
                 transformed_act)
             batch_fake_states.append(obs_state)
             fake_action.append(act.reshape([5, 2]))
-    assert batch_real_states.shape[0] == len(batch_fake_states), "real: {}, fake: {}".format(
-        batch_real_states.shape[0], len(batch_fake_states))
-    assert real_action.shape[0] == len(fake_action), "real: {}, fake: {}".format(
-        real_action.shape[0], len(fake_action))
     batch_fake_states = np.array(batch_fake_states)
     fake_action = np.array(fake_action)
     batch_real_states = normalize_observ(batch_real_states)
+    # assert np.all(np.abs(batch_real_states[:, :, :6] - batch_fake_states[:, :, :6])<1e-2)
+    assert batch_real_states.shape[0] == batch_fake_states.shape[0], "real: {}, fake: {}".format(
+        batch_real_states.shape[0], batch_fake_states.shape[0])
+    assert real_action.shape[0] == fake_action.shape[0], "real: {}, fake: {}".format(
+        real_action.shape[0], fake_action.shape[0])
     D.validate(batch_fake_states, batch_real_states,
                fake_action, normalize_action(real_action))
 
