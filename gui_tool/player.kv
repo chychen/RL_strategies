@@ -51,53 +51,22 @@
 
 <AppEngine>:
     court: court
-    last_button: last_button
-    play_pause_button: play_pause_button
-    reset_button: reset_button
-    next_button: next_button
     slide_bar: slide_bar
     frame_cursor: frame_cursor
     label: label
 
     FloatLayout:
-        Button:
-            id: last_button
-            text: "Last"
-            size_hint: (.3, .1)
-            pos_hint: {'x':0, 'y':.9}
-            background_color: (0, 1, 1, 1)
-
-        Button:
-            id: play_pause_button
-            text: "Play/Pause"
-            size_hint: (.2, .1)
-            pos_hint: {'x':0.3, 'y':.9}
-            background_color: (0, 1, 1, 1)
-
-        Button:
-            id: reset_button
-            text: "Reset"
-            size_hint: (.2, .1)
-            pos_hint: {'x':0.5, 'y':.9}
-            background_color: (0, 1, 1, 1)
-
-        Button:
-            id: next_button
-            text: "Next"
-            size_hint: (.3, .1)
-            pos_hint: {'x':.7, 'y':.9}
-            background_color: (0, 1, 1, 1)
         
         Label:
             id: label
             text: "[size=32]" + "(frame) " + root.frame_idx_str + " / " + root.episode_len_str + " (total)" + " Reward: " + root.reward_str +"[/size]"
             markup: True
             size_hint: (1.0, 0.1)
-            pos_hint: {'x': 0.0, 'y': 0.8}
+            pos_hint: {'x': 0.0, 'y': 0.85}
         
         RelativeLayout:
-            size_hint: (0.8, 0.7)
-            pos_hint: {'center_x': 0.5, 'center_y': 0.45}
+            size_hint: (1.0, 0.6)
+            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
             BBallCourt:
                 id: court
 

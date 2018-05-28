@@ -21,8 +21,8 @@ from kivy.uix.popup import Popup
 from kivy.core.window import Window
 import kivy
 kivy.require('1.9.0')
-Config.set('graphics', 'width', '1800')
-Config.set('graphics', 'height', '800')
+Config.set('graphics', 'width', '1880')
+Config.set('graphics', 'height', '1000')
 
 
 class LoadDialog(FloatLayout):
@@ -113,11 +113,6 @@ class AppEngine(FloatLayout):
     """
     court = ObjectProperty(None)
     frame_idx = ObjectProperty(None)
-    # buttons
-    last_button = ObjectProperty(None)
-    play_pause_button = ObjectProperty(None)
-    reset_button = ObjectProperty(None)
-    next_button = ObjectProperty(None)
     # Label
     label = ObjectProperty(None)
     frame_idx_str = StringProperty("None")
@@ -138,10 +133,6 @@ class AppEngine(FloatLayout):
         self.court.opacity = 0.0
         self.slide_bar.opacity = 0.0
         self.frame_cursor.opacity = 0.0
-        self.last_button.opacity = 0.0
-        self.play_pause_button.opacity = 0.0
-        self.reset_button.opacity = 0.0
-        self.next_button.opacity = 0.0
         content = LoadDialog(load=self.load, cancel=self.dismiss_popup)
         self._popup = Popup(title="Load file",
                             content=content, size_hint=(0.5, 0.5),
@@ -165,10 +156,6 @@ class AppEngine(FloatLayout):
         self.court.opacity = 1.0
         self.slide_bar.opacity = 1.0
         self.frame_cursor.opacity = 1.0
-        self.last_button.opacity = 1.0
-        self.play_pause_button.opacity = 1.0
-        self.reset_button.opacity = 1.0
-        self.next_button.opacity = 1.0
         self.is_init = True
         # data to vis
         data = np.load(filepath.decode("utf-8") )
@@ -188,10 +175,6 @@ class AppEngine(FloatLayout):
         self.episode_len_str = str(self.episode_len-1)
         self.reward_str = str(self.rewards[self.frame_idx])
         # bindings
-        self.last_button.bind(on_release=self.last_button_callback)
-        self.play_pause_button.bind(on_release=self.play_pause_callback)
-        self.reset_button.bind(on_release=self.reset_button_callback)
-        self.next_button.bind(on_release=self.next_button_callback)
         self.bind(frame_idx=self.update_court)
         self.bind(width=self.update_line_chart, height=self.update_line_chart)
         # playing event
@@ -224,24 +207,6 @@ class AppEngine(FloatLayout):
         unit_len = self.width/(self.episode_len-1)
         self.frame_cursor.x = self.frame_idx * unit_len - 1.0
 
-    def next_button_callback(self, instance):
-        if self.is_init:
-            if self.frame_idx < self.episode_len-1:
-                self.frame_idx += 1
-            # pause
-            if self.is_playing:
-                self.playing_evnet.cancel()
-                self.is_playing = not self.is_playing
-
-    def last_button_callback(self, instance):
-        if self.is_init:
-            if self.frame_idx > 0:
-                self.frame_idx -= 1
-            # pause
-            if self.is_playing:
-                self.playing_evnet.cancel()
-                self.is_playing = not self.is_playing
-
     def play_pause_callback(self, instance):
         if self.is_init:
             self.playpause_action()
@@ -254,9 +219,6 @@ class AppEngine(FloatLayout):
             else:
                 self.playing_evnet.cancel()
                 self.is_playing = not self.is_playing
-
-    def reset_button_callback(self, instance):
-        self.frame_idx = 0
 
     def playing_callback(self, dt):
         if self.frame_idx < self.episode_len-1:
