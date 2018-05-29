@@ -84,7 +84,7 @@ class BBallGailDefEnv(gym.Env):
 
         # init dataset
         self.episode_index = 0
-        self.data = np.load('bball_strategies/data/GAILEnvData_11.npy')
+        self.data = np.load('bball_strategies/data/GAILEnvData_21.npy')
         # self.data = None
         self.current_cond = None
         self.time_limit = 49
@@ -148,20 +148,17 @@ class BBallGailDefEnv(gym.Env):
         14 : ball(1) + offense(5) + defense(5) + basket(1) + ball_boundry(2)
         2 : x and y positions
         """
-        obs = np.empty(shape=(self.buffer_size, 11, 2), dtype=np.float32)
+        obs = np.empty(shape=(self.buffer_size, 14, 2), dtype=np.float32)
         for i in range(self.buffer_size):
             obs[i] = np.concatenate([
                 np.expand_dims(
                     self.states.buffer_positions[i, STATE_LOOKUP['BALL']], axis=0),
                 self.states.buffer_positions[i, STATE_LOOKUP['OFFENSE']],
-                self.states.buffer_positions[i, STATE_LOOKUP['DEFENSE']]
-                # ,
-                # np.expand_dims(self.right_basket_pos, axis=0),
-                # np.expand_dims([self.court_length / 2, 0], axis=0),
-                # np.expand_dims([self.court_length, self.court_width], axis=0)
+                self.states.buffer_positions[i, STATE_LOOKUP['DEFENSE']],
+                np.expand_dims(self.right_basket_pos, axis=0),
+                np.expand_dims([self.court_length / 2, 0], axis=0),
+                np.expand_dims([self.court_length, self.court_width], axis=0)
             ], axis=0)
-        # self.states.positions[STATE_LOOKUP['DEFENSE']
-        #                       ] = self.current_cond[self.states.steps, 6:11]  # step have been ++
         return obs
 
     def reset(self):
@@ -441,9 +438,9 @@ class BBallGailDefEnv(gym.Env):
         2 : x and y positions
         """
         low_ = np.array([self.states.x_low_bound, self.states.y_low_bound]) * \
-            np.ones(shape=[self.buffer_size, 11, 2])
+            np.ones(shape=[self.buffer_size, 14, 2])
         high_ = np.array([self.states.x_high_bound, self.states.y_high_bound]) * \
-            np.ones(shape=[self.buffer_size, 11, 2])
+            np.ones(shape=[self.buffer_size, 14, 2])
         return spaces.Box(low=low_, high=high_, dtype=np.float32)
 
     def _update_player_state(self, pl_dash, vels, state_idx):

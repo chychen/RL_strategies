@@ -65,7 +65,8 @@ def default():
 
 def episode_len_11():
     locals().update(default())
-    max_length = 11-1
+    train_len = 11
+    max_length = train_len-1
     # ppo
     update_every = 100
     steps = update_every*max_length
@@ -76,7 +77,8 @@ def episode_len_11():
 
 def episode_len_21():
     locals().update(default())
-    max_length = 21-1
+    train_len = 21
+    max_length = train_len-1
     # ppo
     update_every = 100
     steps = update_every*max_length
@@ -87,7 +89,8 @@ def episode_len_21():
 
 def episode_len_31():
     locals().update(default())
-    max_length = 31-1
+    train_len = 31
+    max_length = train_len-1
     # ppo
     update_every = 100
     steps = update_every*max_length
@@ -98,7 +101,8 @@ def episode_len_31():
 
 def episode_len_51():
     locals().update(default())
-    max_length = 51-1
+    train_len = 51
+    max_length = train_len-1
     # ppo
     update_every = 100
     steps = update_every*max_length

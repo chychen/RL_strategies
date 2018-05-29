@@ -15,6 +15,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 import gym
 import tensorflow as tf
+import h5py
 import numpy as np
 from tensorflow.python import debug as tf_debug
 
@@ -114,7 +115,6 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
                 ]
                 obs_state, _, _, _ = env.step(
                     transformed_act)
-                # assert normalize_observ(obs_state) - 
                 batch_fake_states.append(obs_state)
                 fake_action.append(act.reshape([5, 2]))
             episode_counter += 1
@@ -208,7 +208,8 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
     numpy_collector = np.array(numpy_collector)
     act_collector = np.array(act_collector)
     reward_collector = D.get_rewards_value(numpy_collector, act_collector)
-    np.savez(os.path.join(config.logdir, 'gail_testing/episode_{}.npz'.format(steps)), STATE=numpy_collector[:,-1], REWARD=reward_collector)
+    np.savez(os.path.join(config.logdir, 'gail_testing_{}/episode_{}.npz'.format(config.train_len, steps)),
+             STATE=numpy_collector[:, -1], REWARD=reward_collector)
 
 
 def capped_video_schedule(episode_id):
@@ -282,7 +283,7 @@ def train(config, env_processes, outdir):
     vanilla_env = gym.make(config.env)
     vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=50)
-    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing/'), if_back_real=False, video_callable=lambda _: True,
+    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_{}/'.format(config.train_len)), if_back_real=False, video_callable=lambda _: True,
                                  # init from dataset
                                  init_mode=1)
     # if not os.path.exists(os.path.join(config.logdir, 'gail_testing')):
@@ -317,18 +318,19 @@ def train(config, env_processes, outdir):
     # Agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
     # Data
-    all_data = np.load(
-        'bball_strategies/data/GAILTransitionData_11.npy').item()
+    all_data = h5py.File('bball_strategies/data/GAILTransitionData_{}.hdf5'.format(config.train_len), 'r')
     expert_data, valid_expert_data = np.split(
-        all_data['OBS'], [all_data['OBS'].shape[0]*9//10])
+        all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
     expert_action, valid_expert_action = np.split(
-        all_data['DEF_ACT'], [all_data['DEF_ACT'].shape[0]*9//10])
+        all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0]*9//10])
     print('expert_data', expert_data.shape)
     print('valid_expert_data', valid_expert_data.shape)
     print('expert_action', expert_action.shape)
     print('valid_expert_action', valid_expert_action.shape)
     # TF Session
-    saver = utility.define_saver(exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0')) #TODO _num_finished_episodes => Variable:0
+    # TODO _num_finished_episodes => Variable:0
+    saver = utility.define_saver(
+        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0'))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
@@ -337,34 +339,37 @@ def train(config, env_processes, outdir):
             sess, saver, config.logdir, resume=FLAGS.resume)
         # GAIL
         cumulate_steps = sess.run(graph.step)
+        episode_idx = 0
         valid_episode_idx = 0
         while True:
-            perm_idx = np.random.permutation(expert_data.shape[0])
-            expert_data = expert_data[perm_idx]
-            expert_action = expert_action[perm_idx]
-            if valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch) == 0:
+            if episode_idx > (expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo) or episode_idx == 0:
+                episode_idx = 0
+                perm_idx = np.random.permutation(expert_data.shape[0])
+                expert_data = expert_data[perm_idx]
+                expert_action = expert_action[perm_idx]
+            if valid_episode_idx > (valid_expert_data.shape[0]-config.episodes_per_batch) or valid_episode_idx == 0:
+                valid_episode_idx = 0
                 valid_perm_idx = np.random.permutation(
                     valid_expert_data.shape[0])
                 valid_expert_data = valid_expert_data[valid_perm_idx]
                 valid_expert_action = valid_expert_action[valid_perm_idx]
-            episode_idx = 0
-            while episode_idx < expert_data.shape[0]-config.episodes_per_batch*config.train_d_per_ppo:
-                # testing
-                if valid_episode_idx % (100 * config.episodes_per_batch) == 0:
-                    test_policy(config, vanilla_env, sess.run(D._global_steps), ppo_policy,
-                                D, denormalize_observ)
-                # train Discriminator
-                train_Discriminator(
-                    episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
-                valid_Discriminator(
-                    valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch), config, valid_expert_data, valid_expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
-                episode_idx += config.episodes_per_batch*config.train_d_per_ppo
-                valid_episode_idx += config.episodes_per_batch
-                # train PPO
-                print('train PPO')
-                cumulate_steps += total_steps
-                for score in loop.run(sess, saver, cumulate_steps):
-                    yield score
+            # testing
+            if valid_episode_idx % (100 * config.episodes_per_batch) == 0:
+                test_policy(config, vanilla_env, sess.run(D._global_steps), ppo_policy,
+                            D, denormalize_observ)
+            # train Discriminator
+            train_Discriminator(
+                episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
+            # valid Discriminator
+            valid_Discriminator(
+                valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch), config, valid_expert_data, valid_expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
+            episode_idx += config.episodes_per_batch*config.train_d_per_ppo
+            valid_episode_idx += config.episodes_per_batch
+            # train PPO
+            print('train PPO')
+            cumulate_steps += total_steps
+            for score in loop.run(sess, saver, cumulate_steps):
+                yield score
     batch_env.close()
     vanilla_env.close()
     env.close()
