@@ -4,6 +4,7 @@ Command Line :
     train : python3 -m bball_strategies.scripts.train --config={function name}
     retrain : python3 -m bball_strategies.scripts.train --resume --logdir={checkpoint/dir/path}
     vis : python3 -m bball_strategies.scripts.train --vis
+    tally_only : python3 -m bball_strategies.scripts.gail.train --config=episode_len_21 --resume --tally_only --logdir=logdir/gail_defense/20180530T160131-episode_len_11
 """
 
 from __future__ import absolute_import
@@ -26,6 +27,7 @@ from bball_strategies.scripts.gail import configs
 from bball_strategies.gym_bball.tools import BBallWrapper
 from bball_strategies.algorithms.discriminator import Discriminator
 from bball_strategies.algorithms.ppo_generator import PPOPolicy
+from bball_strategies.analysis.tally_discriminator_reward import vis_line_chart
 
 
 def _create_environment(config):
@@ -212,6 +214,63 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
              STATE=numpy_collector[:, -1], REWARD=reward_collector)
 
 
+def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, normalize_observ):
+    """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
+    """
+    episode_amount = 100
+    # real data
+    all_data = h5py.File(
+        'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
+    expert_data, _ = np.split(
+        all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
+    expert_action, _ = np.split(
+        all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0]*9//10])
+    # env
+    vanilla_env = gym.make(config.env)
+    vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
+                               time_limit=50)
+    vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
+    # real
+    selected_idx = np.random.choice(expert_data.shape[0], episode_amount)
+    batch_real_states = expert_data[selected_idx, 1:] # frame 0 is condition
+    real_action = expert_action[selected_idx, :-1]
+    batch_real_states = np.concatenate(
+        batch_real_states, axis=0)
+    real_action = np.concatenate(real_action, axis=0)
+    batch_real_states = normalize_observ(batch_real_states)
+    real_rewards = D.get_rewards_value(
+        batch_real_states, real_action).reshape([100, -1])
+    # fake
+    numpy_collector = []
+    act_collector = []
+    for _ in range(episode_amount):
+        vanilla_obs = vanilla_env.reset()
+        for _ in range(vanilla_env.time_limit):
+            vanilla_act = ppo_policy.act(
+                np.array(vanilla_obs)[None, None], stochastic=False)
+            act_collector.append(vanilla_act.reshape([5, 2]))
+            vanilla_trans_act = [
+                # Discrete(3) must be int
+                int(0),
+                # Box(2,)
+                np.array([0.0, 0.0], dtype=np.float32),
+                # Box(5, 2)
+                np.zeros(shape=[5, 2], dtype=np.float32),
+                # Box(5, 2)
+                np.reshape(vanilla_act, [5, 2])
+            ]
+            vanilla_obs, _, _, _ = vanilla_env.step(
+                vanilla_trans_act)
+            # numpy_collector.append(denormalize_observ(vanilla_obs))
+            numpy_collector.append(vanilla_obs)
+    numpy_collector = np.array(numpy_collector)
+    act_collector = np.array(act_collector)
+    fake_rewards = D.get_rewards_value(
+        numpy_collector, act_collector).reshape([100, -1])
+    # vis
+    vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
+
+
 def capped_video_schedule(episode_id):
     return episode_id % 10000 == 0
 
@@ -318,7 +377,8 @@ def train(config, env_processes, outdir):
     # Agent to genrate acttion
     ppo_policy = PPOPolicy(config, env)
     # Data
-    all_data = h5py.File('bball_strategies/data/GAILTransitionData_{}.hdf5'.format(config.train_len), 'r')
+    all_data = h5py.File(
+        'bball_strategies/data/GAILTransitionData_{}.hdf5'.format(config.train_len), 'r')
     expert_data, valid_expert_data = np.split(
         all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
     expert_action, valid_expert_action = np.split(
@@ -327,6 +387,7 @@ def train(config, env_processes, outdir):
     print('valid_expert_data', valid_expert_data.shape)
     print('expert_action', expert_action.shape)
     print('valid_expert_action', valid_expert_action.shape)
+
     # TF Session
     # TODO _num_finished_episodes => Variable:0
     saver = utility.define_saver(
@@ -337,6 +398,10 @@ def train(config, env_processes, outdir):
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
+        # visulization stuff
+        if FLAGS.tally_only:
+            tally_reward_line_chart(config, sess.run(D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ)
+            exit()
         # GAIL
         cumulate_steps = sess.run(graph.step)
         episode_idx = 0
@@ -357,6 +422,8 @@ def train(config, env_processes, outdir):
             if valid_episode_idx % (100 * config.episodes_per_batch) == 0:
                 test_policy(config, vanilla_env, sess.run(D._global_steps), ppo_policy,
                             D, denormalize_observ)
+            if valid_episode_idx % (1000 * config.episodes_per_batch) == 0:
+                tally_reward_line_chart(config, sess.run(D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ)
             # train Discriminator
             train_Discriminator(
                 episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
@@ -419,4 +486,7 @@ if __name__ == '__main__':
     tf.app.flags.DEFINE_boolean(
         'resume', False,
         'whether to resume training')
+    tf.app.flags.DEFINE_boolean(
+        'tally_only', False,
+        'whether to tally the reward line chart')
     tf.app.run()

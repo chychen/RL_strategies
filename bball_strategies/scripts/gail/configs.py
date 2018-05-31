@@ -36,7 +36,9 @@ def default():
     # Optimization
     update_every = 40
     update_epochs = 25
-    optimizer = tf.train.AdamOptimizer
+    # optimizer = tf.train.AdamOptimizer
+    # optimizer = tf.train.MomentumOptimizer
+    optimizer = tf.train.GradientDescentOptimizer
     learning_rate = 1e-4
 #   batch_size = 20
 #   chunk_length = 50

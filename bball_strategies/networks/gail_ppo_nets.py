@@ -112,7 +112,7 @@ def gail_def_gaussian(config, action_space, observations, unused_length, state=N
             'def_before_softplus_std', def_action_mean.shape[2:], tf.float32,
             before_softplus_std_initializer))
         def_actions_std = tf.tile(
-            def_actions_std[None, None],
+            def_actions_std[None, None] + 1e-8,
             [tf.shape(observations)[0], tf.shape(observations)[1], 1])
         def_action_mean = tf.check_numerics(
             def_action_mean, 'def_action_mean')
