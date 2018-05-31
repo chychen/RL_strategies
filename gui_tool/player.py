@@ -160,7 +160,7 @@ class AppEngine(FloatLayout):
         # data to vis
         data = np.load(filepath.decode("utf-8") )
         # self.episode = data[0]
-        self.episode = data['STATE']
+        self.episode = data['STATE'][:, 0:11]
         assert self.episode.shape[1:] == tuple((11, 2)), "episode shape[1:] {} doesn't match shape [11,2]".format(self.episode.shape[1:])
         self.episode_len = self.episode.shape[0]
         # reward from discriminator
