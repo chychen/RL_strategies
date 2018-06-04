@@ -36,9 +36,9 @@ def default():
     # Optimization
     update_every = 40
     update_epochs = 25
-    # optimizer = tf.train.AdamOptimizer
+    optimizer = tf.train.AdamOptimizer
     # optimizer = tf.train.MomentumOptimizer
-    optimizer = tf.train.GradientDescentOptimizer
+    # optimizer = tf.train.GradientDescentOptimizer
     learning_rate = 1e-4
 #   batch_size = 20
 #   chunk_length = 50
@@ -98,6 +98,18 @@ def episode_len_31():
     steps = update_every*max_length
     # wgan
     episodes_per_batch = 7
+    d_batch_size = max_length * episodes_per_batch
+    return locals()
+
+def episode_len_41():
+    locals().update(default())
+    train_len = 41
+    max_length = train_len-1
+    # ppo
+    update_every = 100
+    steps = update_every*max_length
+    # wgan
+    episodes_per_batch = 5
     d_batch_size = max_length * episodes_per_batch
     return locals()
 

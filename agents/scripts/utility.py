@@ -141,7 +141,7 @@ def define_saver_with_prefix(exclude=None, prefix='network/'):
                 if pretrained_name[-2:] == ':0':  # remove the special postfix
                     pretrained_name = pretrained_name[:-2]
                 variables[pretrained_name] = variable
-    saver = tf.train.Saver(variables, keep_checkpoint_every_n_hours=5)
+    saver = tf.train.Saver(variables, keep_checkpoint_every_n_hours=24)
     input(variables)
     return saver
 

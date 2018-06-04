@@ -398,6 +398,8 @@ def train(config, env_processes, outdir):
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
+        # NOTE reset variables in optimizer
+        D.reset_optimizer(sess)
         # visulization stuff
         if FLAGS.tally_only:
             tally_reward_line_chart(config, sess.run(D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ)
