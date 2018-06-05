@@ -67,6 +67,7 @@ class Discriminator(object):
                     with tf.control_dependencies([assign_add_]):
                         optimizer = self._config.optimizer(
                             learning_rate=self._config.learning_rate)  # TODO beta1=0.5, beta2=0.9
+                        self._opt_reset = tf.group([v.initializer for v in optimizer.variables()])
                         grads = tf.gradients(self._loss, theta)
                         grads = list(zip(grads, theta))
                         self._train_op = optimizer.apply_gradients(
