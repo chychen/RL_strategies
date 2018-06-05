@@ -39,7 +39,7 @@ def default():
     # optimizer = tf.train.AdamOptimizer
     # optimizer = tf.train.MomentumOptimizer
     optimizer = tf.train.GradientDescentOptimizer
-    learning_rate = 5e-5
+    learning_rate = 5e-4
 #   batch_size = 20
 #   chunk_length = 50
     # Losses

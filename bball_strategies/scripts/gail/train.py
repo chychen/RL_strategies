@@ -133,20 +133,21 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
 
 
 def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action):
+    episode_counter = episode_idx
     print('Validate Discriminator')
     batch_fake_states = []
     fake_action = []
-    batch_real_states = expert_data[episode_idx:episode_idx +
+    batch_real_states = expert_data[episode_counter:episode_counter +
                                     config.episodes_per_batch, 1:]  # frame 0 is condition
-    real_action = expert_action[episode_idx:
-                                episode_idx + config.episodes_per_batch, :-1]
+    real_action = expert_action[episode_counter:
+                                episode_counter + config.episodes_per_batch, :-1]
     batch_real_states = np.concatenate(
         batch_real_states, axis=0)
     real_action = np.concatenate(real_action, axis=0)
     for _ in range(config.episodes_per_batch):
         # align the conditions with env
         # -1 : newest state
-        conditions = expert_data[episode_idx:episode_idx+1, :, :]
+        conditions = expert_data[episode_counter:episode_counter+1, :, :]
         env.data = conditions[:, :, -1]
         obs_state = env.reset()
         for len_idx in range(config.max_length):
@@ -170,6 +171,7 @@ def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
                 transformed_act)
             batch_fake_states.append(obs_state)
             fake_action.append(act.reshape([5, 2]))
+        episode_counter += 1
     batch_fake_states = np.array(batch_fake_states)
     fake_action = np.array(fake_action)
     batch_real_states = normalize_observ(batch_real_states)
@@ -391,19 +393,15 @@ def train(config, env_processes, outdir):
     # TF Session
     # TODO _num_finished_episodes => Variable:0
     saver = utility.define_saver(
-        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0', r'.*Adam.*', r'.*beta.*'))
+        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0'))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
-        # reset D optimizer
+        # NOTE reset variables in optimizer
         D.reset_optimizer(sess)
-        # reset PPO optimizer
-        opt_reset = tf.group(
-            [v.initializer for v in graph.algo._optimizer.variables()])
-        sess.run(opt_reset)
         # visulization stuff
         if FLAGS.tally_only:
             tally_reward_line_chart(config, sess.run(D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ)
@@ -435,7 +433,7 @@ def train(config, env_processes, outdir):
                 episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
             # valid Discriminator
             valid_Discriminator(
-                valid_episode_idx % (valid_expert_data.shape[0]-config.episodes_per_batch), config, valid_expert_data, valid_expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
+                valid_episode_idx, config, valid_expert_data, valid_expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
             episode_idx += config.episodes_per_batch*config.train_d_per_ppo
             valid_episode_idx += config.episodes_per_batch
             # train PPO
