@@ -36,10 +36,10 @@ def default():
     # Optimization
     update_every = 40
     update_epochs = 25
-    optimizer = tf.train.AdamOptimizer
+    # optimizer = tf.train.AdamOptimizer
     # optimizer = tf.train.MomentumOptimizer
-    # optimizer = tf.train.GradientDescentOptimizer
-    learning_rate = 1e-4
+    optimizer = tf.train.GradientDescentOptimizer
+    learning_rate = 5e-5
 #   batch_size = 20
 #   chunk_length = 50
     # Losses
@@ -52,6 +52,7 @@ def default():
     # entropy_regularization = 0.1  # TODO
     # Environment
     env = 'bball_gail_def-v0'
+    # env = 'bball_gail_speed_def-v0'
     # data only have 50 length, if we step 50 times, cant find 51-th conidtion in data
     max_length = 11-1
     # make transitions buffer back to real

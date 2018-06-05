@@ -31,7 +31,7 @@ def distance(pos_a, pos_b, axis=1):
     return length(vec, axis=axis)
 
 
-class BBallGailDefEnv(gym.Env):
+class BBallGailDefSpeedEnv(gym.Env):
     """ the simulated environment designed for studying the strategies of basketball games.
     """
     metadata = {
@@ -67,7 +67,8 @@ class BBallGailDefEnv(gym.Env):
         self.pl_max_speed = 38.9379818754 / FPS
         # cost at least one second to cross over the opponent
         self.pl_collision_speed = self.screen_radius / FPS
-        self.pl_max_power = 24.5810950984 / FPS
+        # self.pl_max_power = 24.5810950984 / FPS
+        self.pl_max_power = self.pl_max_speed
         self.ball_max_speed = 40.0 / FPS
         # reward
         self.len2pi_weight = np.pi / 8  # 1 feet <-> 45 degrees
@@ -465,7 +466,8 @@ class BBallGailDefEnv(gym.Env):
             np.stack([pl_dash_len[indices], pl_dash_len[indices]],
                      axis=-1) * self.pl_max_power
         # can't not exceed the speed limits
-        pl_vels = np.add(vels[state_idx], pl_dash)
+        # pl_vels = np.add(vels[state_idx], pl_dash)
+        pl_vels = pl_dash
         pl_speed = length(pl_vels, axis=1)
         indices = np.argwhere(pl_speed >= self.pl_max_speed)
         pl_vels[indices] = pl_vels[indices] / \
