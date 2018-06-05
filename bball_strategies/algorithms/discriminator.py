@@ -71,6 +71,7 @@ class Discriminator(object):
                         grads = list(zip(grads, theta))
                         self._train_op = optimizer.apply_gradients(
                             grads_and_vars=grads, global_step=self._global_steps)
+                        self._opt_reset = tf.group([v.initializer for v in optimizer.variables()])
             # summary
             log_path = os.path.join(self._config.logdir, 'Discriminator')
             self._summary_op = tf.summary.merge(tf.get_collection('D'))
@@ -80,6 +81,9 @@ class Discriminator(object):
                 log_path + '/D')
             self.valid_summary_writer = tf.summary.FileWriter(
                 log_path + '/D_valid')
+
+    def reset_optimizer(self, sess):
+        sess.run(self._opt_reset)
 
     def __loss_function(self):
         with tf.name_scope('wgan_gp_loss'):

@@ -391,13 +391,19 @@ def train(config, env_processes, outdir):
     # TF Session
     # TODO _num_finished_episodes => Variable:0
     saver = utility.define_saver(
-        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0'))
+        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0', r'.*Adam.*', r'.*beta.*'))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
+        # reset D optimizer
+        D.reset_optimizer(sess)
+        # reset PPO optimizer
+        opt_reset = tf.group(
+            [v.initializer for v in graph.algo._optimizer.variables()])
+        sess.run(opt_reset)
         # visulization stuff
         if FLAGS.tally_only:
             tally_reward_line_chart(config, sess.run(D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ)
