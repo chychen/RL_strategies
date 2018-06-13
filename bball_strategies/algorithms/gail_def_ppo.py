@@ -18,6 +18,7 @@ import tensorflow as tf
 from agents import parts
 from agents import tools
 from agents.algorithms.ppo import utility
+from bball_strategies.algorithms.discriminator import Discriminator
 
 
 class GAIL_DEF_PPO(object):
@@ -49,7 +50,7 @@ class GAIL_DEF_PPO(object):
             name='normalize_observ')
         # because the Wgan's Critic scale and center will differ from time to time #TODO center=False, scale=False
         self._reward_filter = parts.StreamingNormalize(
-            self._batch_env.reward[0], center=False, scale=True, clip=None,
+            self._batch_env.reward[0], center=False, scale=False, clip=None,
             name='normalize_reward')
         self._use_gpu = self._config.use_gpu and utility.available_gpus()
         policy_params, state = self._initialize_policy()
@@ -385,14 +386,24 @@ class GAIL_DEF_PPO(object):
         Returns:
           Summary tensor.
         """
-        return_ = utility.discounted_return(
-            reward, length, self._config.discount)
         value = self._network(observ, length).value
-        if self._config.gae_lambda:  # NOTE
-            advantage = utility.lambda_advantage(
-                reward, value, length, self._config.discount,
-                self._config.gae_lambda)
+        if self._config.is_gail:
+            return_ = utility.discounted_return(
+                reward, length, self._config.discount)
+            if self._config.gae_lambda:  # NOTE
+                advantage = utility.lambda_advantage(
+                    reward, value, length, self._config.discount,
+                    self._config.gae_lambda)
+            else:
+                advantage = return_ - value
         else:
+            def_action = tf.reshape(action[:, :, 13:23], shape=[
+                                    tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+            with tf.device('/gpu:0'):
+                return_ = Discriminator().get_rewards(
+                    observ[:, :, -1], def_action)
+                return_ = tf.reshape(return_, [-1, 1])
+                return_ = tf.tile(return_, [1, self._config.max_length])
             advantage = return_ - value
         mean, variance = tf.nn.moments(advantage, axes=[0, 1], keep_dims=True)
         advantage = (advantage - mean) / (tf.sqrt(variance) + 1e-8)
@@ -435,7 +446,7 @@ class GAIL_DEF_PPO(object):
         length = sequence['length']
         old_policy = []
         old_policy.append(self._policy_type[ACT['DEF_DASH']](**DEF_DASH))
-        value_loss, value_summary = self._value_loss(observ, reward, length)
+        value_loss, value_summary = self._value_loss(observ, reward, length, action)
         network = self._network(observ, length)
         policy_loss, policy_summary = self._policy_loss(
             old_policy, network.policy, action, advantage, length)
@@ -452,7 +463,7 @@ class GAIL_DEF_PPO(object):
         with tf.control_dependencies([optimize]):
             return [tf.identity(x) for x in (value_loss, policy_loss, summary)]
 
-    def _value_loss(self, observ, reward, length):
+    def _value_loss(self, observ, reward, length, action):
         """Compute the loss function for the value baseline.
 
         The value loss is the difference between empirical and approximated returns
@@ -468,8 +479,17 @@ class GAIL_DEF_PPO(object):
         """
         with tf.name_scope('value_loss'):
             value = self._network(observ, length).value
-            return_ = utility.discounted_return(
-                reward, length, self._config.discount)
+            if self._config.is_gail:
+                return_ = utility.discounted_return(
+                    reward, length, self._config.discount)
+            else:
+                def_action = tf.reshape(action[:, :, 13:23], shape=[
+                                        tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+                with tf.device('/gpu:0'):
+                    return_ = Discriminator().get_rewards(
+                        observ[:, :, -1], def_action)
+                    return_ = tf.reshape(return_, [-1, 1])
+                    return_ = tf.tile(return_, [1, self._config.max_length])
             advantage = return_ - value
             value_loss = 0.5 * self._mask(advantage ** 2, length)
             summary = tf.summary.merge([

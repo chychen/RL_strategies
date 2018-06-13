@@ -25,9 +25,9 @@ def residual_block(name, inputs, n_filters, n_layers=2, residual_alpha=1.0, leak
         number of filter in ConV
     n_layers : int
         number of layers in Res Block
-    residual_alpha :
+    residual_alpha : 
         output = residual * residual_alpha + inputs
-    leaky_relu_alpha :
+    leaky_relu_alpha : 
         output = tf.maximum(features, leaky_relu_alpha * features)
 
     Return
@@ -55,65 +55,54 @@ def residual_block(name, inputs, n_filters, n_layers=2, residual_alpha=1.0, leak
         return next_input * residual_alpha + inputs
 
 
-def network(state, action, reuse=False, is_gail=True):
+def network(state, action, reuse=False):
     """
     network structure is alike the value estimation in ppo
-    state : shape=[batch_size, length, 11, 2]
-    action : shape=[batch_size, length, 5, 2]
+    state : shape=[batch_size, buffer_size, 11, 2]
+    action : shape=[batch_size, 5, 2]
 
     """
     with tf.variable_scope('network', reuse=reuse):
         batch_size = tf.shape(state)[0]
-        buffer_size = tf.shape(state)[1]
+        buffer_size = state.shape[1]
         input_ = tf.reshape(state, shape=[batch_size, buffer_size, functools.reduce(
             operator.mul, state.shape.as_list()[2:], 1)])
-        if is_gail:
-            action_ = tf.reshape(action, shape=[batch_size, 5*2])
-            hyper_action = tf.layers.dense(
-                inputs=action_,
-                units=functools.reduce(operator.mul, state.shape.as_list()[2:], 1),
-                activation=leaky_relu,
-                kernel_initializer=layers.xavier_initializer(),
-                bias_initializer=tf.zeros_initializer()
-            )
-            hyper_action = tf.reshape(hyper_action, shape=[
-                                    batch_size, 1, functools.reduce(operator.mul, state.shape.as_list()[2:], 1)])
-        else:
-            action_ = tf.reshape(action, shape=[batch_size, buffer_size, 5*2])
-            hyper_action = tf.layers.conv1d(
-                inputs=action_,
-                filters=functools.reduce(operator.mul, state.shape.as_list()[2:], 1),
-                kernel_size = 5,
-                strides = 1,
-                padding = 'same',
-                activation = leaky_relu,
-                kernel_initializer = layers.xavier_initializer(),
-                bias_initializer = tf.zeros_initializer()
-            )
-        sum_act_obs=tf.add(input_, hyper_action)
-        conv_input=tf.layers.conv1d(
-            inputs = sum_act_obs,
-            filters = 128,
-            kernel_size = 5,
-            strides = 1,
-            padding = 'same',
-            activation = leaky_relu,
-            kernel_initializer = layers.xavier_initializer(),
-            bias_initializer = tf.zeros_initializer()
+
+        action_ = tf.reshape(action, shape=[batch_size, 5*2])
+        hyper_action = tf.layers.dense(
+            inputs=action_,
+            units=functools.reduce(operator.mul, state.shape.as_list()[1:], 1),
+            activation=leaky_relu,
+            kernel_initializer=layers.xavier_initializer(),
+            bias_initializer=tf.zeros_initializer()
+        )
+        hyper_action = tf.reshape(hyper_action, shape=[
+                                  batch_size, buffer_size, functools.reduce(operator.mul, state.shape.as_list()[2:], 1)])
+        sum_act_obs = tf.add(input_, hyper_action)
+
+        conv_input = tf.layers.conv1d(
+            inputs=sum_act_obs,
+            filters=256,
+            kernel_size=3,
+            strides=1,
+            padding='same',
+            activation=leaky_relu,
+            kernel_initializer=layers.xavier_initializer(),
+            bias_initializer=tf.zeros_initializer()
         )
         # residual block
-        next_input=conv_input
-        for i in range(4):
-            res_block=residual_block(
-                'Res' + str(i), next_input, n_filters = 128, n_layers = 2)
-            next_input=res_block
+        next_input = conv_input
+        for i in range(2):
+            res_block = residual_block(
+                'Res' + str(i), next_input, n_filters=256, n_layers=2)
+            next_input = res_block
 
-        normed=layers.layer_norm(next_input)
-        nonlinear=leaky_relu(normed)
-        conv_output=tf.layers.conv1d(
+        normed = layers.layer_norm(next_input)
+        nonlinear = leaky_relu(normed)
+        conv_output = tf.layers.conv1d(
             inputs=nonlinear,
             filters=1,
-            kernel_size=5,
+            kernel_size=3,
             strides=1,
             padding='same',
             activation=leaky_relu,

@@ -75,8 +75,8 @@ def discounted_return(reward, length, discount):
         lambda agg, cur: cur + discount * agg,
         tf.transpose(tf.reverse(mask * reward, [1]), [1, 0]),
         tf.zeros_like(reward[:, -1]), 1, False), [1, 0]), [1])
-    return_ = return_ / reward.shape[1].value
     # # NOTE: get average
+    return_ = return_ / reward.shape[1].value
     # denominator = tf.range(reward.shape[1].value, dtype=tf.float32)+1.0
     # denominator = tf.tile(denominator, [tf.shape(length)[0]])
     # denominator = tf.reshape(

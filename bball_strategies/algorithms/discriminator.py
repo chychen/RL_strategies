@@ -49,15 +49,15 @@ class Discriminator(object):
                 ], dtype=tf.int32, initializer=tf.zeros_initializer(dtype=tf.int32), trainable=False)
                 # state shape = [batch_size, buffer_size, 14, 2]
                 self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
-                                                None]+list(env.observation_space.shape))
+                                                None, None]+list(env.observation_space.shape[1:]))
                 self._agent_s = tf.placeholder(dtype=tf.float32, shape=[
-                                               None]+list(env.observation_space.shape))
+                                               None, None]+list(env.observation_space.shape[1:]))
                 self._expert_a = tf.placeholder(dtype=tf.float32, shape=[
-                                                None, 5, 2])
+                                                None, None, 5, 2])
                 self._agent_a = tf.placeholder(dtype=tf.float32, shape=[
-                    None, 5, 2])
+                    None, None, 5, 2])
                 self._batch_size = tf.shape(self._expert_s)[0]
-                self._buffer_size = list(env.observation_space.shape)[0]
+                self._buffer_size = tf.shape(self._expert_s)[1]
                 self._config = config
                 self._loss = self.__loss_function()
                 with tf.name_scope('optimizer'):
@@ -67,12 +67,14 @@ class Discriminator(object):
                     with tf.control_dependencies([assign_add_]):
                         optimizer = self._config.optimizer(
                             learning_rate=self._config.learning_rate)  # TODO beta1=0.5, beta2=0.9
-                        self._opt_reset = tf.group([v.initializer for v in optimizer.variables()])
+                        self._opt_reset = tf.group(
+                            [v.initializer for v in optimizer.variables()])
                         grads = tf.gradients(self._loss, theta)
                         grads = list(zip(grads, theta))
                         self._train_op = optimizer.apply_gradients(
                             grads_and_vars=grads, global_step=self._global_steps)
-                        self._opt_reset = tf.group([v.initializer for v in optimizer.variables()])
+                        self._opt_reset = tf.group(
+                            [v.initializer for v in optimizer.variables()])
             # summary
             log_path = os.path.join(self._config.logdir, 'Discriminator')
             self._summary_op = tf.summary.merge(tf.get_collection('D'))
@@ -94,8 +96,8 @@ class Discriminator(object):
             # only defense part is different, others are conditions
             # conditions part might be canceled out to 0
             X_inter = epsilon * self._expert_s + (1.0-epsilon) * self._agent_s
-            X_act_inter = epsilon[:, 0] * self._expert_a + \
-                (1.0-epsilon[:, 0]) * self._agent_a
+            X_act_inter = epsilon * self._expert_a + \
+                (1.0-epsilon) * self._agent_a
             # add back the conditions
             X_inter = tf.concat(
                 [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:14]], axis=2)
@@ -103,19 +105,19 @@ class Discriminator(object):
                 X_inter = tf.concat(
                     [self._expert_s[:, :self._buffer_size-1, :], X_inter[:, -1:, :]], axis=1)
             grad_obs, grad_act = tf.gradients(self._config.d_network(
-                X_inter, X_act_inter, reuse=False), [X_inter, X_act_inter])
+                X_inter, X_act_inter, reuse=False, is_gail=self._config.is_gail), [X_inter, X_act_inter])
             grad_obs = tf.reshape(grad_obs, shape=[self._batch_size, -1])
             grad_act = tf.reshape(grad_act, shape=[self._batch_size, -1])
             grad = tf.concat([grad_obs, grad_act], axis=1)
-            
+
             sum_ = tf.reduce_sum(tf.square(grad), axis=0)
             grad_norm = tf.sqrt(sum_)
             grad_pen = self._config.wgan_penalty_lambda * tf.reduce_mean(
                 tf.square(grad_norm - 1.0))
             self.fake_scores = self._config.d_network(
-                self._agent_s, self._agent_a, reuse=True)
+                self._agent_s, self._agent_a, reuse=True, is_gail=self._config.is_gail)
             real_scores = self._config.d_network(
-                self._expert_s, self._expert_a, reuse=True)
+                self._expert_s, self._expert_a, reuse=True, is_gail=self._config.is_gail)
             f_fake = tf.reduce_mean(self.fake_scores)
             f_real = tf.reduce_mean(real_scores)
             em_distance = f_real - f_fake
@@ -156,8 +158,8 @@ class Discriminator(object):
 
     def get_rewards(self, state, action):
         with tf.variable_scope('Discriminator'):
-            return self._config.d_network(state, action, reuse=True)
-    
+            return self._config.d_network(state, action, reuse=True, is_gail=self._config.is_gail)
+
     def get_rewards_value(self, state, action):
         feed_dict = {
             self._agent_s: state,

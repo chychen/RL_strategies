@@ -39,7 +39,7 @@ def default():
     # optimizer = tf.train.AdamOptimizer
     # optimizer = tf.train.MomentumOptimizer
     optimizer = tf.train.GradientDescentOptimizer
-    learning_rate = 5e-4
+    learning_rate = 1e-4
 #   batch_size = 20
 #   chunk_length = 50
     # Losses
@@ -63,6 +63,8 @@ def default():
     episodes_per_batch = 5
     d_batch_size = max_length * episodes_per_batch
     train_d_per_ppo = 5
+    # Gail
+    is_gail = False
 
     return locals()
 
@@ -124,6 +126,41 @@ def episode_len_51():
     # wgan
     episodes_per_batch = 4
     d_batch_size = max_length * episodes_per_batch
+    return locals()
+
+def episode_len_11_D():
+    locals().update(episode_len_11())
+    # wgan
+    episodes_per_batch = 128
+    d_batch_size = episodes_per_batch
+    return locals()
+
+def episode_len_21_D():
+    locals().update(episode_len_21())
+    # wgan
+    episodes_per_batch = 128
+    d_batch_size = episodes_per_batch
+    return locals()
+
+def episode_len_31_D():
+    locals().update(episode_len_31())
+    # wgan
+    episodes_per_batch = 128
+    d_batch_size = episodes_per_batch
+    return locals()
+
+def episode_len_41_D():
+    locals().update(episode_len_41())
+    # wgan
+    episodes_per_batch = 128
+    d_batch_size = episodes_per_batch
+    return locals()
+
+def episode_len_51_D():
+    locals().update(episode_len_51())
+    # wgan
+    episodes_per_batch = 128
+    d_batch_size = episodes_per_batch
     return locals()
 
 def server_40cpu():

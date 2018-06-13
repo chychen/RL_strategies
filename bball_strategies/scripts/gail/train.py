@@ -80,9 +80,117 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
 
 
 def train_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action):
-    episode_counter = episode_idx
-    for _ in range(config.train_d_per_ppo):
-        print('train Discriminator')
+    if config.is_gail:
+        episode_counter = episode_idx
+        for _ in range(config.train_d_per_ppo):
+            print('train Discriminator')
+            batch_fake_states = []
+            fake_action = []
+            batch_real_states = expert_data[episode_counter:episode_counter +
+                                            config.episodes_per_batch, 1:]  # frame 0 is condition
+            real_action = expert_action[episode_counter:
+                                        episode_counter + config.episodes_per_batch, :-1]
+            batch_real_states = np.concatenate(
+                batch_real_states, axis=0)
+            real_action = np.concatenate(real_action, axis=0)
+            real_action = np.reshape(real_action, [
+                real_action.shape[0], 1, real_action.shape[1], real_action.shape[2]])
+            for _ in range(config.episodes_per_batch):
+                # align the conditions with env
+                # -1 : newest state
+                conditions = expert_data[episode_counter:episode_counter+1, :, :]
+                env.data = conditions[:, :, -1]
+                obs_state = env.reset()
+                for len_idx in range(config.max_length):
+                    if config.if_back_real:
+                        act = ppo_policy.act(
+                            np.array(conditions[:, len_idx:len_idx+1, :]), stochastic=True)
+                    else:
+                        act = ppo_policy.act(
+                            np.array(obs_state)[None, None], stochastic=True)
+                    transformed_act = [
+                        # Discrete(3) must be int
+                        int(0),
+                        # Box(2,)
+                        np.array([0.0, 0.0], dtype=np.float32),
+                        # Box(5, 2)
+                        np.zeros(shape=[5, 2], dtype=np.float32),
+                        # Box(5, 2)
+                        np.reshape(act, [5, 2])
+                    ]
+                    obs_state, _, _, _ = env.step(
+                        transformed_act)
+                    batch_fake_states.append(obs_state)
+                    fake_action.append(act.reshape([1, 5, 2]))
+                episode_counter += 1
+            batch_fake_states = np.array(batch_fake_states)
+            fake_action = np.array(fake_action)
+            batch_real_states = normalize_observ(batch_real_states)
+            # assert np.all(np.abs(batch_real_states[:, :, :6] - batch_fake_states[:, :, :6])<1e-2)
+            assert batch_real_states.shape[0] == batch_fake_states.shape[0], "real: {}, fake: {}".format(
+                batch_real_states.shape[0], batch_fake_states.shape[0])
+            assert real_action.shape[0] == fake_action.shape[0], "real: {}, fake: {}".format(
+                real_action.shape[0], fake_action.shape[0])
+            D.train(batch_fake_states, batch_real_states,
+                    fake_action, normalize_action(real_action))
+    else:
+        episode_counter = episode_idx
+        for _ in range(config.train_d_per_ppo):
+            print('train Discriminator')
+            batch_fake_states = []
+            fake_action = []
+            batch_real_states = expert_data[episode_counter:episode_counter +
+                                            config.episodes_per_batch, 1:, -1]  # frame 0 is condition
+            real_action = expert_action[episode_counter:
+                                        episode_counter + config.episodes_per_batch, :-1]
+            for _ in range(config.episodes_per_batch):
+                # align the conditions with env
+                # -1 : newest state
+                conditions = expert_data[episode_counter:episode_counter+1, :, :]
+                env.data = conditions[:, :, -1]
+                obs_state = env.reset()
+                one_epi_fake = []
+                one_epi_fake_act = []
+                for len_idx in range(config.max_length):
+                    if config.if_back_real:
+                        act = ppo_policy.act(
+                            np.array(conditions[:, len_idx:len_idx+1, :]), stochastic=True)
+                    else:
+                        act = ppo_policy.act(
+                            np.array(obs_state)[None, None], stochastic=True)
+                    transformed_act = [
+                        # Discrete(3) must be int
+                        int(0),
+                        # Box(2,)
+                        np.array([0.0, 0.0], dtype=np.float32),
+                        # Box(5, 2)
+                        np.zeros(shape=[5, 2], dtype=np.float32),
+                        # Box(5, 2)
+                        np.reshape(act, [5, 2])
+                    ]
+                    obs_state, _, _, _ = env.step(
+                        transformed_act)
+                    one_epi_fake.append(obs_state[-1])
+                    one_epi_fake_act.append(act.reshape([5, 2]))
+                episode_counter += 1
+                batch_fake_states.append(one_epi_fake)
+                fake_action.append(one_epi_fake_act)
+            batch_fake_states = np.array(batch_fake_states)
+            fake_action = np.array(fake_action)
+            batch_real_states = normalize_observ(batch_real_states)
+            # assert np.all(np.abs(batch_real_states[:, :, :6] - batch_fake_states[:, :, :6])<1e-2)
+            assert batch_real_states.shape[0] == batch_fake_states.shape[0], "real: {}, fake: {}".format(
+                batch_real_states.shape[0], batch_fake_states.shape[0])
+            assert real_action.shape[0] == fake_action.shape[0], "real: {}, fake: {}".format(
+                real_action.shape[0], fake_action.shape[0])
+            D.train(batch_fake_states, batch_real_states,
+                    fake_action, normalize_action(real_action))
+
+
+def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action):
+    if config.is_gail:
+        episode_counter = episode_idx
+        print('Validate Discriminator')
         batch_fake_states = []
         fake_action = []
         batch_real_states = expert_data[episode_counter:episode_counter +
@@ -92,6 +200,8 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
         batch_real_states = np.concatenate(
             batch_real_states, axis=0)
         real_action = np.concatenate(real_action, axis=0)
+        real_action = np.reshape(real_action, [
+            real_action.shape[0], 1, real_action.shape[1], real_action.shape[2]])
         for _ in range(config.episodes_per_batch):
             # align the conditions with env
             # -1 : newest state
@@ -118,7 +228,7 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
                 obs_state, _, _, _ = env.step(
                     transformed_act)
                 batch_fake_states.append(obs_state)
-                fake_action.append(act.reshape([5, 2]))
+                fake_action.append(act.reshape([1, 5, 2]))
             episode_counter += 1
         batch_fake_states = np.array(batch_fake_states)
         fake_action = np.array(fake_action)
@@ -128,60 +238,59 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
             batch_real_states.shape[0], batch_fake_states.shape[0])
         assert real_action.shape[0] == fake_action.shape[0], "real: {}, fake: {}".format(
             real_action.shape[0], fake_action.shape[0])
-        D.train(batch_fake_states, batch_real_states,
-                fake_action, normalize_action(real_action))
-
-
-def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action):
-    episode_counter = episode_idx
-    print('Validate Discriminator')
-    batch_fake_states = []
-    fake_action = []
-    batch_real_states = expert_data[episode_counter:episode_counter +
-                                    config.episodes_per_batch, 1:]  # frame 0 is condition
-    real_action = expert_action[episode_counter:
-                                episode_counter + config.episodes_per_batch, :-1]
-    batch_real_states = np.concatenate(
-        batch_real_states, axis=0)
-    real_action = np.concatenate(real_action, axis=0)
-    for _ in range(config.episodes_per_batch):
-        # align the conditions with env
-        # -1 : newest state
-        conditions = expert_data[episode_counter:episode_counter+1, :, :]
-        env.data = conditions[:, :, -1]
-        obs_state = env.reset()
-        for len_idx in range(config.max_length):
-            if config.if_back_real:
-                act = ppo_policy.act(
-                    np.array(conditions[:, len_idx:len_idx+1, :]), stochastic=True)
-            else:
-                act = ppo_policy.act(
-                    np.array(obs_state)[None, None], stochastic=True)
-            transformed_act = [
-                # Discrete(3) must be int
-                int(0),
-                # Box(2,)
-                np.array([0.0, 0.0], dtype=np.float32),
-                # Box(5, 2)
-                np.zeros(shape=[5, 2], dtype=np.float32),
-                # Box(5, 2)
-                np.reshape(act, [5, 2])
-            ]
-            obs_state, _, _, _ = env.step(
-                transformed_act)
-            batch_fake_states.append(obs_state)
-            fake_action.append(act.reshape([5, 2]))
-        episode_counter += 1
-    batch_fake_states = np.array(batch_fake_states)
-    fake_action = np.array(fake_action)
-    batch_real_states = normalize_observ(batch_real_states)
-    # assert np.all(np.abs(batch_real_states[:, :, :6] - batch_fake_states[:, :, :6])<1e-2)
-    assert batch_real_states.shape[0] == batch_fake_states.shape[0], "real: {}, fake: {}".format(
-        batch_real_states.shape[0], batch_fake_states.shape[0])
-    assert real_action.shape[0] == fake_action.shape[0], "real: {}, fake: {}".format(
-        real_action.shape[0], fake_action.shape[0])
-    D.validate(batch_fake_states, batch_real_states,
-               fake_action, normalize_action(real_action))
+        D.validate(batch_fake_states, batch_real_states,
+                   fake_action, normalize_action(real_action))
+    else:
+        episode_counter = episode_idx
+        print('Validate Discriminator')
+        batch_fake_states = []
+        fake_action = []
+        batch_real_states = expert_data[episode_counter:episode_counter +
+                                        config.episodes_per_batch, 1:, -1]  # frame 0 is condition
+        real_action = expert_action[episode_counter:
+                                    episode_counter + config.episodes_per_batch, :-1]
+        for _ in range(config.episodes_per_batch):
+            # align the conditions with env
+            # -1 : newest state
+            conditions = expert_data[episode_counter:episode_counter+1, :, :]
+            env.data = conditions[:, :, -1]
+            obs_state = env.reset()
+            one_epi_fake = []
+            one_epi_fake_act = []
+            for len_idx in range(config.max_length):
+                if config.if_back_real:
+                    act = ppo_policy.act(
+                        np.array(conditions[:, len_idx:len_idx+1, :]), stochastic=True)
+                else:
+                    act = ppo_policy.act(
+                        np.array(obs_state)[None, None], stochastic=True)
+                transformed_act = [
+                    # Discrete(3) must be int
+                    int(0),
+                    # Box(2,)
+                    np.array([0.0, 0.0], dtype=np.float32),
+                    # Box(5, 2)
+                    np.zeros(shape=[5, 2], dtype=np.float32),
+                    # Box(5, 2)
+                    np.reshape(act, [5, 2])
+                ]
+                obs_state, _, _, _ = env.step(
+                    transformed_act)
+                one_epi_fake.append(obs_state[-1])
+                one_epi_fake_act.append(act.reshape([5, 2]))
+            episode_counter += 1
+            batch_fake_states.append(one_epi_fake)
+            fake_action.append(one_epi_fake_act)
+        batch_fake_states = np.array(batch_fake_states)
+        fake_action = np.array(fake_action)
+        batch_real_states = normalize_observ(batch_real_states)
+        # assert np.all(np.abs(batch_real_states[:, :, :6] - batch_fake_states[:, :, :6])<1e-2)
+        assert batch_real_states.shape[0] == batch_fake_states.shape[0], "real: {}, fake: {}".format(
+            batch_real_states.shape[0], batch_fake_states.shape[0])
+        assert real_action.shape[0] == fake_action.shape[0], "real: {}, fake: {}".format(
+            real_action.shape[0], fake_action.shape[0])
+        D.validate(batch_fake_states, batch_real_states,
+                   fake_action, normalize_action(real_action))
 
 
 def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
@@ -189,63 +298,36 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
     - draw episode into mpeg video
     - collect episdoe and each state scores into numpy
     """
-    numpy_collector = []
-    act_collector = []
-    vanilla_obs = vanilla_env.reset()
-    for _ in range(vanilla_env.time_limit):
-        vanilla_act = ppo_policy.act(
-            np.array(vanilla_obs)[None, None], stochastic=False)
-        act_collector.append(vanilla_act.reshape([5, 2]))
-        vanilla_trans_act = [
-            # Discrete(3) must be int
-            int(0),
-            # Box(2,)
-            np.array([0.0, 0.0], dtype=np.float32),
-            # Box(5, 2)
-            np.zeros(shape=[5, 2], dtype=np.float32),
-            # Box(5, 2)
-            np.reshape(vanilla_act, [5, 2])
-        ]
-        vanilla_obs, _, _, _ = vanilla_env.step(
-            vanilla_trans_act)
-        numpy_collector.append(denormalize_observ(vanilla_obs))
-    numpy_collector = np.array(numpy_collector)
-    act_collector = np.array(act_collector)
-    reward_collector = D.get_rewards_value(numpy_collector, act_collector)
-    np.savez(os.path.join(config.logdir, 'gail_testing_{}/episode_{}.npz'.format(config.train_len, steps)),
-             STATE=numpy_collector[:, -1], REWARD=reward_collector)
-
-
-def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, normalize_observ):
-    """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
-    """
-    episode_amount = 100
-    # real data
-    all_data = h5py.File(
-        'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
-    expert_data, _ = np.split(
-        all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
-    expert_action, _ = np.split(
-        all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0]*9//10])
-    # env
-    vanilla_env = gym.make(config.env)
-    vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
-                               time_limit=50)
-    vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
-    # real
-    selected_idx = np.random.choice(expert_data.shape[0], episode_amount)
-    batch_real_states = expert_data[selected_idx, 1:] # frame 0 is condition
-    real_action = expert_action[selected_idx, :-1]
-    batch_real_states = np.concatenate(
-        batch_real_states, axis=0)
-    real_action = np.concatenate(real_action, axis=0)
-    batch_real_states = normalize_observ(batch_real_states)
-    real_rewards = D.get_rewards_value(
-        batch_real_states, real_action).reshape([100, -1])
-    # fake
-    numpy_collector = []
-    act_collector = []
-    for _ in range(episode_amount):
+    if config.is_gail:
+        numpy_collector = []
+        act_collector = []
+        vanilla_obs = vanilla_env.reset()
+        for _ in range(vanilla_env.time_limit):
+            vanilla_act = ppo_policy.act(
+                np.array(vanilla_obs)[None, None], stochastic=False)
+            act_collector.append(vanilla_act.reshape([1, 5, 2]))
+            vanilla_trans_act = [
+                # Discrete(3) must be int
+                int(0),
+                # Box(2,)
+                np.array([0.0, 0.0], dtype=np.float32),
+                # Box(5, 2)
+                np.zeros(shape=[5, 2], dtype=np.float32),
+                # Box(5, 2)
+                np.reshape(vanilla_act, [5, 2])
+            ]
+            vanilla_obs, _, _, _ = vanilla_env.step(
+                vanilla_trans_act)
+            numpy_collector.append(vanilla_obs)
+        numpy_collector = np.array(numpy_collector)
+        act_collector = np.array(act_collector)
+        reward_collector = D.get_rewards_value(numpy_collector, act_collector)
+        numpy_collector = denormalize_observ(numpy_collector)
+        np.savez(os.path.join(config.logdir, 'gail_testing_{}/episode_{}.npz'.format(config.train_len, steps)),
+                 STATE=numpy_collector[:, -1], REWARD=reward_collector)
+    else:
+        numpy_collector = []
+        act_collector = []
         vanilla_obs = vanilla_env.reset()
         for _ in range(vanilla_env.time_limit):
             vanilla_act = ppo_policy.act(
@@ -263,14 +345,127 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, no
             ]
             vanilla_obs, _, _, _ = vanilla_env.step(
                 vanilla_trans_act)
-            # numpy_collector.append(denormalize_observ(vanilla_obs))
             numpy_collector.append(vanilla_obs)
-    numpy_collector = np.array(numpy_collector)
-    act_collector = np.array(act_collector)
-    fake_rewards = D.get_rewards_value(
-        numpy_collector, act_collector).reshape([100, -1])
-    # vis
-    vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
+        numpy_collector = np.array(numpy_collector)
+        act_collector = np.array(act_collector)
+        reward_collector = D.get_rewards_value(numpy_collector[None, :, -1], act_collector[None])
+        numpy_collector = denormalize_observ(numpy_collector)
+        np.savez(os.path.join(config.logdir, 'gail_testing_{}/episode_{}.npz'.format(config.train_len, steps)),
+                 STATE=numpy_collector[:, -1], REWARD=np.ones(shape=[vanilla_env.time_limit, ])*reward_collector)
+
+
+def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, normalize_observ, normalize_action):
+    """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
+    """
+    if config.is_gail:
+        episode_amount = 100
+        # real data
+        all_data = h5py.File(
+            'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
+        expert_data, _ = np.split(
+            all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
+        expert_action, _ = np.split(
+            all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0]*9//10])
+        # env
+        vanilla_env = gym.make(config.env)
+        vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
+                                   time_limit=50)
+        vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
+        # real
+        selected_idx = np.random.choice(expert_data.shape[0], episode_amount)
+        # frame 0 is condition
+        batch_real_states = expert_data[selected_idx, 1:]
+        real_action = expert_action[selected_idx, :-1]
+        batch_real_states = np.concatenate(
+            batch_real_states, axis=0)
+        real_action = np.concatenate(real_action[:, None], axis=0)
+        batch_real_states = normalize_observ(batch_real_states)
+        real_rewards = D.get_rewards_value(
+            batch_real_states, normalize_action(real_action)).reshape([100, -1])
+        # fake
+        numpy_collector = []
+        act_collector = []
+        for _ in range(episode_amount):
+            vanilla_obs = vanilla_env.reset()
+            for _ in range(vanilla_env.time_limit):
+                vanilla_act = ppo_policy.act(
+                    np.array(vanilla_obs)[None, None], stochastic=False)
+                act_collector.append(vanilla_act.reshape([1, 5, 2]))
+                vanilla_trans_act = [
+                    # Discrete(3) must be int
+                    int(0),
+                    # Box(2,)
+                    np.array([0.0, 0.0], dtype=np.float32),
+                    # Box(5, 2)
+                    np.zeros(shape=[5, 2], dtype=np.float32),
+                    # Box(5, 2)
+                    np.reshape(vanilla_act, [5, 2])
+                ]
+                vanilla_obs, _, _, _ = vanilla_env.step(
+                    vanilla_trans_act)
+                numpy_collector.append(vanilla_obs)
+        numpy_collector = np.array(numpy_collector)
+        act_collector = np.array(act_collector)
+        fake_rewards = D.get_rewards_value(
+            numpy_collector, act_collector).reshape([100, -1])
+        # vis
+        vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
+    else:
+        episode_amount = 100
+        # real data
+        all_data = h5py.File(
+            'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
+        expert_data, _ = np.split(
+            all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
+        expert_action, _ = np.split(
+            all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0]*9//10])
+        # env
+        vanilla_env = gym.make(config.env)
+        vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
+                                   time_limit=config.max_length)
+        vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
+        # real
+        selected_idx = np.random.choice(expert_data.shape[0], episode_amount)
+        # frame 0 is condition
+        batch_real_states = expert_data[selected_idx, 1:config.max_length+1, -1]
+        real_action = expert_action[selected_idx, :config.max_length]
+        batch_real_states = normalize_observ(batch_real_states)
+        real_rewards = D.get_rewards_value(
+            batch_real_states, normalize_action(real_action)).reshape([-1, 1])
+        real_rewards = np.tile(real_rewards, [1, config.max_length])
+        # fake
+        numpy_collector = []
+        act_collector = []
+        for _ in range(episode_amount):
+            vanilla_obs = vanilla_env.reset()
+            epi_obs = []
+            epi_act = []
+            for _ in range(config.max_length):
+                vanilla_act = ppo_policy.act(
+                    np.array(vanilla_obs)[None, None], stochastic=False)
+                vanilla_trans_act = [
+                    # Discrete(3) must be int
+                    int(0),
+                    # Box(2,)
+                    np.array([0.0, 0.0], dtype=np.float32),
+                    # Box(5, 2)
+                    np.zeros(shape=[5, 2], dtype=np.float32),
+                    # Box(5, 2)
+                    np.reshape(vanilla_act, [5, 2])
+                ]
+                vanilla_obs, _, _, _ = vanilla_env.step(
+                    vanilla_trans_act)
+                epi_obs.append(vanilla_obs[-1])
+                epi_act.append(vanilla_act.reshape([5, 2]))
+            numpy_collector.append(epi_obs)
+            act_collector.append(epi_act)
+        numpy_collector = np.array(numpy_collector)
+        act_collector = np.array(act_collector)
+        fake_rewards = D.get_rewards_value(
+            numpy_collector, act_collector).reshape([-1, 1])
+        fake_rewards = np.tile(fake_rewards, [1, config.max_length])
+        # vis
+        vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
 
 
 def capped_video_schedule(episode_id):
@@ -323,8 +518,8 @@ def train(config, env_processes, outdir):
     dummy_env = gym.make(config.env)
 
     def normalize_observ(observ):
-        min_ = dummy_env.observation_space.low
-        max_ = dummy_env.observation_space.high
+        min_ = dummy_env.observation_space.low[0]
+        max_ = dummy_env.observation_space.high[0]
         observ = 2.0 * (observ - min_) / (max_ - min_) - 1.0
         return observ
 
@@ -335,8 +530,8 @@ def train(config, env_processes, outdir):
         return act
 
     def denormalize_observ(observ):
-        min_ = dummy_env.observation_space.low
-        max_ = dummy_env.observation_space.high
+        min_ = dummy_env.observation_space.low[0]
+        max_ = dummy_env.observation_space.high[0]
         observ = (observ + 1.0) * (max_ - min_) / 2.0 + min_
         return observ
 
@@ -366,7 +561,7 @@ def train(config, env_processes, outdir):
     with tf.device('/cpu:0'):
         batch_env = utility.define_batch_env(
             lambda: _create_environment(config),
-            config.num_agents, env_processes, outdir=outdir)
+            config.num_agents, env_processes, outdir=outdir, is_gail=config.is_gail)
         graph = utility.define_simulation_graph(
             batch_env, config.algorithm, config)
         loop = _define_loop(
@@ -393,7 +588,7 @@ def train(config, env_processes, outdir):
     # TF Session
     # TODO _num_finished_episodes => Variable:0
     saver = utility.define_saver(
-        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0'))
+        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0', r'.*Adam.*', r'.*beta.*'))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
@@ -408,7 +603,8 @@ def train(config, env_processes, outdir):
         sess.run(opt_reset)
         # visulization stuff
         if FLAGS.tally_only:
-            tally_reward_line_chart(config, sess.run(D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ)
+            tally_reward_line_chart(config, sess.run(
+                D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ, normalize_action)
             exit()
         # GAIL
         cumulate_steps = sess.run(graph.step)
@@ -431,10 +627,14 @@ def train(config, env_processes, outdir):
                 test_policy(config, vanilla_env, sess.run(D._global_steps), ppo_policy,
                             D, denormalize_observ)
             if valid_episode_idx % (1000 * config.episodes_per_batch) == 0:
-                tally_reward_line_chart(config, sess.run(D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ)
+                tally_reward_line_chart(config, sess.run(
+                    D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ, normalize_action)
             # train Discriminator
             train_Discriminator(
                 episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
+            if valid_episode_idx % (1000 * config.episodes_per_batch) == 0:
+                tally_reward_line_chart(config, sess.run(
+                    D._global_steps), ppo_policy, D, denormalize_observ, normalize_observ, normalize_action)
             # valid Discriminator
             valid_Discriminator(
                 valid_episode_idx, config, valid_expert_data, valid_expert_action, env, ppo_policy, D, normalize_observ, normalize_action)
