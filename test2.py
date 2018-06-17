@@ -1,3 +1,57 @@
+from multiprocessing import Pool
+import numpy as np
+import os
+import h5py
+import gym
+import time
+from bball_strategies import gym_bball
+from bball_strategies.gym_bball.tools import BBallWrapper
+
+
+def f(conditions):
+    # env to generate fake state
+    env = gym.make('bball_gail_def-v0')
+    env = BBallWrapper(env, init_mode=1, fps=5, if_back_real=False,
+                       time_limit=10)
+    # env.data = conditions[:, :, -1]
+    obs_state = env.reset()
+    batch_fake_states = []
+    fake_action = []
+    for len_idx in range(10):
+        act = np.zeros(shape=[10, ])
+        transformed_act = [
+            # Discrete(3) must be int
+            int(0),
+            # Box(2,)
+            np.array([0.0, 0.0], dtype=np.float32),
+            # Box(5, 2)
+            np.zeros(shape=[5, 2], dtype=np.float32),
+            # Box(5, 2)
+            np.reshape(act, [5, 2])
+        ]
+        obs_state, _, _, _ = env.step(
+            transformed_act)
+        batch_fake_states.append(obs_state)
+        fake_action.append(act.reshape([1, 5, 2]))
+    return batch_fake_states
+
+
+if __name__ == '__main__':
+    all_data = h5py.File(
+        'bball_strategies/data/GAILTransitionData_11.hdf5', 'r')
+    expert_data, valid_expert_data = np.split(
+        all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
+    conditions = expert_data[0:100, :, :]
+    a = time.time()
+    with Pool(1) as p:
+        collected_result = p.map(f, conditions)
+    # collected_result = list(map(f, conditions))
+    collected_result = np.array(collected_result)
+    print(collected_result.shape)
+    print(time.time()-a)
+
+
+############################################################
 # import tensorflow as tf
 # from tensorflow.python.client import device_lib
 # local_device_protos = device_lib.list_local_devices()
@@ -13,24 +67,23 @@
 #     # Runs the op.
 #     print(sess.run(c))
 
-
 ############################################################
-import tensorflow as tf 
-import numpy as np
-# tf.enable_eager_execution()
+# import tensorflow as tf
+# import numpy as np
+# # tf.enable_eager_execution()
 
-a = tf.range(10)
-print(a[None, :]<a[:, None])
-a = tf.reshape(a, [10,1])
+# a = tf.range(10)
+# print(a[None, :]<a[:, None])
+# a = tf.reshape(a, [10,1])
 
-print(a.shape)
-print(a.shape[0].value)
-b = tf.tile(a, [1,2])
-b = tf.reshape(b, [10,2])
-print(b)
-sess = tf.Session()
-print(sess.run(a))
-print(sess.run(b))
+# print(a.shape)
+# print(a.shape[0].value)
+# b = tf.tile(a, [1,2])
+# b = tf.reshape(b, [10,2])
+# print(b)
+# sess = tf.Session()
+# print(sess.run(a))
+# print(sess.run(b))
 
 
 # a = tf.constant(0.)
@@ -68,10 +121,10 @@ print(sess.run(b))
 # sess = tf.Session()
 
 # def leak_version():
-#     return sess.run(a[0,0]) 
+#     return sess.run(a[0,0])
 
 # def safe_version():
-#     return sess.run(a)[0,0] 
+#     return sess.run(a)[0,0]
 
 # for i in range(10):
 #     tracker.print_diff()
