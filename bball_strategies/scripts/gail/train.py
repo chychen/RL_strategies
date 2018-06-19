@@ -13,6 +13,7 @@ from __future__ import print_function
 
 import datetime
 import os
+import time
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 import gym
 import tensorflow as tf
@@ -80,10 +81,10 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
 
 
 def train_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action):
+    time_tmp = time.time()
     if config.is_gail:
         episode_counter = episode_idx
         for _ in range(config.train_d_per_ppo):
-            print('train Discriminator')
             batch_fake_states = []
             fake_action = []
             batch_real_states = expert_data[episode_counter:episode_counter +
@@ -136,7 +137,6 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
     else:
         episode_counter = episode_idx
         for _ in range(config.train_d_per_ppo):
-            print('train Discriminator')
             batch_fake_states = []
             fake_action = []
             batch_real_states = expert_data[episode_counter:episode_counter +
@@ -185,12 +185,13 @@ def train_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
                 real_action.shape[0], fake_action.shape[0])
             D.train(batch_fake_states, batch_real_states,
                     fake_action, normalize_action(real_action))
+    print('train Discriminator (time cost: {})'.format(time.time()-time_tmp))
 
 
 def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, ppo_policy, D, normalize_observ, normalize_action):
+    time_tmp = time.time()
     if config.is_gail:
         episode_counter = episode_idx
-        print('Validate Discriminator')
         batch_fake_states = []
         fake_action = []
         batch_real_states = expert_data[episode_counter:episode_counter +
@@ -242,7 +243,6 @@ def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
                    fake_action, normalize_action(real_action))
     else:
         episode_counter = episode_idx
-        print('Validate Discriminator')
         batch_fake_states = []
         fake_action = []
         batch_real_states = expert_data[episode_counter:episode_counter +
@@ -291,6 +291,7 @@ def valid_Discriminator(episode_idx, config, expert_data, expert_action, env, pp
             real_action.shape[0], fake_action.shape[0])
         D.validate(batch_fake_states, batch_real_states,
                    fake_action, normalize_action(real_action))
+    print('Validate Discriminator (time cost: {})'.format(time.time()-time_tmp))
 
 
 def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
