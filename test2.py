@@ -1,4 +1,5 @@
 from multiprocessing import Pool
+from functools import partial
 import numpy as np
 import os
 import h5py
@@ -8,17 +9,17 @@ from bball_strategies import gym_bball
 from bball_strategies.gym_bball.tools import BBallWrapper
 
 
-def f(conditions):
+def f(A, conditions):
     # env to generate fake state
     env = gym.make('bball_gail_def-v0')
     env = BBallWrapper(env, init_mode=1, fps=5, if_back_real=False,
                        time_limit=10)
-    # env.data = conditions[:, :, -1]
+    env.data = conditions[None, :, -1]
     obs_state = env.reset()
     batch_fake_states = []
     fake_action = []
     for len_idx in range(10):
-        act = np.zeros(shape=[10, ])
+        act = A.test()
         transformed_act = [
             # Discrete(3) must be int
             int(0),
@@ -33,22 +34,57 @@ def f(conditions):
             transformed_act)
         batch_fake_states.append(obs_state)
         fake_action.append(act.reshape([1, 5, 2]))
-    return batch_fake_states
+    return batch_fake_states, batch_fake_states
 
+def wrapper(Foo):
+    return Foo.work
+
+def fa(work, aaaaaa):
+    work('aasdsafaf')
+    print(aaaaaa)
+
+def main():
+
+    import multiprocessing as mp
+    from foo import Foo
+
+    pool = mp.Pool()
+    a = Foo()
+    pool.map(Foo.work, [1,2,3])
+    # fff = partial(fa, a.work)
+    # pool.map(fff, [1,2,3])
+    pool.close()
+    pool.join()
+
+class A(object):
+    @classmethod
+    def test(cls):
+        return np.zeros(shape=[10,])
 
 if __name__ == '__main__':
-    all_data = h5py.File(
-        'bball_strategies/data/GAILTransitionData_11.hdf5', 'r')
-    expert_data, valid_expert_data = np.split(
-        all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
-    conditions = expert_data[0:100, :, :]
-    a = time.time()
-    with Pool(1) as p:
-        collected_result = p.map(f, conditions)
-    # collected_result = list(map(f, conditions))
-    collected_result = np.array(collected_result)
-    print(collected_result.shape)
-    print(time.time()-a)
+    main()
+    
+    
+    # all_data = h5py.File(
+    #     'bball_strategies/data/GAILTransitionData_11.hdf5', 'r')
+    # expert_data, valid_expert_data = np.split(
+    #     all_data['OBS'].value, [all_data['OBS'].value.shape[0]*9//10])
+    # conditions = expert_data[0:100, :, :]
+    # print('1')
+    # a = time.time()
+    # partial_f = partial(f, A())
+    # with Pool(10) as p:
+    #     collected_result = p.map(partial_f, conditions)
+    # # collected_result = list(map(f, conditions))
+    # collected_result = np.array([v[0] for v in collected_result])
+    # print(collected_result.shape)
+    # print(time.time()-a)
+    # print('2')
+    # a = time.time()
+    # with Pool(1) as p:
+    #     collected_result = p.map(partial_f, conditions)
+    # print(time.time()-a)
+    # print('3')
 
 
 ############################################################
