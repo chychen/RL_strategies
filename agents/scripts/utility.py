@@ -58,7 +58,7 @@ def define_simulation_graph(batch_env, algo_cls, config):
         tf.bool, name='is_optimizing_offense')
     algo = algo_cls(batch_env, step, is_training, should_log,
                     config, is_optimizing_offense=is_optimizing_offense)
-    done, score, summary = tools.simulate(
+    done, score, summary, gail_summary = tools.simulate(
         batch_env, algo, should_log, force_reset)
     message = 'Graph contains {} trainable variables.'
     tf.logging.info(message.format(tools.count_weights()))

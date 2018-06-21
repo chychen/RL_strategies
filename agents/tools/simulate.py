@@ -145,12 +145,13 @@ def simulate(batch_env, algo, log=True, reset=False):
         with tf.control_dependencies([step]):
             agent_indices = tf.cast(
                 tf.where(batch_env.done)[:, 0], tf.int32)
-            end_episode = tf.cond(
+            end_episode, gail_end_episode = tf.cond(
                 tf.cast(tf.shape(agent_indices)[0], tf.bool),
-                lambda: _define_end_episode(agent_indices), str)
+                lambda: _define_end_episode(agent_indices), lambda: (str(), str()))
         with tf.control_dependencies([end_episode]):
             summary = tf.summary.merge([
                 _define_summaries(), begin_episode, step, end_episode])
         with tf.control_dependencies([summary]):
             done, score = tf.identity(batch_env.done), tf.identity(score)
-        return done, score, summary
+            
+        return done, score, summary, gail_end_episode

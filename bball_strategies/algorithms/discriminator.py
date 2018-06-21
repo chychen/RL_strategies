@@ -9,6 +9,8 @@ import time
 import shutil
 import numpy as np
 import tensorflow as tf
+import gym
+from bball_strategies import gym_bball
 
 
 def get_var_list(prefix):
@@ -30,63 +32,50 @@ def get_var_list(prefix):
 class Discriminator(object):
     __instance = None
 
-    def __new__(cls, config=None, env=None):
+    def __new__(cls, agent_s=None, agent_a=None, config=None):
         if Discriminator.__instance is None:
             Discriminator.__instance = object.__new__(cls)
         else:
             print("Instance Exists! :D")
         return Discriminator.__instance
 
-    def __init__(self, config=None, env=None):
+    def __init__(self, agent_s=None, agent_a=None, config=None):
         """
         state is composed of offense(condition) and defense
         """
         if self.__instance is not None and config is not None:
+            env = gym.make(config.env)
             # first init the class
-            self._global_steps = tf.train.get_or_create_global_step()
+            # self._global_steps = tf.train.get_or_create_global_step()
             with tf.variable_scope('Discriminator', reuse=tf.AUTO_REUSE):
-                self.__steps = tf.get_variable('D_steps', shape=[
+                self._steps = tf.get_variable('D_steps', shape=[
                 ], dtype=tf.int32, initializer=tf.zeros_initializer(dtype=tf.int32), trainable=False)
                 # state shape = [batch_size, buffer_size, 14, 2]
                 self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
-                                                None, None]+list(env.observation_space.shape[1:]))
-                self._agent_s = tf.placeholder(dtype=tf.float32, shape=[
-                                               None, None]+list(env.observation_space.shape[1:]))
+                                                None, None] + list(env.observation_space.shape[1:]))
+                self._agent_s_ph = tf.placeholder(dtype=tf.float32, shape=[
+                    None, None] + list(env.observation_space.shape[1:]))
+                self._agent_s = agent_s
                 self._expert_a = tf.placeholder(dtype=tf.float32, shape=[
                                                 None, None, 5, 2])
-                self._agent_a = tf.placeholder(dtype=tf.float32, shape=[
+                self._agent_a_ph = tf.placeholder(dtype=tf.float32, shape=[
                     None, None, 5, 2])
+                self._agent_a = agent_a
                 self._batch_size = tf.shape(self._expert_s)[0]
                 self._buffer_size = tf.shape(self._expert_s)[1]
                 self._config = config
-                self._loss = self.__loss_function()
+                self._loss, self.f_fake, self.f_real, self.em_distance, self.grad_pen = self.__loss_function()
                 with tf.name_scope('optimizer'):
                     theta = get_var_list('Discriminator')
                     # Discriminator train one iteration, step++
-                    assign_add_ = tf.assign_add(self.__steps, 1)
-                    with tf.control_dependencies([assign_add_]):
-                        optimizer = self._config.optimizer(
-                            learning_rate=self._config.learning_rate)  # TODO beta1=0.5, beta2=0.9
-                        self._opt_reset = tf.group(
-                            [v.initializer for v in optimizer.variables()])
-                        grads = tf.gradients(self._loss, theta)
-                        grads = list(zip(grads, theta))
-                        self._train_op = optimizer.apply_gradients(
-                            grads_and_vars=grads, global_step=self._global_steps)
-                        self._opt_reset = tf.group(
-                            [v.initializer for v in optimizer.variables()])
-            # summary
-            log_path = os.path.join(self._config.logdir, 'Discriminator')
-            self._summary_op = tf.summary.merge(tf.get_collection('D'))
-            self._summary_valid_op = tf.summary.merge(
-                tf.get_collection('D_valid'))
-            self.summary_writer = tf.summary.FileWriter(
-                log_path + '/D')
-            self.valid_summary_writer = tf.summary.FileWriter(
-                log_path + '/D_valid')
-
-    def reset_optimizer(self, sess):
-        sess.run(self._opt_reset)
+                    # assign_add_ = tf.assign_add(self._steps, 1)
+                    # with tf.control_dependencies([assign_add_]):
+                    self.optimizer = self._config.optimizer(
+                        learning_rate=self._config.learning_rate)  # TODO beta1=0.5, beta2=0.9
+                    grads = tf.gradients(self._loss, theta)
+                    grads = list(zip(grads, theta))
+                    self._train_op = self.optimizer.apply_gradients(
+                        grads_and_vars=grads, global_step=self._steps)
 
     def __loss_function(self):
         with tf.name_scope('wgan_gp_loss'):
@@ -95,17 +84,18 @@ class Discriminator(object):
                 [self._batch_size, 1, 1, 1], minval=0.0, maxval=1.0)
             # only defense part is different, others are conditions
             # conditions part might be canceled out to 0
-            X_inter = epsilon * self._expert_s + (1.0-epsilon) * self._agent_s
+            X_inter = epsilon * self._expert_s + \
+                (1.0 - epsilon) * self._agent_s
             X_act_inter = epsilon * self._expert_a + \
-                (1.0-epsilon) * self._agent_a
+                (1.0 - epsilon) * self._agent_a
             # add back the conditions
             X_inter = tf.concat(
                 [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:14]], axis=2)
             if self._config.if_back_real:
                 X_inter = tf.concat(
-                    [self._expert_s[:, :self._buffer_size-1, :], X_inter[:, -1:, :]], axis=1)
+                    [self._expert_s[:, :self._buffer_size - 1, :], X_inter[:, -1:, :]], axis=1)
             grad_obs, grad_act = tf.gradients(self._config.d_network(
-                X_inter, X_act_inter, reuse=False, is_gail=self._config.is_gail), [X_inter, X_act_inter])
+                X_inter, X_act_inter, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail), [X_inter, X_act_inter])
             grad_obs = tf.reshape(grad_obs, shape=[self._batch_size, -1])
             grad_act = tf.reshape(grad_act, shape=[self._batch_size, -1])
             grad = tf.concat([grad_obs, grad_act], axis=1)
@@ -114,25 +104,16 @@ class Discriminator(object):
             grad_norm = tf.sqrt(sum_)
             grad_pen = self._config.wgan_penalty_lambda * tf.reduce_mean(
                 tf.square(grad_norm - 1.0))
-            self.fake_scores = self._config.d_network(
-                self._agent_s, self._agent_a, reuse=True, is_gail=self._config.is_gail)
+            fake_scores = self._config.d_network(
+                self._agent_s, self._agent_a, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
             real_scores = self._config.d_network(
-                self._expert_s, self._expert_a, reuse=True, is_gail=self._config.is_gail)
-            f_fake = tf.reduce_mean(self.fake_scores)
+                self._expert_s, self._expert_a, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
+            f_fake = tf.reduce_mean(fake_scores)
             f_real = tf.reduce_mean(real_scores)
             em_distance = f_real - f_fake
             loss = -em_distance + grad_pen
 
-            # logging
-            tf.summary.scalar('D_loss', loss,
-                              collections=['D', 'D_valid'])
-            tf.summary.scalar('F_real', f_real, collections=['D'])
-            tf.summary.scalar('F_fake', f_fake, collections=['D'])
-            tf.summary.scalar('Earth Moving Distance',
-                              em_distance, collections=['D', 'D_valid'])
-            tf.summary.scalar('grad_pen', grad_pen, collections=['D'])
-
-            return loss
+            return loss, f_fake, f_real, em_distance, grad_pen
 
     def train(self, agent_s, expert_s, agent_a, expert_a):
         feed_dict = {
@@ -156,16 +137,20 @@ class Discriminator(object):
             [self._global_steps, self._summary_valid_op], feed_dict=feed_dict)
         self.valid_summary_writer.add_summary(summary, global_step=global_step)
 
-    def get_rewards(self, state, action):
+    @classmethod
+    def get_rewards(cls, state, action, config):
         with tf.variable_scope('Discriminator'):
-            return self._config.d_network(state, action, reuse=True, is_gail=self._config.is_gail)
+            return config.d_network(state, action, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
 
     def get_rewards_value(self, state, action):
         feed_dict = {
-            self._agent_s: state,
-            self._agent_a: action
+            self._agent_s_ph: state,
+            self._agent_a_ph: action
         }
-        return tf.get_default_session().run(self.fake_scores, feed_dict=feed_dict)
+        with tf.variable_scope('Discriminator'):
+            fake_scores = self._config.d_network(
+                self._agent_s_ph, self._agent_a_ph, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
+            return tf.get_default_session().run(fake_scores, feed_dict=feed_dict)
 
 
 def main():

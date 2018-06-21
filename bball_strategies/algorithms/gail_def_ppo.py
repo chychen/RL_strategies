@@ -36,6 +36,7 @@ class GAIL_DEF_PPO(object):
         config : Object containing the agent configuration as attributes.
         is_optimizing_offense : (Extended) whose turn to optimize
         """
+        self.D = None  # Discriminator
         self._batch_env = batch_env
         self._step = step
         self._is_training = is_training
@@ -235,7 +236,7 @@ class GAIL_DEF_PPO(object):
         with tf.name_scope('end_episode/'):
             return tf.cond(
                 self._is_training,
-                lambda: self._define_end_episode(agent_indices), str)
+                lambda: self._define_end_episode(agent_indices), lambda: (str(), str()))
 
     def _initialize_policy(self):
         """ #### Initialize the policy.
@@ -307,13 +308,13 @@ class GAIL_DEF_PPO(object):
                 self._current_episodes = parts.EpisodeMemory(
                     template, len(self._batch_env), self._config.max_length, 'episodes')
         self._finished_episodes = parts.EpisodeMemory(
-            template, self._config.update_every, self._config.max_length, 'memory')
+            template, self._config.episodes_per_batch, self._config.max_length, 'memory')
         self._num_finished_episodes = tf.Variable(0, False)
 
     def _define_end_episode(self, agent_indices):
         """Implement the branch of end_episode() entered during training."""
         episodes, length = self._current_episodes.data(agent_indices)
-        space_left = self._config.update_every - self._num_finished_episodes
+        space_left = self._config.episodes_per_batch - self._num_finished_episodes
         use_episodes = tf.range(tf.minimum(
             tf.shape(agent_indices)[0], space_left))
         episodes = tools.nested.map(
@@ -326,7 +327,9 @@ class GAIL_DEF_PPO(object):
                 tf.shape(use_episodes)[0])
         with tf.control_dependencies([increment_index]):
             memory_full = self._num_finished_episodes >= self._config.update_every
-            return tf.cond(memory_full, self._training, str)
+            gail_memory_full = self._num_finished_episodes >= self._config.episodes_per_batch
+
+            return tf.cond(memory_full, self._training, str), tf.cond(gail_memory_full, self._gail_training, str)
 
     def _training(self):
         """Perform multiple training iterations of both policy and value baseline.
@@ -339,10 +342,11 @@ class GAIL_DEF_PPO(object):
         """
         with tf.device('/gpu:0' if self._use_gpu else '/cpu:0'):
             with tf.name_scope('training'):
-                assert_full = tf.assert_equal(
+                assert_full = tf.assert_greater_equal(
                     self._num_finished_episodes, self._config.update_every)
                 with tf.control_dependencies([assert_full]):
-                    data = self._finished_episodes.data()
+                    data = self._finished_episodes.data(
+                        tf.range(self._config.update_every))
                 (observ, action, old_policy_params, reward), length = data
                 # We set padding frames of the parameters to ones to prevent Gaussians
                 # with zero variance. This would result in an inifite KL divergence,
@@ -360,13 +364,57 @@ class GAIL_DEF_PPO(object):
                         observ, old_policy_params, length)
                 with tf.control_dependencies([penalty_summary]):
                     clear_memory = tf.group(
-                        self._finished_episodes.clear(),
+                        self._finished_episodes.clear(
+                            tf.range(self._config.update_every)),
                         self._num_finished_episodes.assign(0))
                 with tf.control_dependencies([clear_memory]):
                     weight_summary = utility.variable_summaries(
                         tf.trainable_variables(), self._config.weight_summaries)
                     return tf.summary.merge([
                         update_summary, penalty_summary, weight_summary])
+
+    def _gail_training(self):
+        """Perform training on Discriminator of Gail.
+
+        Training on the episodes collected in the memory. Reset the memory
+        afterwards. Always returns a summary string.
+
+        Returns:
+          Summary tensor.
+        """
+        with tf.device('/gpu:0' if self._use_gpu else '/cpu:0'):
+            with tf.name_scope('gail_training'):
+                assert_full = tf.assert_equal(
+                    self._num_finished_episodes, self._config.episodes_per_batch)
+                # return str()
+                with tf.control_dependencies([assert_full]):
+                    data = self._finished_episodes.data(
+                        tf.range(self._config.episodes_per_batch))
+                    (observ, action, old_policy_params, reward), length = data
+                    observ = self._observ_filter.transform(observ)
+                    reward = self._reward_filter.transform(reward)
+                    self.D = Discriminator(
+                        observ[:, :, -1], tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2]), self._config)
+                    with tf.control_dependencies([self.D._train_op]):
+                        clear_memory = tf.group(
+                            self._finished_episodes.clear(
+                                tf.range(self._config.episodes_per_batch)),
+                            self._num_finished_episodes.assign(0))
+                    with tf.control_dependencies([clear_memory]):
+                        # logging
+                        d_loss = tf.summary.scalar('D_loss', self.D._loss,
+                                                   collections=['D'])
+                        f_real = tf.summary.scalar(
+                            'F_real', self.D.f_real, collections=['D'])
+                        f_fake = tf.summary.scalar(
+                            'F_fake', self.D.f_fake, collections=['D'])
+                        em_distance = tf.summary.scalar('Earth_Moving_Distance',
+                                                        self.D.em_distance, collections=['D'])
+                        grad_pen = tf.summary.scalar(
+                            'grad_pen', self.D.grad_pen, collections=['D'])
+                        summary_op = tf.summary.merge(
+                            [d_loss, f_real, f_fake, em_distance, grad_pen])
+                        return summary_op
 
     def _perform_update_steps(
             self, observ, action, old_policy_params, reward, length):
@@ -400,8 +448,8 @@ class GAIL_DEF_PPO(object):
             def_action = tf.reshape(action[:, :, 13:23], shape=[
                                     tf.shape(action)[0], tf.shape(action)[1], 5, 2])
             with tf.device('/gpu:0'):
-                return_ = Discriminator().get_rewards(
-                    observ[:, :, -1], def_action)
+                return_ = Discriminator.get_rewards(
+                    observ[:, :, -1], def_action, self._config)
                 return_ = tf.reshape(return_, [-1, 1])
                 return_ = tf.tile(return_, [1, self._config.max_length])
             advantage = return_ - value
@@ -446,7 +494,8 @@ class GAIL_DEF_PPO(object):
         length = sequence['length']
         old_policy = []
         old_policy.append(self._policy_type[ACT['DEF_DASH']](**DEF_DASH))
-        value_loss, value_summary = self._value_loss(observ, reward, length, action)
+        value_loss, value_summary = self._value_loss(
+            observ, reward, length, action)
         network = self._network(observ, length)
         policy_loss, policy_summary = self._policy_loss(
             old_policy, network.policy, action, advantage, length)
@@ -486,8 +535,8 @@ class GAIL_DEF_PPO(object):
                 def_action = tf.reshape(action[:, :, 13:23], shape=[
                                         tf.shape(action)[0], tf.shape(action)[1], 5, 2])
                 with tf.device('/gpu:0'):
-                    return_ = Discriminator().get_rewards(
-                        observ[:, :, -1], def_action)
+                    return_ = Discriminator.get_rewards(
+                        observ[:, :, -1], def_action, self._config)
                     return_ = tf.reshape(return_, [-1, 1])
                     return_ = tf.tile(return_, [1, self._config.max_length])
             advantage = return_ - value
