@@ -89,11 +89,11 @@ class Discriminator(object):
             X_act_inter = epsilon * self._expert_a + \
                 (1.0 - epsilon) * self._agent_a
             # add back the conditions
-            X_inter = tf.concat(
-                [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:14]], axis=2)
-            if self._config.if_back_real:
-                X_inter = tf.concat(
-                    [self._expert_s[:, :self._buffer_size - 1, :], X_inter[:, -1:, :]], axis=1)
+            # X_inter = tf.concat(
+            #     [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:14]], axis=2)
+            # if self._config.if_back_real:
+            #     X_inter = tf.concat(
+            #         [self._expert_s[:, :self._buffer_size - 1, :], X_inter[:, -1:, :]], axis=1)
             grad_obs, grad_act = tf.gradients(self._config.d_network(
                 X_inter, X_act_inter, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail), [X_inter, X_act_inter])
             grad_obs = tf.reshape(grad_obs, shape=[self._batch_size, -1])
