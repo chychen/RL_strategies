@@ -65,6 +65,7 @@ def default():
     train_d_per_ppo = 5
     # Gail
     is_gail = False
+    is_double_curiculum = False
 
     return locals()
 
@@ -131,6 +132,36 @@ def episode_len_51():
     # wgan
     episodes_per_batch = 4
     d_batch_size = max_length * episodes_per_batch
+    return locals()
+
+
+def double_curiculum():
+    locals().update(default())
+    ########################################################
+    is_double_curiculum = True
+    train_len = 21
+    max_length = train_len - 1
+    D_len = 10
+    use_padding = True
+    ########################################################
+    num_agents = 20
+    # ppo
+    update_every = 100
+    # no need to divide num_agent because they maintain steps made in class Loop
+    steps = update_every * max_length
+    # wgan
+    train_d_per_ppo = 5
+    # one episode can generate 'max_length' episodes, d_batch_size must be the multiple of num_agents
+    d_batch_size = 200
+    if use_padding:
+        episodes_per_batch = d_batch_size // (max_length - D_len + 10)
+    else:
+        if max_length == D_len:
+            episodes_per_batch = d_batch_size
+        else:
+            episodes_per_batch = d_batch_size // (max_length - D_len)
+
+    gail_steps = episodes_per_batch * max_length // num_agents
     return locals()
 
 

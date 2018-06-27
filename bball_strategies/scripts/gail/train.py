@@ -110,7 +110,7 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
         act_collector = np.array(act_collector)
         reward_collector = D.get_rewards_value(numpy_collector, act_collector)
         numpy_collector = denormalize_observ(numpy_collector)
-        np.savez(os.path.join(config.logdir, 'gail_testing_{}/episode_{}.npz'.format(config.train_len, steps)),
+        np.savez(os.path.join(config.logdir, 'gail_testing_G{}_D{}/episode_{}.npz'.format(config.train_len, config.D_len, steps)),
                  STATE=numpy_collector[:, -1], REWARD=reward_collector)
     else:
         numpy_collector = []
@@ -138,7 +138,7 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
         reward_collector = D.get_rewards_value(
             numpy_collector[None, :, -1], act_collector[None])
         numpy_collector = denormalize_observ(numpy_collector)
-        np.savez(os.path.join(config.logdir, 'gail_testing_{}/episode_{}.npz'.format(config.train_len, steps)),
+        np.savez(os.path.join(config.logdir, 'gail_testing_G{}_D{}/episode_{}.npz'.format(config.train_len, config.D_len, steps)),
                  STATE=numpy_collector[:, -1], REWARD=np.ones(shape=[vanilla_env.time_limit, ]) * reward_collector)
 
 
@@ -330,7 +330,7 @@ def train(config, env_processes, outdir):
     vanilla_env = gym.make(config.env)
     vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=50)
-    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_{}/'.format(config.train_len)), if_back_real=False, video_callable=lambda _: True,
+    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_G{}_D{}/'.format(config.train_len, config.D_len)), if_back_real=False, video_callable=lambda _: True,
                                  # init from dataset
                                  init_mode=1)
     vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
@@ -420,15 +420,34 @@ def train(config, env_processes, outdir):
             # # train Discriminator
             gail_timer = time.time()
             for _ in range(config.train_d_per_ppo):
-                batch_real_states = expert_data[episode_idx:episode_idx +config.episodes_per_batch, 1:, -1]
-                real_action = expert_action[episode_idx:episode_idx+config.episodes_per_batch, :-1]
+                if config.is_double_curiculum:
+                    observ = expert_data[episode_idx:episode_idx +config.episodes_per_batch, 1:]
+                    action = expert_action[episode_idx:episode_idx+config.episodes_per_batch, :-1]
+                    if config.use_padding:
+                        # 1. padding with buffer
+                        buffer = observ[:, 0, :-1]
+                        padded_observ = np.concatenate([buffer, observ[:, :, -1]], axis=1)
+                        padded_act = np.concatenate([np.zeros(shape=[action.shape[0], 9, 5, 2]), action], axis=1)
+                        # 2. split the whole episode into training data of Discriminator with length=config.D_len
+                        training_obs = []
+                        training_act = []
+                        for i in range(config.max_length):
+                            training_obs.append(padded_observ[:, i:i+config.D_len])
+                            training_act.append(padded_act[:, i:i+config.D_len])
+                        training_obs = np.concatenate(training_obs, axis=0)
+                        training_act = np.concatenate(training_act, axis=0)
+                    else:
+                        pass
+                else:
+                    training_obs = expert_data[episode_idx:episode_idx +config.episodes_per_batch, 1:, -1]
+                    training_act = expert_action[episode_idx:episode_idx+config.episodes_per_batch, :-1]
                 feed_dict = {
                     graph.is_training: True,
                     graph.should_log: True,
                     graph.do_report: True,
                     graph.force_reset: False,
-                    graph.algo.D._expert_s: batch_real_states,
-                    graph.algo.D._expert_a: real_action}
+                    graph.algo.D._expert_s: training_obs,
+                    graph.algo.D._expert_a: training_act}
                 gail_counter = 0
                 while gail_counter < config.gail_steps:
                     gail_summary = sess.run(

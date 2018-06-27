@@ -43,6 +43,7 @@ class GAIL_DEF_PPO(object):
         self._is_optimizing_offense = is_optimizing_offense
         self._should_log = should_log
         self._config = config
+        self._max_memory_size = max(self._config.episodes_per_batch, self._config.update_every)
         # NOTE: clipping!!!!!!!!!
         # cant normalize obser, because outside the ppo we never know the current mean and stddev, than we can't normalize the input for outside action generator
         # TODO maybe we could noralize all obs by dataset's mean and variance
@@ -308,13 +309,13 @@ class GAIL_DEF_PPO(object):
                 self._current_episodes = parts.EpisodeMemory(
                     template, len(self._batch_env), self._config.max_length, 'episodes')
         self._finished_episodes = parts.EpisodeMemory(
-            template, self._config.episodes_per_batch, self._config.max_length, 'memory')
+            template, self._max_memory_size, self._config.max_length, 'memory')
         self._num_finished_episodes = tf.Variable(0, False)
 
     def _define_end_episode(self, agent_indices):
         """Implement the branch of end_episode() entered during training."""
         episodes, length = self._current_episodes.data(agent_indices)
-        space_left = self._config.episodes_per_batch - self._num_finished_episodes
+        space_left = self._max_memory_size - self._num_finished_episodes
         use_episodes = tf.range(tf.minimum(
             tf.shape(agent_indices)[0], space_left))
         episodes = tools.nested.map(
@@ -364,8 +365,7 @@ class GAIL_DEF_PPO(object):
                         observ, old_policy_params, length)
                 with tf.control_dependencies([penalty_summary]):
                     clear_memory = tf.group(
-                        self._finished_episodes.clear(
-                            tf.range(self._config.update_every)),
+                        self._finished_episodes.clear(),
                         self._num_finished_episodes.assign(0))
                 with tf.control_dependencies([clear_memory]):
                     weight_summary = utility.variable_summaries(
@@ -383,27 +383,50 @@ class GAIL_DEF_PPO(object):
           Summary tensor.
         """
         with tf.device('/gpu:0' if self._use_gpu else '/cpu:0'):
-            with tf.name_scope('gail_training'):
-                assert_full = tf.assert_equal(
-                    self._num_finished_episodes, self._config.episodes_per_batch)
-                # return str()
-                with tf.control_dependencies([assert_full]):
-                    data = self._finished_episodes.data(
-                        tf.range(self._config.episodes_per_batch))
-                    (observ, action, old_policy_params, reward), length = data
-                    observ = self._observ_filter.transform(observ)
-                    reward = self._reward_filter.transform(reward)
-                    self.D = Discriminator(
-                        observ[:, :, -1], tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2]), self._config)
+                with tf.name_scope('gail_training'):
+                    assert_full = tf.assert_greater_equal(
+                        self._num_finished_episodes, self._config.episodes_per_batch)
+                    # return str()
+                    with tf.control_dependencies([assert_full]):
+                        data = self._finished_episodes.data(
+                            tf.range(self._config.episodes_per_batch))
+                        (observ, action, old_policy_params, reward), length = data
+                        observ = self._observ_filter.transform(observ)
+                        reward = self._reward_filter.transform(reward)
+                    if self._config.is_double_curiculum:
+                        if self._config.use_padding:
+                            # 1. padding with buffer
+                            buffer = observ[:, 0, :-1]
+                            padded_observ = tf.concat([buffer, observ[:, :, -1]], axis=1)
+                            reshape_act = tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+                            padded_act = tf.concat([tf.zeros(shape=[tf.shape(reshape_act)[0], 9, 5, 2]), reshape_act], axis=1)
+                            print(padded_observ)
+                            print(padded_act)
+                            # 2. split the whole episode into training data of Discriminator with length=config.D_len
+                            training_obs = []
+                            training_act = []
+                            for i in range(self._config.max_length):
+                                training_obs.append(padded_observ[:, i:i+self._config.D_len])
+                                training_act.append(padded_act[:, i:i+self._config.D_len])
+                            training_obs = tf.concat(training_obs, axis=0)
+                            training_act = tf.concat(training_act, axis=0)
+                            print(training_obs)
+                            print(training_act)
+                            self.D = Discriminator(
+                                training_obs, training_act, self._config)
+                        else:
+                            pass
+                    else:
+                        self.D = Discriminator(
+                            observ[:, :, -1], tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2]), self._config)
                     with tf.control_dependencies([self.D._train_op]):
                         clear_memory = tf.group(
-                            self._finished_episodes.clear(
-                                tf.range(self._config.episodes_per_batch)),
+                            self._finished_episodes.clear(),
                             self._num_finished_episodes.assign(0))
                     with tf.control_dependencies([clear_memory]):
                         # logging
                         d_loss = tf.summary.scalar('D_loss', self.D._loss,
-                                                   collections=['D'])
+                                                collections=['D'])
                         f_real = tf.summary.scalar(
                             'F_real', self.D.f_real, collections=['D'])
                         f_fake = tf.summary.scalar(
