@@ -116,7 +116,7 @@ def define_saver(exclude=None):
         if any(regex.match(variable.name) for regex in exclude):
             continue
         variables.append(variable)
-    saver = tf.train.Saver(variables, keep_checkpoint_every_n_hours=5)
+    saver = tf.train.Saver(variables, keep_checkpoint_every_n_hours=2)
     return saver
 
 
