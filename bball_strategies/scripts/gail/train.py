@@ -431,7 +431,7 @@ def train(config, env_processes, outdir):
                         # 2. split the whole episode into training data of Discriminator with length=config.D_len
                         training_obs = []
                         training_act = []
-                        for i in range(config.max_length):
+                        for i in range(config.max_length-config.D_len+10):
                             training_obs.append(padded_observ[:, i:i+config.D_len])
                             training_act.append(padded_act[:, i:i+config.D_len])
                         training_obs = np.concatenate(training_obs, axis=0)
