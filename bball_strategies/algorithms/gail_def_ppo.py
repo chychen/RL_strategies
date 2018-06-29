@@ -43,7 +43,8 @@ class GAIL_DEF_PPO(object):
         self._is_optimizing_offense = is_optimizing_offense
         self._should_log = should_log
         self._config = config
-        self._max_memory_size = max(self._config.episodes_per_batch, self._config.update_every)
+        self._max_memory_size = max(
+            self._config.episodes_per_batch, self._config.update_every)
         # NOTE: clipping!!!!!!!!!
         # cant normalize obser, because outside the ppo we never know the current mean and stddev, than we can't normalize the input for outside action generator
         # TODO maybe we could noralize all obs by dataset's mean and variance
@@ -383,61 +384,66 @@ class GAIL_DEF_PPO(object):
           Summary tensor.
         """
         with tf.device('/gpu:0' if self._use_gpu else '/cpu:0'):
-                with tf.name_scope('gail_training'):
-                    assert_full = tf.assert_greater_equal(
-                        self._num_finished_episodes, self._config.episodes_per_batch)
-                    # return str()
-                    with tf.control_dependencies([assert_full]):
-                        data = self._finished_episodes.data(
-                            tf.range(self._config.episodes_per_batch))
-                        (observ, action, old_policy_params, reward), length = data
-                        observ = self._observ_filter.transform(observ)
-                        reward = self._reward_filter.transform(reward)
-                    if self._config.is_double_curiculum:
-                        if self._config.use_padding:
-                            # 1. padding with buffer
-                            buffer = observ[:, 0, :-1]
-                            padded_observ = tf.concat([buffer, observ[:, :, -1]], axis=1)
-                            reshape_act = tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2])
-                            padded_act = tf.concat([tf.zeros(shape=[tf.shape(reshape_act)[0], 9, 5, 2]), reshape_act], axis=1)
-                            print(padded_observ)
-                            print(padded_act)
-                            # 2. split the whole episode into training data of Discriminator with length=config.D_len
-                            training_obs = []
-                            training_act = []
-                            for i in range(self._config.max_length):
-                                training_obs.append(padded_observ[:, i:i+self._config.D_len])
-                                training_act.append(padded_act[:, i:i+self._config.D_len])
-                            training_obs = tf.concat(training_obs, axis=0)
-                            training_act = tf.concat(training_act, axis=0)
-                            print(training_obs)
-                            print(training_act)
-                            self.D = Discriminator(
-                                training_obs, training_act, self._config)
-                        else:
-                            pass
-                    else:
+            with tf.name_scope('gail_training'):
+                assert_full = tf.assert_greater_equal(
+                    self._num_finished_episodes, self._config.episodes_per_batch)
+                # return str()
+                with tf.control_dependencies([assert_full]):
+                    data = self._finished_episodes.data(
+                        tf.range(self._config.episodes_per_batch))
+                    (observ, action, old_policy_params, reward), length = data
+                    observ = self._observ_filter.transform(observ)
+                    reward = self._reward_filter.transform(reward)
+                if self._config.is_double_curiculum:
+                    if self._config.use_padding:
+                        # 1. padding with buffer
+                        buffer = observ[:, 0, :-1]
+                        padded_observ = tf.concat(
+                            [buffer, observ[:, :, -1]], axis=1)
+                        reshape_act = tf.reshape(action[:, :, 13:23], [
+                                                 tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+                        padded_act = tf.concat(
+                            [tf.zeros(shape=[tf.shape(reshape_act)[0], 9, 5, 2]), reshape_act], axis=1)
+                        print(padded_observ)
+                        print(padded_act)
+                        # 2. split the whole episode into training data of Discriminator with length=config.D_len
+                        training_obs = []
+                        training_act = []
+                        for i in range(self._config.max_length-self._config.D_len+10):
+                            training_obs.append(
+                                padded_observ[:, i:i+self._config.D_len])
+                            training_act.append(
+                                padded_act[:, i:i+self._config.D_len])
+                        training_obs = tf.concat(training_obs, axis=0)
+                        training_act = tf.concat(training_act, axis=0)
+                        print(training_obs)
+                        print(training_act)
                         self.D = Discriminator(
-                            observ[:, :, -1], tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2]), self._config)
-                    with tf.control_dependencies([self.D._train_op]):
-                        clear_memory = tf.group(
-                            self._finished_episodes.clear(),
-                            self._num_finished_episodes.assign(0))
-                    with tf.control_dependencies([clear_memory]):
-                        # logging
-                        d_loss = tf.summary.scalar('D_loss', self.D._loss,
-                                                collections=['D'])
-                        f_real = tf.summary.scalar(
-                            'F_real', self.D.f_real, collections=['D'])
-                        f_fake = tf.summary.scalar(
-                            'F_fake', self.D.f_fake, collections=['D'])
-                        em_distance = tf.summary.scalar('Earth_Moving_Distance',
-                                                        self.D.em_distance, collections=['D'])
-                        grad_pen = tf.summary.scalar(
-                            'grad_pen', self.D.grad_pen, collections=['D'])
-                        summary_op = tf.summary.merge(
-                            [d_loss, f_real, f_fake, em_distance, grad_pen])
-                        return summary_op
+                            training_obs, training_act, self._config)
+                    else:
+                        pass
+                else:
+                    self.D = Discriminator(
+                        observ[:, :, -1], tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2]), self._config)
+                with tf.control_dependencies([self.D._train_op]):
+                    clear_memory = tf.group(
+                        self._finished_episodes.clear(),
+                        self._num_finished_episodes.assign(0))
+                with tf.control_dependencies([clear_memory]):
+                    # logging
+                    d_loss = tf.summary.scalar('D_loss', self.D._loss,
+                                               collections=['D'])
+                    f_real = tf.summary.scalar(
+                        'F_real', self.D.f_real, collections=['D'])
+                    f_fake = tf.summary.scalar(
+                        'F_fake', self.D.f_fake, collections=['D'])
+                    em_distance = tf.summary.scalar('Earth_Moving_Distance',
+                                                    self.D.em_distance, collections=['D'])
+                    grad_pen = tf.summary.scalar(
+                        'grad_pen', self.D.grad_pen, collections=['D'])
+                    summary_op = tf.summary.merge(
+                        [d_loss, f_real, f_fake, em_distance, grad_pen])
+                    return summary_op
 
     def _perform_update_steps(
             self, observ, action, old_policy_params, reward, length):

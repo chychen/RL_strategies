@@ -84,7 +84,7 @@ class BBallGailDefEnv(gym.Env):
 
         # init dataset
         self.episode_index = 0
-        self.data = np.load('bball_strategies/data/GAILEnvData_21.npy')
+        self.data = np.load('bball_strategies/data/GAILEnvData_11.npy')
         # self.data = None
         self.current_cond = None
         self.time_limit = 49
