@@ -388,12 +388,12 @@ def train(config, env_processes, outdir):
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
         # NOTE reset variables in optimizer
-        opt_reset_D = tf.group(
-            [v.initializer for v in graph.algo.D.optimizer.variables()])
-        # reset PPO optimizer
-        opt_reset = tf.group(
-            [v.initializer for v in graph.algo._optimizer.variables()])
-        sess.run([opt_reset, opt_reset_D])
+        # opt_reset_D = tf.group(
+        #     [v.initializer for v in graph.algo.D.optimizer.variables()])
+        # # reset PPO optimizer
+        # opt_reset = tf.group(
+        #     [v.initializer for v in graph.algo._optimizer.variables()])
+        # sess.run([opt_reset, opt_reset_D])
         # visulization stuff
         if FLAGS.tally_only:
             tally_reward_line_chart(config, sess.run(
@@ -431,7 +431,7 @@ def train(config, env_processes, outdir):
                         # 2. split the whole episode into training data of Discriminator with length=config.D_len
                         training_obs = []
                         training_act = []
-                        for i in range(config.max_length):
+                        for i in range(config.max_length-config.D_len+10):
                             training_obs.append(padded_observ[:, i:i+config.D_len])
                             training_act.append(padded_act[:, i:i+config.D_len])
                         training_obs = np.concatenate(training_obs, axis=0)
