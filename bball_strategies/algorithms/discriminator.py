@@ -94,8 +94,9 @@ class Discriminator(object):
             # if self._config.if_back_real:
             #     X_inter = tf.concat(
             #         [self._expert_s[:, :self._buffer_size - 1, :], X_inter[:, -1:, :]], axis=1)
-            grad_obs, grad_act = tf.gradients(self._config.d_network(
-                X_inter, X_act_inter, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail), [X_inter, X_act_inter])
+            d_out_inter, _ = self._config.d_network(
+                X_inter, X_act_inter, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
+            grad_obs, grad_act = tf.gradients(d_out_inter, [X_inter, X_act_inter])
             grad_obs = tf.reshape(grad_obs, shape=[self._batch_size, -1])
             grad_act = tf.reshape(grad_act, shape=[self._batch_size, -1])
             grad = tf.concat([grad_obs, grad_act], axis=1)
@@ -104,9 +105,9 @@ class Discriminator(object):
             grad_norm = tf.sqrt(sum_)
             grad_pen = self._config.wgan_penalty_lambda * tf.reduce_mean(
                 tf.square(grad_norm - 1.0))
-            fake_scores = self._config.d_network(
+            fake_scores, _ = self._config.d_network(
                 self._agent_s, self._agent_a, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
-            real_scores = self._config.d_network(
+            real_scores, _ = self._config.d_network(
                 self._expert_s, self._expert_a, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
             f_fake = tf.reduce_mean(fake_scores)
             f_real = tf.reduce_mean(real_scores)
@@ -140,7 +141,8 @@ class Discriminator(object):
     @classmethod
     def get_rewards(cls, state, action, config):
         with tf.variable_scope('Discriminator'):
-            return config.d_network(state, action, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
+            rewards, _ = config.d_network(state, action, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
+            return rewards
 
     def get_rewards_value(self, state, action):
         feed_dict = {
@@ -148,9 +150,9 @@ class Discriminator(object):
             self._agent_a_ph: action
         }
         with tf.variable_scope('Discriminator'):
-            fake_scores = self._config.d_network(
+            _, fake_scores_by_frame = self._config.d_network(
                 self._agent_s_ph, self._agent_a_ph, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
-            return tf.get_default_session().run(fake_scores, feed_dict=feed_dict)
+            return tf.get_default_session().run(fake_scores_by_frame, feed_dict=feed_dict)
 
 
 def main():

@@ -85,71 +85,14 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
     - draw episode into mpeg video
     - collect episdoe and each state scores into numpy
     """
-    numpy_collector = []
-    act_collector = []
-    vanilla_obs = vanilla_env.reset()
-    for _ in range(vanilla_env.time_limit):
-        vanilla_act = ppo_policy.act(
-            np.array(vanilla_obs)[None, None], stochastic=False)
-        act_collector.append(vanilla_act.reshape([5, 2]))
-        vanilla_trans_act = [
-            # Discrete(3) must be int
-            int(0),
-            # Box(2,)
-            np.array([0.0, 0.0], dtype=np.float32),
-            # Box(5, 2)
-            np.zeros(shape=[5, 2], dtype=np.float32),
-            # Box(5, 2)
-            np.reshape(vanilla_act, [5, 2])
-        ]
-        vanilla_obs, _, _, _ = vanilla_env.step(
-            vanilla_trans_act)
-        numpy_collector.append(vanilla_obs)
-    numpy_collector = np.array(numpy_collector)
-    act_collector = np.array(act_collector)
-    reward_collector = D.get_rewards_value(
-        numpy_collector[None, :, -1], act_collector[None])
-    numpy_collector = denormalize_observ(numpy_collector)
-    np.savez(os.path.join(config.logdir, 'gail_testing_G{}_D{}/episode_{}.npz'.format(config.train_len, config.D_len, steps)),
-                STATE=numpy_collector[:, -1], REWARD=reward_collector[0])
-
-
-def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, normalize_observ, normalize_action):
-    """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
-    """
-    episode_amount = 100
-    # real data
-    all_data = h5py.File(
-        'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
-    expert_data, _ = np.split(
-        all_data['OBS'].value, [all_data['OBS'].value.shape[0] * 9 // 10])
-    expert_action, _ = np.split(
-        all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0] * 9 // 10])
-    # env
-    vanilla_env = gym.make(config.env)
-    vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
-                                time_limit=50)
-    vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
-    # real
-    selected_idx = np.random.choice(expert_data.shape[0], episode_amount)
-    # frame 0 is condition
-    batch_real_states = expert_data[selected_idx,
-                                    1:vanilla_env.time_limit + 1, -1]
-    real_action = expert_action[selected_idx, :vanilla_env.time_limit]
-    real_action = normalize_action(real_action)
-    batch_real_states = normalize_observ(batch_real_states)
-    real_rewards = D.get_rewards_value(
-        batch_real_states, real_action)
-    # fake
-    numpy_collector = []
-    act_collector = []
-    for _ in range(episode_amount):
+    if config.is_gail:
+        numpy_collector = []
+        act_collector = []
         vanilla_obs = vanilla_env.reset()
-        epi_obs = []
-        epi_act = []
         for _ in range(vanilla_env.time_limit):
             vanilla_act = ppo_policy.act(
                 np.array(vanilla_obs)[None, None], stochastic=False)
+            act_collector.append(vanilla_act.reshape([1, 5, 2]))
             vanilla_trans_act = [
                 # Discrete(3) must be int
                 int(0),
@@ -162,16 +105,158 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, no
             ]
             vanilla_obs, _, _, _ = vanilla_env.step(
                 vanilla_trans_act)
-            epi_obs.append(vanilla_obs[-1])
-            epi_act.append(vanilla_act.reshape([5, 2]))
-        numpy_collector.append(epi_obs)
-        act_collector.append(epi_act)
-    numpy_collector = np.array(numpy_collector)
-    act_collector = np.array(act_collector)
-    fake_rewards = D.get_rewards_value(
-        numpy_collector, act_collector)
-    # vis
-    vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
+            numpy_collector.append(vanilla_obs)
+        numpy_collector = np.array(numpy_collector)
+        act_collector = np.array(act_collector)
+        reward_collector = D.get_rewards_value(numpy_collector, act_collector)
+        numpy_collector = denormalize_observ(numpy_collector)
+        np.savez(os.path.join(config.logdir, 'gail_testing_G{}_D{}/episode_{}.npz'.format(config.train_len, config.D_len, steps)),
+                 STATE=numpy_collector[:, -1], REWARD=reward_collector)
+    else:
+        numpy_collector = []
+        act_collector = []
+        vanilla_obs = vanilla_env.reset()
+        for _ in range(vanilla_env.time_limit):
+            vanilla_act = ppo_policy.act(
+                np.array(vanilla_obs)[None, None], stochastic=False)
+            act_collector.append(vanilla_act.reshape([5, 2]))
+            vanilla_trans_act = [
+                # Discrete(3) must be int
+                int(0),
+                # Box(2,)
+                np.array([0.0, 0.0], dtype=np.float32),
+                # Box(5, 2)
+                np.zeros(shape=[5, 2], dtype=np.float32),
+                # Box(5, 2)
+                np.reshape(vanilla_act, [5, 2])
+            ]
+            vanilla_obs, _, _, _ = vanilla_env.step(
+                vanilla_trans_act)
+            numpy_collector.append(vanilla_obs)
+        numpy_collector = np.array(numpy_collector)
+        act_collector = np.array(act_collector)
+        reward_collector = D.get_rewards_value(
+            numpy_collector[None, :, -1], act_collector[None])
+        numpy_collector = denormalize_observ(numpy_collector)
+        np.savez(os.path.join(config.logdir, 'gail_testing_G{}_D{}/episode_{}.npz'.format(config.train_len, config.D_len, steps)),
+                 STATE=numpy_collector[:, -1], REWARD=np.ones(shape=[vanilla_env.time_limit, ]) * reward_collector)
+
+
+def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, normalize_observ, normalize_action):
+    """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
+    """
+    if config.is_gail:
+        episode_amount = 100
+        # real data
+        all_data = h5py.File(
+            'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
+        expert_data, _ = np.split(
+            all_data['OBS'].value, [all_data['OBS'].value.shape[0] * 9 // 10])
+        expert_action, _ = np.split(
+            all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0] * 9 // 10])
+        # env
+        vanilla_env = gym.make(config.env)
+        vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
+                                   time_limit=50)
+        vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
+        # real
+        selected_idx = np.random.choice(expert_data.shape[0], episode_amount)
+        # frame 0 is condition
+        batch_real_states = expert_data[selected_idx, 1:]
+        real_action = expert_action[selected_idx, :-1]
+        batch_real_states = np.concatenate(
+            batch_real_states, axis=0)
+        real_action = np.concatenate(real_action[:, None], axis=0)
+        real_action = normalize_action(real_action)
+        batch_real_states = normalize_observ(batch_real_states)
+        real_rewards = D.get_rewards_value(
+            batch_real_states, real_action).reshape([100, -1])
+        # fake
+        numpy_collector = []
+        act_collector = []
+        for _ in range(episode_amount):
+            vanilla_obs = vanilla_env.reset()
+            for _ in range(vanilla_env.time_limit):
+                vanilla_act = ppo_policy.act(
+                    np.array(vanilla_obs)[None, None], stochastic=False)
+                act_collector.append(vanilla_act.reshape([1, 5, 2]))
+                vanilla_trans_act = [
+                    # Discrete(3) must be int
+                    int(0),
+                    # Box(2,)
+                    np.array([0.0, 0.0], dtype=np.float32),
+                    # Box(5, 2)
+                    np.zeros(shape=[5, 2], dtype=np.float32),
+                    # Box(5, 2)
+                    np.reshape(vanilla_act, [5, 2])
+                ]
+                vanilla_obs, _, _, _ = vanilla_env.step(
+                    vanilla_trans_act)
+                numpy_collector.append(vanilla_obs)
+        numpy_collector = np.array(numpy_collector)
+        act_collector = np.array(act_collector)
+        fake_rewards = D.get_rewards_value(
+            numpy_collector, act_collector).reshape([100, -1])
+        # vis
+        vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
+    else:
+        episode_amount = 100
+        # real data
+        all_data = h5py.File(
+            'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
+        expert_data, _ = np.split(
+            all_data['OBS'].value, [all_data['OBS'].value.shape[0] * 9 // 10])
+        expert_action, _ = np.split(
+            all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0] * 9 // 10])
+        # env
+        vanilla_env = gym.make(config.env)
+        vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
+                                   time_limit=config.max_length)
+        vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
+        # real
+        selected_idx = np.random.choice(expert_data.shape[0], episode_amount)
+        # frame 0 is condition
+        batch_real_states = expert_data[selected_idx,
+                                        1:config.max_length + 1, -1]
+        real_action = expert_action[selected_idx, :config.max_length]
+        real_action = normalize_action(real_action)
+        batch_real_states = normalize_observ(batch_real_states)
+        real_rewards = D.get_rewards_value(
+            batch_real_states, real_action).reshape([-1, 1])
+        real_rewards = np.tile(real_rewards, [1, config.max_length])
+        # fake
+        numpy_collector = []
+        act_collector = []
+        for _ in range(episode_amount):
+            vanilla_obs = vanilla_env.reset()
+            epi_obs = []
+            epi_act = []
+            for _ in range(config.max_length):
+                vanilla_act = ppo_policy.act(
+                    np.array(vanilla_obs)[None, None], stochastic=False)
+                vanilla_trans_act = [
+                    # Discrete(3) must be int
+                    int(0),
+                    # Box(2,)
+                    np.array([0.0, 0.0], dtype=np.float32),
+                    # Box(5, 2)
+                    np.zeros(shape=[5, 2], dtype=np.float32),
+                    # Box(5, 2)
+                    np.reshape(vanilla_act, [5, 2])
+                ]
+                vanilla_obs, _, _, _ = vanilla_env.step(
+                    vanilla_trans_act)
+                epi_obs.append(vanilla_obs[-1])
+                epi_act.append(vanilla_act.reshape([5, 2]))
+            numpy_collector.append(epi_obs)
+            act_collector.append(epi_act)
+        numpy_collector = np.array(numpy_collector)
+        act_collector = np.array(act_collector)
+        fake_rewards = D.get_rewards_value(
+            numpy_collector, act_collector).reshape([-1, 1])
+        fake_rewards = np.tile(fake_rewards, [1, config.max_length])
+        # vis
+        vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
 
 
 def capped_video_schedule(episode_id):
@@ -328,7 +413,7 @@ def train(config, env_processes, outdir):
             if episode_idx % (config.train_d_per_ppo * 100 * config.episodes_per_batch) == 0:
                 test_policy(config, vanilla_env, sess.run(graph.algo.D._steps), ppo_policy,
                             graph.algo.D, denormalize_observ)
-            if episode_idx % (config.train_d_per_ppo * 500 * config.episodes_per_batch) == 0:
+            if episode_idx % (config.train_d_per_ppo * 1000 * config.episodes_per_batch) == 0:
                 tally_reward_line_chart(config, sess.run(
                     graph.algo.D._steps), ppo_policy, graph.algo.D, denormalize_observ, normalize_observ, normalize_action)
 

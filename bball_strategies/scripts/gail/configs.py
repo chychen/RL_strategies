@@ -36,9 +36,9 @@ def default():
     # Optimization
     update_every = 40
     update_epochs = 25
-    # optimizer = tf.train.AdamOptimizer
+    optimizer = tf.train.AdamOptimizer
     # optimizer = tf.train.MomentumOptimizer
-    optimizer = tf.train.GradientDescentOptimizer
+    # optimizer = tf.train.GradientDescentOptimizer
     learning_rate = 1e-4
 #   batch_size = 20
 #   chunk_length = 50
@@ -64,82 +64,16 @@ def default():
     d_batch_size = max_length * episodes_per_batch
     train_d_per_ppo = 5
     # Gail
-    is_gail = False
-    is_double_curiculum = False
+    is_gail = False # to be depregated
+    is_double_curiculum = False  # to be depregated
 
     return locals()
-
-
-def episode_len_11():
-    locals().update(default())
-    train_len = 11
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    steps = update_every * max_length
-    # wgan
-    episodes_per_batch = 20
-    d_batch_size = max_length * episodes_per_batch
-    return locals()
-
-
-def episode_len_21():
-    locals().update(default())
-    train_len = 21
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    steps = update_every * max_length
-    # wgan
-    episodes_per_batch = 10
-    d_batch_size = max_length * episodes_per_batch
-    return locals()
-
-
-def episode_len_31():
-    locals().update(default())
-    train_len = 31
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    steps = update_every * max_length
-    # wgan
-    episodes_per_batch = 7
-    d_batch_size = max_length * episodes_per_batch
-    return locals()
-
-
-def episode_len_41():
-    locals().update(default())
-    train_len = 41
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    steps = update_every * max_length
-    # wgan
-    episodes_per_batch = 5
-    d_batch_size = max_length * episodes_per_batch
-    return locals()
-
-
-def episode_len_51():
-    locals().update(default())
-    train_len = 51
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    steps = update_every * max_length
-    # wgan
-    episodes_per_batch = 4
-    d_batch_size = max_length * episodes_per_batch
-    return locals()
-
 
 def double_curiculum():
     locals().update(default())
     ########################################################
     is_double_curiculum = True
-    train_len = 21
+    train_len = 11
     max_length = train_len - 1
     D_len = 10
     use_padding = True
@@ -162,96 +96,4 @@ def double_curiculum():
             episodes_per_batch = d_batch_size // (max_length - D_len)
 
     gail_steps = episodes_per_batch * max_length // num_agents
-    return locals()
-
-
-def episode_len_11_D():
-    locals().update(default())
-    num_agents = 20
-    train_len = 11
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    # no need to divide num_agent because they maintain steps made in class Loop
-    steps = update_every * max_length
-    # wgan
-    train_d_per_ppo = 5
-    episodes_per_batch = 120
-    gail_steps = episodes_per_batch * max_length // num_agents
-    d_batch_size = episodes_per_batch
-    return locals()
-
-
-def episode_len_21_D():
-    locals().update(default())
-    num_agents = 20
-    train_len = 21
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    # no need to divide num_agent because they maintain steps made in class Loop
-    steps = update_every * max_length
-    # wgan
-    train_d_per_ppo = 5
-    episodes_per_batch = 120
-    gail_steps = episodes_per_batch * max_length // num_agents
-    d_batch_size = episodes_per_batch
-    return locals()
-
-
-def episode_len_31_D():
-    locals().update(default())
-    num_agents = 20
-    train_len = 31
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    # no need to divide num_agent because they maintain steps made in class Loop
-    steps = update_every * max_length
-    # wgan
-    train_d_per_ppo = 5
-    episodes_per_batch = 120
-    gail_steps = episodes_per_batch * max_length // num_agents
-    d_batch_size = episodes_per_batch
-    return locals()
-
-
-def episode_len_41_D():
-    locals().update(default())
-    num_agents = 20
-    train_len = 41
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    # no need to divide num_agent because they maintain steps made in class Loop
-    steps = update_every * max_length
-    # wgan
-    train_d_per_ppo = 5
-    episodes_per_batch = 120
-    gail_steps = episodes_per_batch * max_length // num_agents
-    d_batch_size = episodes_per_batch
-    return locals()
-
-
-def episode_len_51_D():
-    locals().update(default())
-    num_agents = 20
-    train_len = 51
-    max_length = train_len - 1
-    # ppo
-    update_every = 100
-    # no need to divide num_agent because they maintain steps made in class Loop
-    steps = update_every * max_length
-    # wgan
-    train_d_per_ppo = 5
-    episodes_per_batch = 120
-    d_batch_size = episodes_per_batch
-    gail_steps = episodes_per_batch * max_length // num_agents
-    return locals()
-
-
-def server_40cpu():
-    locals().update(default())
-    num_agents = 40
-    eval_episodes = 40
     return locals()

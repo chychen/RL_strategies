@@ -120,12 +120,13 @@ def network(state, action, reuse=False, is_gail=True):
             kernel_initializer=layers.xavier_initializer(),
             bias_initializer=tf.zeros_initializer()
         )
-        conv_output = tf.reduce_mean(conv_output, axis=1)
+        score_by_frame = tf.reshape(conv_output, [tf.shape(conv_output)[0], tf.shape(conv_output)[1]])
+        scores = tf.reduce_mean(score_by_frame, axis=1)
         final_ = tf.reshape(
-            conv_output, shape=[batch_size, ])
+            scores, shape=[batch_size, ])
         def_value = tf.check_numerics(final_, 'def_value')
 
-        return def_value
+        return def_value, score_by_frame
 
         # init_xavier_weights = tf.variance_scaling_initializer(
         #     scale=1.0, mode='fan_avg', distribution='uniform')
