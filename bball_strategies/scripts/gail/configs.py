@@ -76,7 +76,7 @@ def double_curiculum():
     train_len = 11
     max_length = train_len - 1
     D_len = 10
-    use_padding = True
+    use_padding = False
     ########################################################
     num_agents = 20
     # ppo

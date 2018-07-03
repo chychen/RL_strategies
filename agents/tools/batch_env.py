@@ -109,10 +109,12 @@ class BatchEnv(object):
         done = np.stack(dones)
         info = tuple(infos)
         # Extended
-        turn_info = np.empty(shape=observ.shape[0], dtype=np.int8)
+        expert_s = np.empty(shape=[observ.shape[0], 5, 2], dtype=np.float32)
+        expert_a = np.empty(shape=[observ.shape[0], 5, 2], dtype=np.float32)
         for i, v in enumerate(info):
-            turn_info[i] = v['turn']
-        return observ, reward, done, turn_info
+            expert_s[i] = v['expert_s']
+            expert_a[i] = v['expert_a']
+        return observ, reward, done, expert_s, expert_a
 
     def reset(self, indices=None):
         """Reset the environment and convert the resulting observation.

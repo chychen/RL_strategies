@@ -32,32 +32,47 @@ def get_var_list(prefix):
 class Discriminator(object):
     __instance = None
 
-    def __new__(cls, agent_s=None, agent_a=None, config=None):
+    def __new__(cls, agent_s=None, agent_a=None, expert_s=None, expert_a=None, config=None):
         if Discriminator.__instance is None:
             Discriminator.__instance = object.__new__(cls)
         else:
             print("Instance Exists! :D")
         return Discriminator.__instance
 
-    def __init__(self, agent_s=None, agent_a=None, config=None):
+    def __init__(self, agent_s=None, agent_a=None, expert_s=None, expert_a=None, config=None):
         """
         state is composed of offense(condition) and defense
         """
         if self.__instance is not None and config is not None:
             env = gym.make(config.env)
+
+            def normalize_observ(observ):
+                min_ = env.observation_space.low[0]
+                max_ = env.observation_space.high[0]
+                observ = 2.0 * (observ - min_) / (max_ - min_) - 1.0
+                return observ
+
+            def normalize_action(act):
+                min_ = env.action_space[3].low
+                max_ = env.action_space[3].high
+                act = 2.0 * (act - min_) / (max_ - min_) - 1.0
+                return act
+
             # first init the class
             # self._global_steps = tf.train.get_or_create_global_step()
             with tf.variable_scope('Discriminator', reuse=tf.AUTO_REUSE):
                 self._steps = tf.get_variable('D_steps', shape=[
                 ], dtype=tf.int32, initializer=tf.zeros_initializer(dtype=tf.int32), trainable=False)
                 # state shape = [batch_size, buffer_size, 14, 2]
-                self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
-                                                None, None] + list(env.observation_space.shape[1:]))
+                # self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
+                #                                 None, None] + list(env.observation_space.shape[1:]))
+                self._expert_s = normalize_observ(expert_s)
                 self._agent_s_ph = tf.placeholder(dtype=tf.float32, shape=[
                     None, None] + list(env.observation_space.shape[1:]))
                 self._agent_s = agent_s
-                self._expert_a = tf.placeholder(dtype=tf.float32, shape=[
-                                                None, None, 5, 2])
+                # self._expert_a = tf.placeholder(dtype=tf.float32, shape=[
+                #                                 None, None, 5, 2])
+                self._expert_a = normalize_action(expert_a)
                 self._agent_a_ph = tf.placeholder(dtype=tf.float32, shape=[
                     None, None, 5, 2])
                 self._agent_a = agent_a
@@ -89,8 +104,8 @@ class Discriminator(object):
             X_act_inter = epsilon * self._expert_a + \
                 (1.0 - epsilon) * self._agent_a
             # add back the conditions
-            # X_inter = tf.concat(
-            #     [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:14]], axis=2)
+            X_inter = tf.concat(
+                [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:14]], axis=2)
             # if self._config.if_back_real:
             #     X_inter = tf.concat(
             #         [self._expert_s[:, :self._buffer_size - 1, :], X_inter[:, -1:, :]], axis=1)
@@ -116,27 +131,27 @@ class Discriminator(object):
 
             return loss, f_fake, f_real, em_distance, grad_pen
 
-    def train(self, agent_s, expert_s, agent_a, expert_a):
-        feed_dict = {
-            self._expert_s: expert_s,
-            self._agent_s: agent_s,
-            self._expert_a: expert_a,
-            self._agent_a: agent_a
-        }
-        global_step, _, summary = tf.get_default_session().run(
-            [self._global_steps, self._train_op, self._summary_op], feed_dict=feed_dict)
-        self.summary_writer.add_summary(summary, global_step=global_step)
+    # def train(self, agent_s, expert_s, agent_a, expert_a):
+    #     feed_dict = {
+    #         self._expert_s: expert_s,
+    #         self._agent_s: agent_s,
+    #         self._expert_a: expert_a,
+    #         self._agent_a: agent_a
+    #     }
+    #     global_step, _, summary = tf.get_default_session().run(
+    #         [self._global_steps, self._train_op, self._summary_op], feed_dict=feed_dict)
+    #     self.summary_writer.add_summary(summary, global_step=global_step)
 
-    def validate(self, agent_s, expert_s, agent_a, expert_a):
-        feed_dict = {
-            self._expert_s: expert_s,
-            self._agent_s: agent_s,
-            self._expert_a: expert_a,
-            self._agent_a: agent_a
-        }
-        global_step, summary = tf.get_default_session().run(
-            [self._global_steps, self._summary_valid_op], feed_dict=feed_dict)
-        self.valid_summary_writer.add_summary(summary, global_step=global_step)
+    # def validate(self, agent_s, expert_s, agent_a, expert_a):
+    #     feed_dict = {
+    #         self._expert_s: expert_s,
+    #         self._agent_s: agent_s,
+    #         self._expert_a: expert_a,
+    #         self._agent_a: agent_a
+    #     }
+    #     global_step, summary = tf.get_default_session().run(
+    #         [self._global_steps, self._summary_valid_op], feed_dict=feed_dict)
+    #     self.valid_summary_writer.add_summary(summary, global_step=global_step)
 
     @classmethod
     def get_rewards(cls, state, action, config):

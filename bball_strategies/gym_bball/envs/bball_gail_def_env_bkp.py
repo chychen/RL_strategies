@@ -15,7 +15,6 @@ from os import path
 import copy
 import sys
 from bball_strategies.gym_bball import tools
-import h5py
 
 
 logging.basicConfig(level=logging.INFO)
@@ -85,13 +84,9 @@ class BBallGailDefEnv(gym.Env):
 
         # init dataset
         self.episode_index = 0
-        # self.data = np.load('bball_strategies/data/GAILTransitionData_51.npy')
-        all_data = h5py.File(
-            'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
-        self.expert_data = all_data['OBS'].value.astype(np.float32)
-        self.expert_action = all_data['DEF_ACT'].value.astype(np.float32)
+        self.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
+        # self.data = None
         self.current_cond = None
-        self.current_real_act = None
         self.time_limit = 49
 
         # random seed
@@ -144,7 +139,7 @@ class BBallGailDefEnv(gym.Env):
         # update env information, steps++
         self.states.end_step()
 
-        return self._get_obs(), 0, self.states.done, dict(expert_s=self.current_cond[self.states.steps, 6:11], expert_a=self.current_real_act[self.states.steps-1])
+        return self._get_obs(), 0, self.states.done, dict(turn=0)
 
     def _get_obs(self):
         """
@@ -183,9 +178,8 @@ class BBallGailDefEnv(gym.Env):
                 self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET']:
             ep_idx = np.floor(self.np_random_generator.uniform(
-                low=0.0, high=self.expert_data.shape[0])).astype(np.int)
-            self.current_cond = copy.deepcopy(self.expert_data[ep_idx, :, -1])
-            self.current_real_act = copy.deepcopy(self.expert_action[ep_idx])
+                low=0.0, high=self.data.shape[0])).astype(np.int)
+            self.current_cond = copy.deepcopy(self.data[ep_idx])
             ball_pos = self.current_cond[0, 0, 0:2]
             off_positions = self.current_cond[0, 1:6, 0:2]
             def_positions = self.current_cond[0, 6:11, 0:2]
@@ -198,7 +192,7 @@ class BBallGailDefEnv(gym.Env):
             self.states.reset(positions, ball_handler_idx,
                               buffer_size=self.buffer_size)
         elif self.init_mode == INIT_LOOKUP['DATASET_ORDERED']:
-            self.current_cond = copy.deepcopy(self.expert_data[0])
+            self.current_cond = copy.deepcopy(self.data[0])
             ball_pos = self.current_cond[0, 0, 0:2]
             off_positions = self.current_cond[0, 1:6, 0:2]
             def_positions = self.current_cond[0, 6:11, 0:2]

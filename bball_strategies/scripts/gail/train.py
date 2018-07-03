@@ -314,51 +314,25 @@ def train(config, env_processes, outdir):
             tally_reward_line_chart(config, sess.run(
                 graph.algo.D._steps), ppo_policy, D, denormalize_observ, normalize_observ, normalize_action)
             exit()
-        
         # GAIL
         cumulate_steps = sess.run(graph.step)
-        episode_idx = 0
+        counter = 0
         while True:
-            if episode_idx > (expert_data.shape[0] - config.episodes_per_batch * config.train_d_per_ppo) or episode_idx == 0:
-                episode_idx = 0
-                perm_idx = np.random.permutation(expert_data.shape[0])
-                expert_data = expert_data[perm_idx]
-                expert_action = expert_action[perm_idx]
             # # testing
-            if episode_idx % (config.train_d_per_ppo * 100 * config.episodes_per_batch) == 0:
+            if counter % (config.train_d_per_ppo * 2500 // config.max_length) == 0:
                 test_policy(config, vanilla_env, sess.run(graph.algo.D._steps), ppo_policy,
                             graph.algo.D, denormalize_observ)
-            if episode_idx % (config.train_d_per_ppo * 200 * config.episodes_per_batch) == 0:
+            if counter % (config.train_d_per_ppo * 5000 // config.max_length) == 0:
                 tally_reward_line_chart(config, sess.run(
                     graph.algo.D._steps), ppo_policy, graph.algo.D, denormalize_observ, normalize_observ, normalize_action)
-
             # # train Discriminator
             gail_timer = time.time()
             for _ in range(config.train_d_per_ppo):
-                observ = expert_data[episode_idx:episode_idx +config.episodes_per_batch, 1:]
-                action = expert_action[episode_idx:episode_idx+config.episodes_per_batch, :-1]
-                if config.use_padding:
-                    # 1. padding with buffer
-                    buffer = observ[:, 0, :-1]
-                    padded_observ = np.concatenate([buffer, observ[:, :, -1]], axis=1)
-                    padded_act = np.concatenate([np.zeros(shape=[action.shape[0], 9, 5, 2]), action], axis=1)
-                    # 2. split the whole episode into training data of Discriminator with length=config.D_len
-                    training_obs = []
-                    training_act = []
-                    for i in range(config.max_length-config.D_len+10):
-                        training_obs.append(padded_observ[:, i:i+config.D_len])
-                        training_act.append(padded_act[:, i:i+config.D_len])
-                    training_obs = np.concatenate(training_obs, axis=0)
-                    training_act = np.concatenate(training_act, axis=0)
-                else:
-                    pass
                 feed_dict = {
                     graph.is_training: True,
                     graph.should_log: True,
                     graph.do_report: True,
-                    graph.force_reset: False,
-                    graph.algo.D._expert_s: training_obs,
-                    graph.algo.D._expert_a: training_act}
+                    graph.force_reset: False}
                 gail_counter = 0
                 while gail_counter < config.gail_steps:
                     gail_summary = sess.run(
@@ -367,7 +341,7 @@ def train(config, env_processes, outdir):
                         summary_writer.add_summary(
                             gail_summary, global_step=sess.run(graph.algo.D._steps))
                     gail_counter += 1
-                episode_idx += config.episodes_per_batch
+                counter += 1
             print('Time Cost of Discriminator per Update: {}'.format(
                 (time.time() - gail_timer) / config.train_d_per_ppo))
             # train ppo

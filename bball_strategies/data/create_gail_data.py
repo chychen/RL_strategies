@@ -7,7 +7,7 @@ import numpy as np
 
 
 FPS = 5
-OBSERVATION_LENGTH = 10
+OBSERVATION_LENGTH = 1
 
 NON_OVERLAP_LENGTH = 10
 ENV_CONDITION_LENGTH_LIST = [11, 21, 31, 41, 51]
@@ -83,10 +83,13 @@ def main():
         for i in range(data.shape[0]):
             for chunk_idx in range(0, data_len[i]-ENV_CONDITION_LENGTH, NON_OVERLAP_LENGTH):
                 # padding by duplicating first frame
-                pad = np.concatenate([data[i, chunk_idx:chunk_idx+1]
-                                      for _ in range(OBSERVATION_LENGTH-1)], axis=0)
-                pad_data = np.concatenate(
-                    [pad, data[i, chunk_idx:chunk_idx + ENV_CONDITION_LENGTH]], axis=0)
+                if OBSERVATION_LENGTH>1:
+                    pad = np.concatenate([data[i, chunk_idx:chunk_idx+1]
+                                        for _ in range(OBSERVATION_LENGTH-1)], axis=0)
+                    pad_data = np.concatenate(
+                        [pad, data[i, chunk_idx:chunk_idx + ENV_CONDITION_LENGTH]], axis=0)
+                else:
+                    pad_data = data[i, chunk_idx:chunk_idx + ENV_CONDITION_LENGTH]
                 chunk = []
                 for k in range(ENV_CONDITION_LENGTH):
                     buffer = pad_data[k:k+OBSERVATION_LENGTH, :, 0:2]

@@ -58,10 +58,13 @@ class InGraphBatchEnv(object):
             self._done = tf.Variable(
                 tf.cast(tf.ones((len(self._batch_env),)), tf.bool),
                 name='done', trainable=False)
-            # Extended, who is next
-            self._turn_info = tf.Variable(
-                tf.cast(tf.ones((len(self._batch_env),)), tf.int8),
-                name='turn_info', trainable=False)
+            # Extended
+            self._expert_s = tf.Variable(
+                tf.zeros([len(self._batch_env),5,2], observ_dtype),
+                name='expert_s', trainable=False)
+            self._expert_a = tf.Variable(
+                tf.zeros([len(self._batch_env),5,2], action_dtype),
+                name='expert_a', trainable=False)
 
     def __getattr__(self, name):
         """Forward unimplemented attributes to one of the original environments.
@@ -98,12 +101,9 @@ class InGraphBatchEnv(object):
                 action = tf.check_numerics(action, 'action')
             observ_dtype = self._parse_dtype(self._batch_env.observation_space)
             # Extended
-            observ, reward, done, turn_info = tf.py_func(
+            observ, reward, done, expert_s, expert_a = tf.py_func(
                 lambda a: self._batch_env.step(a), [action],
-                [observ_dtype, tf.float32, tf.bool, tf.int8], name='step')
-            # observ, reward, done = tf.py_func(
-            #     lambda a: self._batch_env.step(a)[:3], [action],
-            #     [observ_dtype, tf.float32, tf.bool], name='step')
+                [observ_dtype, tf.float32, tf.bool, tf.float32, tf.float32], name='step')
             observ = tf.check_numerics(observ, 'observ')
             reward = tf.check_numerics(reward, 'reward')
 
@@ -112,7 +112,8 @@ class InGraphBatchEnv(object):
                 self._action.assign(action),
                 self._reward.assign(reward),
                 self._done.assign(done),
-                self._turn_info.assign(turn_info))
+                self._expert_s.assign(expert_s),
+                self._expert_a.assign(expert_a))
 
     def reset(self, indices=None):
         """Reset the batch of environments.
@@ -131,12 +132,10 @@ class InGraphBatchEnv(object):
         observ = tf.check_numerics(observ, 'observ')
         reward = tf.zeros_like(indices, tf.float32)
         done = tf.zeros_like(indices, tf.bool)
-        turn_info = tf.zeros_like(indices, tf.int8)  # offense is next
         with tf.control_dependencies([
                 tf.scatter_update(self._observ, indices, observ),
                 tf.scatter_update(self._reward, indices, reward),
-                tf.scatter_update(self._done, indices, done),
-                tf.scatter_update(self._turn_info, indices, turn_info)]):
+                tf.scatter_update(self._done, indices, done)]):
             return tf.identity(observ)
 
     @property
@@ -170,10 +169,15 @@ class InGraphBatchEnv(object):
 
     # Extended
     @property
-    def turn_info(self):
+    def expert_s(self):
         """Access the variable holding who is in turn, offense or defense."""
-        return self._turn_info
+        return self._expert_s
 
+    @property
+    def expert_a(self):
+        """Access the variable holding who is in turn, offense or defense."""
+        return self._expert_a
+    
     def close(self):
         """Send close messages to the external process and join them."""
         self._batch_env.close()
