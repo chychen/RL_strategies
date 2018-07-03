@@ -328,34 +328,30 @@ def train(config, env_processes, outdir):
             if episode_idx % (config.train_d_per_ppo * 100 * config.episodes_per_batch) == 0:
                 test_policy(config, vanilla_env, sess.run(graph.algo.D._steps), ppo_policy,
                             graph.algo.D, denormalize_observ)
-            if episode_idx % (config.train_d_per_ppo * 500 * config.episodes_per_batch) == 0:
+            if episode_idx % (config.train_d_per_ppo * 200 * config.episodes_per_batch) == 0:
                 tally_reward_line_chart(config, sess.run(
                     graph.algo.D._steps), ppo_policy, graph.algo.D, denormalize_observ, normalize_observ, normalize_action)
 
             # # train Discriminator
             gail_timer = time.time()
             for _ in range(config.train_d_per_ppo):
-                if config.is_double_curiculum:
-                    observ = expert_data[episode_idx:episode_idx +config.episodes_per_batch, 1:]
-                    action = expert_action[episode_idx:episode_idx+config.episodes_per_batch, :-1]
-                    if config.use_padding:
-                        # 1. padding with buffer
-                        buffer = observ[:, 0, :-1]
-                        padded_observ = np.concatenate([buffer, observ[:, :, -1]], axis=1)
-                        padded_act = np.concatenate([np.zeros(shape=[action.shape[0], 9, 5, 2]), action], axis=1)
-                        # 2. split the whole episode into training data of Discriminator with length=config.D_len
-                        training_obs = []
-                        training_act = []
-                        for i in range(config.max_length-config.D_len+10):
-                            training_obs.append(padded_observ[:, i:i+config.D_len])
-                            training_act.append(padded_act[:, i:i+config.D_len])
-                        training_obs = np.concatenate(training_obs, axis=0)
-                        training_act = np.concatenate(training_act, axis=0)
-                    else:
-                        pass
+                observ = expert_data[episode_idx:episode_idx +config.episodes_per_batch, 1:]
+                action = expert_action[episode_idx:episode_idx+config.episodes_per_batch, :-1]
+                if config.use_padding:
+                    # 1. padding with buffer
+                    buffer = observ[:, 0, :-1]
+                    padded_observ = np.concatenate([buffer, observ[:, :, -1]], axis=1)
+                    padded_act = np.concatenate([np.zeros(shape=[action.shape[0], 9, 5, 2]), action], axis=1)
+                    # 2. split the whole episode into training data of Discriminator with length=config.D_len
+                    training_obs = []
+                    training_act = []
+                    for i in range(config.max_length-config.D_len+10):
+                        training_obs.append(padded_observ[:, i:i+config.D_len])
+                        training_act.append(padded_act[:, i:i+config.D_len])
+                    training_obs = np.concatenate(training_obs, axis=0)
+                    training_act = np.concatenate(training_act, axis=0)
                 else:
-                    training_obs = expert_data[episode_idx:episode_idx +config.episodes_per_batch, 1:, -1]
-                    training_act = expert_action[episode_idx:episode_idx+config.episodes_per_batch, :-1]
+                    pass
                 feed_dict = {
                     graph.is_training: True,
                     graph.should_log: True,
