@@ -45,19 +45,6 @@ class Discriminator(object):
         """
         if self.__instance is not None and config is not None:
             env = gym.make(config.env)
-
-            def normalize_observ(observ):
-                min_ = env.observation_space.low[0]
-                max_ = env.observation_space.high[0]
-                observ = 2.0 * (observ - min_) / (max_ - min_) - 1.0
-                return observ
-
-            def normalize_action(act):
-                min_ = env.action_space[3].low
-                max_ = env.action_space[3].high
-                act = 2.0 * (act - min_) / (max_ - min_) - 1.0
-                return act
-
             # first init the class
             # self._global_steps = tf.train.get_or_create_global_step()
             with tf.variable_scope('Discriminator', reuse=tf.AUTO_REUSE):
@@ -66,13 +53,13 @@ class Discriminator(object):
                 # state shape = [batch_size, buffer_size, 14, 2]
                 # self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
                 #                                 None, None] + list(env.observation_space.shape[1:]))
-                self._expert_s = normalize_observ(expert_s)
+                self._expert_s = expert_s
                 self._agent_s_ph = tf.placeholder(dtype=tf.float32, shape=[
                     None, None] + list(env.observation_space.shape[1:]))
                 self._agent_s = agent_s
                 # self._expert_a = tf.placeholder(dtype=tf.float32, shape=[
                 #                                 None, None, 5, 2])
-                self._expert_a = normalize_action(expert_a)
+                self._expert_a = expert_a
                 self._agent_a_ph = tf.placeholder(dtype=tf.float32, shape=[
                     None, None, 5, 2])
                 self._agent_a = agent_a

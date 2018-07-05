@@ -152,15 +152,16 @@ class InGraphBatchEnv(object):
     def reward(self):
         """Access the variable holding the current reward."""
         # NOTE: modified
-        if self._is_gail:
-            # omit env reward!!! use discriminator as reward insteaded!!!
-            def_action = tf.reshape(self._action[:, 13:23], shape=[
-                                    len(self._batch_env), 1, 5, 2])
-            with tf.device('/gpu:0'):
-                reward = Discriminator().get_rewards(self._observ, def_action)
-            return reward
-        else:
-            return self._reward
+        # if self._is_gail:
+        #     # omit env reward!!! use discriminator as reward insteaded!!!
+        #     def_action = tf.reshape(self._action[:, 13:23], shape=[
+        #                             len(self._batch_env), 1, 5, 2])
+        #     with tf.device('/gpu:0'):
+        #         reward = Discriminator().get_rewards(self._observ, def_action)
+        #     return reward
+        # else:
+        #     return self._reward
+        return self._reward
 
     @property
     def done(self):

@@ -5,6 +5,7 @@ from __future__ import print_function
 import gym
 from bball_strategies import gym_bball
 import numpy as np
+import h5py
 
 
 def no_op():
@@ -22,10 +23,11 @@ def no_op():
 
 
 def random_dancing():
-    for _ in range(120):
+    for _ in range(100000000):
         action = env.action_space.sample()
-        _, reward, done, _ = env.step(action)
+        _, reward, done, infos = env.step(action)
         env.render()
+        
         if done:
             env.reset()
             env.render()
@@ -34,15 +36,27 @@ def random_dancing():
 
 class MonitorWrapper(gym.wrappers.Monitor):
     # init_mode 0 : init by default
-    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None):
+    def __init__(self, env, data=h5py.File('bball_strategies/data/GAILTransitionData_52.hdf5', 'r'), init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None):
         super(MonitorWrapper, self).__init__(env=env, directory='./test/',
-                                             video_callable=lambda count: count % 1 == 0, force=True)
+                                             video_callable=lambda count: count % 1 != 0, force=True)
         env.init_mode = init_mode
+        env.data = data
+        env.time_limit = 50
         env.if_vis_trajectory = if_vis_trajectory
         env.if_vis_visual_aid = if_vis_visual_aid
         env.init_positions = init_positions
         env.init_ball_handler_idx = init_ball_handler_idx
 
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+
+    @property
+    def data(self):
+        return self._env.data
+
+    @data.setter
+    def data(self, value):
+        self._env.data = value
 
 
 def main():

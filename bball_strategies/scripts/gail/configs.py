@@ -73,8 +73,8 @@ def double_curiculum():
     locals().update(default())
     ########################################################
     is_double_curiculum = True
-    train_len = 11
-    max_length = train_len - 1
+    train_len = 12
+    max_length = train_len - 2
     D_len = 10
     use_padding = False
     ########################################################
@@ -84,7 +84,8 @@ def double_curiculum():
     # no need to divide num_agent because they maintain steps made in class Loop
     steps = update_every * max_length
     # wgan
-    train_d_per_ppo = 5
+    train_d_per_ppo = 3
+    pretrain_d_times = 30
     # one episode can generate 'max_length' episodes, d_batch_size must be the multiple of num_agents
     d_batch_size = 200
     if use_padding:

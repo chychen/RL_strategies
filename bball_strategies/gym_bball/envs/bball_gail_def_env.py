@@ -85,34 +85,31 @@ class BBallGailDefEnv(gym.Env):
 
         # init dataset
         self.episode_index = 0
-        # self.data = np.load('bball_strategies/data/GAILTransitionData_51.npy')
-        all_data = h5py.File(
-            'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
-        self.expert_data = all_data['OBS'].value.astype(np.float32)
-        self.expert_action = all_data['DEF_ACT'].value.astype(np.float32)
+        self.data = None
+        # self.data = h5py.File(
+        #     'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
+        self.expert_data = None
+        self.expert_action = None
+        self.IS_FIRST = True
+        # assert (np.array(self.data['DEF_ACT'])<50).all()
         self.current_cond = None
         self.current_real_act = None
-        self.time_limit = 49
+        self.current_init_vel = None
+        self.time_limit = None
 
         # random seed
         self.seed()
 
     def _update_offense_from_real_data(self):
-        if self.states.steps+1 == self.time_limit:
+        if self.states.steps + 1 == self.time_limit:
             self.states.update_status(done=True, status=STATUS_LOOKUP['OOT'])
         self.states.positions[STATE_LOOKUP['BALL']
-                              ] = self.current_cond[self.states.steps+1, 0]
+                              ] = self.current_cond[self.states.steps + 1, 0]
         self.states.positions[STATE_LOOKUP['OFFENSE']
-                              ] = self.current_cond[self.states.steps+1, 1:6]
+                              ] = self.current_cond[self.states.steps + 1, 1:6]
 
-    def before_step(self):
-        # correct back the defense t-1
-        if self.if_back_real:
-            self.states.positions[STATE_LOOKUP['DEFENSE']
-                                  ] = self.current_cond[self.states.steps-1, 6:11]
-            self.states.buffer_positions[-1, STATE_LOOKUP['DEFENSE']
-                                         ] = copy.deepcopy(self.states.positions[STATE_LOOKUP['DEFENSE']])
-        self.states.before_step()
+    # def before_step(self):
+    #     self.states.before_step()
 
     def step(self, action):
         """
@@ -129,7 +126,7 @@ class BBallGailDefEnv(gym.Env):
         done (boolean) : whether the episode has ended, in which case further step() calls will return undefined results
         info (dict) : contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
-        self.before_step()
+        # self.before_step()
         decision = action[ACTION_LOOKUP['DECISION']]  # should be zeros
         ball_pass_vel = action[ACTION_LOOKUP['BALL']]  # should be zeros
         off_pl_dash = action[ACTION_LOOKUP['OFF_DASH']]  # should be zeros
@@ -144,7 +141,9 @@ class BBallGailDefEnv(gym.Env):
         # update env information, steps++
         self.states.end_step()
 
-        return self._get_obs(), 0, self.states.done, dict(expert_s=self.current_cond[self.states.steps, 6:11], expert_a=self.current_real_act[self.states.steps-1])
+        # assert (self.current_real_act[self.states.steps - 1] < 50.0).all(), '{}\n{}\n{}\n'.format(
+        #     self.current_cond[self.states.steps - 1:self.states.steps + 2, 6:11], self.current_real_act[self.states.steps - 1], self.states.steps - 1)
+        return self._get_obs(), 0, self.states.done, dict(expert_s=self.current_cond[self.states.steps, 6:11], expert_a=self.current_real_act[self.states.steps - 1])
 
     def _get_obs(self):
         """
@@ -171,21 +170,17 @@ class BBallGailDefEnv(gym.Env):
 
         Returns : self._get_obs()
         """
-        if self.init_mode == INIT_LOOKUP['INPUT']:
-            assert self.init_positions is not None
-            ball_pos = self.init_positions[0]
-            off_positions = self.init_positions[1]
-            def_positions = self.init_positions[2]
-            off2ball_vec = off_positions - ball_pos
-            ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
-            self.init_positions[0] = off_positions[ball_handler_idx]
-            self.states.reset(
-                self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
-        elif self.init_mode == INIT_LOOKUP['DATASET']:
+        if self.IS_FIRST:
+            self.expert_data = self.data['OBS'].value
+            self.expert_action = self.data['DEF_ACT'].value
+            self.expert_init_vel = self.data['DEF_INIT_VEL'].value
+            self.IS_FIRST = False
+        if self.init_mode == INIT_LOOKUP['DATASET']:
             ep_idx = np.floor(self.np_random_generator.uniform(
                 low=0.0, high=self.expert_data.shape[0])).astype(np.int)
             self.current_cond = copy.deepcopy(self.expert_data[ep_idx, :, -1])
             self.current_real_act = copy.deepcopy(self.expert_action[ep_idx])
+            self.current_init_vel = copy.deepcopy(self.expert_init_vel[ep_idx])
             ball_pos = self.current_cond[0, 0, 0:2]
             off_positions = self.current_cond[0, 1:6, 0:2]
             def_positions = self.current_cond[0, 6:11, 0:2]
@@ -193,50 +188,74 @@ class BBallGailDefEnv(gym.Env):
             ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
             positions = np.array(
                 [off_positions[ball_handler_idx], off_positions, def_positions])
-            vels = np.array([np.zeros_like(ball_pos, dtype=np.float32), np.zeros_like(
-                off_positions, dtype=np.float32), np.zeros_like(def_positions, dtype=np.float32)])
-            self.states.reset(positions, ball_handler_idx,
+            self.states.reset(positions, self.current_init_vel, ball_handler_idx,
                               buffer_size=self.buffer_size)
-        elif self.init_mode == INIT_LOOKUP['DATASET_ORDERED']:
-            self.current_cond = copy.deepcopy(self.expert_data[0])
-            ball_pos = self.current_cond[0, 0, 0:2]
-            off_positions = self.current_cond[0, 1:6, 0:2]
-            def_positions = self.current_cond[0, 6:11, 0:2]
-            off2ball_vec = off_positions - ball_pos
-            ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
-            positions = np.array(
-                [off_positions[ball_handler_idx], off_positions, def_positions])
-            vels = np.array([np.zeros_like(ball_pos, dtype=np.float32), np.zeros_like(
-                off_positions, dtype=np.float32), np.zeros_like(def_positions, dtype=np.float32)])
-            self.states.reset(positions, ball_handler_idx,
-                              buffer_size=self.buffer_size)
-        else:
-            if self.init_mode == INIT_LOOKUP['DEFAULT']:
-                off_positions = np.array([
-                    [80, 40],
-                    [70, 35],
-                    [60, 25],
-                    [70, 15],
-                    [80, 10]
-                ], dtype=np.float32)
-                ball_handler_idx = 2
-            else:
-                off_positions = self.np_random_generator.uniform(
-                    low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
-                ball_handler_idx = np.floor(self.np_random_generator.uniform(
-                    low=0.0, high=5.0)).astype(np.int)
+        # if self.init_mode == INIT_LOOKUP['INPUT']:
+        #     assert self.init_positions is not None
+        #     ball_pos = self.init_positions[0]
+        #     off_positions = self.init_positions[1]
+        #     def_positions = self.init_positions[2]
+        #     off2ball_vec = off_positions - ball_pos
+        #     ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
+        #     self.init_positions[0] = off_positions[ball_handler_idx]
+        #     self.states.reset(
+        #         self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
+        # elif self.init_mode == INIT_LOOKUP['DATASET']:
+        #     ep_idx = np.floor(self.np_random_generator.uniform(
+        #         low=0.0, high=self.expert_data.shape[0])).astype(np.int)
+        #     self.current_cond = copy.deepcopy(self.expert_data[ep_idx, :, -1])
+        #     self.current_real_act = copy.deepcopy(self.expert_action[ep_idx])
+        #     ball_pos = self.current_cond[0, 0, 0:2]
+        #     off_positions = self.current_cond[0, 1:6, 0:2]
+        #     def_positions = self.current_cond[0, 6:11, 0:2]
+        #     off2ball_vec = off_positions - ball_pos
+        #     ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
+        #     positions = np.array(
+        #         [off_positions[ball_handler_idx], off_positions, def_positions])
+        #     vels = np.array([np.zeros_like(ball_pos, dtype=np.float32), np.zeros_like(
+        #         off_positions, dtype=np.float32), np.zeros_like(def_positions, dtype=np.float32)])
+        #     self.states.reset(positions, ball_handler_idx,
+        #                       buffer_size=self.buffer_size)
+        # elif self.init_mode == INIT_LOOKUP['DATASET_ORDERED']:
+        #     self.current_cond = copy.deepcopy(self.expert_data[0])
+        #     ball_pos = self.current_cond[0, 0, 0:2]
+        #     off_positions = self.current_cond[0, 1:6, 0:2]
+        #     def_positions = self.current_cond[0, 6:11, 0:2]
+        #     off2ball_vec = off_positions - ball_pos
+        #     ball_handler_idx = np.argmin(length(off2ball_vec, axis=1))
+        #     positions = np.array(
+        #         [off_positions[ball_handler_idx], off_positions, def_positions])
+        #     vels = np.array([np.zeros_like(ball_pos, dtype=np.float32), np.zeros_like(
+        #         off_positions, dtype=np.float32), np.zeros_like(def_positions, dtype=np.float32)])
+        #     self.states.reset(positions, ball_handler_idx,
+        #                       buffer_size=self.buffer_size)
+        # else:
+        #     if self.init_mode == INIT_LOOKUP['DEFAULT']:
+        #         off_positions = np.array([
+        #             [80, 40],
+        #             [70, 35],
+        #             [60, 25],
+        #             [70, 15],
+        #             [80, 10]
+        #         ], dtype=np.float32)
+        #         ball_handler_idx = 2
+        #     else:
+        #         off_positions = self.np_random_generator.uniform(
+        #             low=[self.court_length // 2, 0], high=[self.court_length, self.court_width], size=[5, 2])
+        #         ball_handler_idx = np.floor(self.np_random_generator.uniform(
+        #             low=0.0, high=5.0)).astype(np.int)
 
-            def_positions = np.array(
-                off_positions, copy=True, dtype=np.float32)
-            vec = self.right_basket_pos - off_positions
-            vec_length = length(vec, axis=1)
-            u_vec = vec / np.stack([vec_length, vec_length], axis=1)
-            def_positions = def_positions + u_vec * self.screen_radius * 2
-            ball_pos = np.array(
-                off_positions[ball_handler_idx, :], copy=True, dtype=np.float32)
-            positions = np.array([ball_pos, off_positions, def_positions])
-            self.states.reset(positions, ball_handler_idx,
-                              buffer_size=self.buffer_size)
+        #     def_positions = np.array(
+        #         off_positions, copy=True, dtype=np.float32)
+        #     vec = self.right_basket_pos - off_positions
+        #     vec_length = length(vec, axis=1)
+        #     u_vec = vec / np.stack([vec_length, vec_length], axis=1)
+        #     def_positions = def_positions + u_vec * self.screen_radius * 2
+        #     ball_pos = np.array(
+        #         off_positions[ball_handler_idx, :], copy=True, dtype=np.float32)
+        #     positions = np.array([ball_pos, off_positions, def_positions])
+        #     self.states.reset(positions, ball_handler_idx,
+        #                       buffer_size=self.buffer_size)
 
         return self._get_obs()
 
@@ -249,9 +268,9 @@ class BBallGailDefEnv(gym.Env):
         from gym.envs.classic_control import rendering
         if not self.if_vis_trajectory:
             if self.viewer is None:
-                self.viewer = rendering.Viewer(940+100, 500+100)
+                self.viewer = rendering.Viewer(940 + 100, 500 + 100)
                 # feet # coordinates
-                self.viewer.set_bounds(0-5, 94+5, 0-5, 50+5)
+                self.viewer.set_bounds(0 - 5, 94 + 5, 0 - 5, 50 + 5)
                 # background img
                 fname = path.join(path.dirname(__file__), "fullcourt.png")
                 img = rendering.Image(fname, 94, 50)
@@ -334,9 +353,9 @@ class BBallGailDefEnv(gym.Env):
 
         if self.if_vis_trajectory:
             if self.viewer is None:
-                self.viewer = rendering.Viewer(940+100, 500+100)
+                self.viewer = rendering.Viewer(940 + 100, 500 + 100)
                 # feet # coordinates
-                self.viewer.set_bounds(0-5, 94+5, 0-5, 50+5)
+                self.viewer.set_bounds(0 - 5, 94 + 5, 0 - 5, 50 + 5)
                 # background img
                 fname = path.join(path.dirname(__file__), "fullcourt.png")
                 img = rendering.Image(fname, 94, 50)
@@ -715,16 +734,16 @@ class States(object):
         # court information
         self.clip_padding = 5.0
         self.x_high_bound = 94.0 + self.clip_padding
-        self.x_low_bound = 94.0/2.0 - self.clip_padding
+        self.x_low_bound = 94.0 / 2.0 - self.clip_padding
         self.y_high_bound = 50.0 + self.clip_padding
         self.y_low_bound = 0 - self.clip_padding
 
-    def reset(self, positions, ball_handler_idx, buffer_size=5):
+    def reset(self, positions, def_init_vel, ball_handler_idx, buffer_size=5):
         self.positions = positions
         # fill all with first frames
         self.buffer_positions = np.tile(positions, [buffer_size, 1])
         self.vels = np.array([np.zeros_like(positions[0], dtype=np.float32), np.zeros_like(
-            positions[1], dtype=np.float32), np.zeros_like(positions[2], dtype=np.float32)])
+            positions[1], dtype=np.float32), def_init_vel])
         self.done = False
         self.status = None
         self.steps = 0
@@ -759,14 +778,14 @@ class States(object):
         self.positions[team_id][pl_idx] = position
         self.vels[team_id][pl_idx] = vel
 
-    def before_step(self):
-        """
-        update
-        """
-        # correct vel
-        for key in STATE_LOOKUP:
-            self.vels[STATE_LOOKUP[key]] = self.buffer_positions[-1, STATE_LOOKUP[key]
-                                                                 ] - self.buffer_positions[-2, STATE_LOOKUP[key]]
+    # def before_step(self):
+    #     """
+    #     update
+    #     """
+    #     # correct vel
+    #     for key in STATE_LOOKUP:
+    #         self.vels[STATE_LOOKUP[key]] = self.buffer_positions[-1, STATE_LOOKUP[key]
+    #                                                              ] - self.buffer_positions[-2, STATE_LOOKUP[key]]
 
     def end_step(self):
         """

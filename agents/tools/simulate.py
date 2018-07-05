@@ -83,7 +83,7 @@ def simulate(batch_env, algo, log=True, reset=False):
             agent_indices = tf.range(len(batch_env))
             experience_summary = algo.experience(
                 agent_indices, prevob, batch_env.action, batch_env.reward,
-                batch_env.done, batch_env.observ, batch_env.expert_s, batch_env.expert_s)
+                batch_env.done, batch_env.observ, batch_env.expert_s, batch_env.expert_a)
         return tf.summary.merge([step_summary, experience_summary])
 
     def _define_end_episode(agent_indices):

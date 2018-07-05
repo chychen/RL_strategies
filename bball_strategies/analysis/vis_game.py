@@ -358,16 +358,17 @@ def test():
     # plot_data(target_data, length=100,
     #             file_path=opt.save_path + 'play_def.mp4', if_save=opt.save)
 
-    if not os.path.exists(opt.save):
-        os.makedirs(opt.save)
+    if not os.path.exists(opt.save_path):
+        os.makedirs(opt.save_path)
     train_data = np.load('../data/FixedFPS5.npy')
     train_data_len = np.load('../data/FixedFPS5Length.npy')
     print(train_data.shape)
     print(train_data_len.shape)
     target_data = np.concatenate([train_data[:, :, 0:1, :3].reshape(
         [train_data.shape[0], train_data.shape[1], 3]), train_data[:, :, 1:, :2].reshape([train_data.shape[0], train_data.shape[1], 20])], axis=-1)
+    print(target_data.shape)
     for i in range(10):
-        plot_data(target_data[i], length=train_data_len[i],
+        plot_data(target_data[i, :train_data_len[i]], length=train_data_len[i],
                   file_path=opt.save_path + '/play_{}.mp4'.format(i), if_save=opt.save)
 
 

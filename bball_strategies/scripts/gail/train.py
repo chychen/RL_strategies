@@ -44,7 +44,8 @@ def _create_environment(config):
     Wrapped OpenAI Gym environment.
     """
     env = gym.make(config.env)
-    env = BBallWrapper(env, fps=config.FPS, time_limit=config.max_length)
+    env = BBallWrapper(env, data=h5py.File('bball_strategies/data/GAILTransitionData_{}.hdf5'.format(
+        config.train_len), 'r'), fps=config.FPS, time_limit=config.max_length)
     return env
 
 
@@ -74,7 +75,7 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
         'eval_offense', graph.done, graph.score, graph.summary, eval_steps,
         report_every=eval_steps,
         log_every=eval_steps,
-        checkpoint_every=300 * eval_steps,
+        checkpoint_every=200 * eval_steps,
         feed={graph.is_training: False,
               graph.is_optimizing_offense: True})
     return loop
@@ -110,43 +111,29 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
     reward_collector = D.get_rewards_value(
         numpy_collector[None, :, -1], act_collector[None])
     numpy_collector = denormalize_observ(numpy_collector)
-    np.savez(os.path.join(config.logdir, 'gail_testing_G{}_D{}/episode_{}.npz'.format(config.train_len, config.D_len, steps)),
-                STATE=numpy_collector[:, -1], REWARD=reward_collector[0])
+    np.savez(os.path.join(config.logdir, 'gail_testing_G{}_D{}/episode_{}.npz'.format(config.max_length, config.D_len, steps)),
+             STATE=numpy_collector[:, -1], REWARD=reward_collector[0])
 
 
 def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, normalize_observ, normalize_action):
     """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
     """
     episode_amount = 100
-    # real data
-    all_data = h5py.File(
-        'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
-    expert_data, _ = np.split(
-        all_data['OBS'].value, [all_data['OBS'].value.shape[0] * 9 // 10])
-    expert_action, _ = np.split(
-        all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0] * 9 // 10])
     # env
     vanilla_env = gym.make(config.env)
-    vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
-                                time_limit=50)
-    vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
-    # real
-    selected_idx = np.random.choice(expert_data.shape[0], episode_amount)
-    # frame 0 is condition
-    batch_real_states = expert_data[selected_idx,
-                                    1:vanilla_env.time_limit + 1, -1]
-    real_action = expert_action[selected_idx, :vanilla_env.time_limit]
-    real_action = normalize_action(real_action)
-    batch_real_states = normalize_observ(batch_real_states)
-    real_rewards = D.get_rewards_value(
-        batch_real_states, real_action)
+    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/GAILTransitionData_52.hdf5', 'r'), init_mode=1, fps=config.FPS, if_back_real=False,
+                               time_limit=50)
     # fake
     numpy_collector = []
     act_collector = []
+    real_numpy_collector = []
+    real_act_collector = []
     for _ in range(episode_amount):
         vanilla_obs = vanilla_env.reset()
         epi_obs = []
         epi_act = []
+        real_epi_obs = []
+        real_epi_act = []
         for _ in range(vanilla_env.time_limit):
             vanilla_act = ppo_policy.act(
                 np.array(vanilla_obs)[None, None], stochastic=False)
@@ -160,22 +147,33 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, no
                 # Box(5, 2)
                 np.reshape(vanilla_act, [5, 2])
             ]
-            vanilla_obs, _, _, _ = vanilla_env.step(
+            vanilla_obs, _, _, info = vanilla_env.step(
                 vanilla_trans_act)
             epi_obs.append(vanilla_obs[-1])
             epi_act.append(vanilla_act.reshape([5, 2]))
+            real_epi_obs.append(np.concatenate(
+                [vanilla_obs[-1, 0:6], info['expert_s'], vanilla_obs[-1, 11:14]], axis=0))
+            real_epi_act.append(info['expert_a'])
         numpy_collector.append(epi_obs)
         act_collector.append(epi_act)
+        real_numpy_collector.append(real_epi_obs)
+        real_act_collector.append(real_epi_act)
     numpy_collector = np.array(numpy_collector)
     act_collector = np.array(act_collector)
+    real_numpy_collector = np.array(real_numpy_collector)
+    real_act_collector = np.array(real_act_collector)
     fake_rewards = D.get_rewards_value(
         numpy_collector, act_collector)
+    real_numpy_collector = normalize_observ(real_numpy_collector)
+    real_act_collector = normalize_action(real_act_collector)
+    real_rewards = D.get_rewards_value(
+        real_numpy_collector, real_act_collector)
     # vis
     vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
 
 
 def capped_video_schedule(episode_id):
-    return episode_id % 10000 == 0
+    return episode_id % 500 == 0
 
 
 class MonitorWrapper(gym.wrappers.Monitor):
@@ -243,19 +241,18 @@ def train(config, env_processes, outdir):
 
     # env to testing
     vanilla_env = gym.make(config.env)
-    vanilla_env = BBallWrapper(vanilla_env, init_mode=1, fps=config.FPS, if_back_real=False,
+    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/GAILTransitionData_52.hdf5', 'r'), init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=50)
-    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_G{}_D{}/'.format(config.train_len, config.D_len)), if_back_real=False, video_callable=lambda _: True,
+    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_G{}_D{}/'.format(config.max_length, config.D_len)), if_back_real=False, video_callable=lambda _: True,
                                  # init from dataset
                                  init_mode=1)
-    vanilla_env.data = np.load('bball_strategies/data/GAILEnvData_51.npy')
     # env to generate fake state
-    env = gym.make(config.env)
-    env = BBallWrapper(env, init_mode=3, fps=config.FPS, if_back_real=config.if_back_real,
-                       time_limit=config.max_length)
-    env = MonitorWrapper(env, directory=os.path.join(config.logdir, 'gail_training/'), if_back_real=config.if_back_real,
-                         # init from dataset in order
-                         init_mode=3)
+    # env = gym.make(config.env)
+    # env = BBallWrapper(env, data=h5py.File('bball_strategies/data/GAILTransitionData_{}.hdf5'.format(config.train_len), 'r'), init_mode=1, fps=config.FPS, if_back_real=config.if_back_real,
+    #                    time_limit=config.max_length)
+    # env = MonitorWrapper(env, directory=os.path.join(config.logdir, 'gail_training/'), if_back_real=config.if_back_real,
+    #                      # init from dataset in order
+    #                      init_mode=1)
     # PPO graph
     if config.update_every % config.num_agents:
         tf.logging.warn('Number of agents should divide episodes per update.')
@@ -273,23 +270,7 @@ def train(config, env_processes, outdir):
             config.steps / config.update_every *
             (config.update_every + config.eval_episodes))
     # Agent to genrate acttion
-    ppo_policy = PPOPolicy(config, env)
-    # Data
-    all_data = h5py.File(
-        'bball_strategies/data/GAILTransitionData_{}.hdf5'.format(config.train_len), 'r')
-    expert_data, valid_expert_data = np.split(
-        all_data['OBS'].value, [all_data['OBS'].value.shape[0] * 9 // 10])
-    expert_action, valid_expert_action = np.split(
-        all_data['DEF_ACT'].value, [all_data['DEF_ACT'].value.shape[0] * 9 // 10])
-    print('expert_data', expert_data.shape)
-    print('valid_expert_data', valid_expert_data.shape)
-    print('expert_action', expert_action.shape)
-    print('valid_expert_action', valid_expert_action.shape)
-    # Preprocessing/ Normalization
-    expert_data = normalize_observ(expert_data)
-    valid_expert_data = normalize_observ(valid_expert_data)
-    expert_action = normalize_action(expert_action)
-    valid_expert_action = normalize_action(valid_expert_action)
+    ppo_policy = PPOPolicy(config, dummy_env)
     # summary writer of Discriminator
     summary_writer = tf.summary.FileWriter(config.logdir + '/Disciminator')
     # TF Session
@@ -319,10 +300,10 @@ def train(config, env_processes, outdir):
         counter = 0
         while True:
             # # testing
-            if counter % (config.train_d_per_ppo * 2500 // config.max_length) == 0:
+            if counter % (config.train_d_per_ppo * 500 // config.max_length) == 0:
                 test_policy(config, vanilla_env, sess.run(graph.algo.D._steps), ppo_policy,
                             graph.algo.D, denormalize_observ)
-            if counter % (config.train_d_per_ppo * 5000 // config.max_length) == 0:
+            if counter % (config.train_d_per_ppo * 1000 // config.max_length) == 0:
                 tally_reward_line_chart(config, sess.run(
                     graph.algo.D._steps), ppo_policy, graph.algo.D, denormalize_observ, normalize_observ, normalize_action)
             # # train Discriminator
@@ -344,10 +325,11 @@ def train(config, env_processes, outdir):
                 counter += 1
             print('Time Cost of Discriminator per Update: {}'.format(
                 (time.time() - gail_timer) / config.train_d_per_ppo))
-            # train ppo
-            cumulate_steps += total_steps
-            for score in loop.run(sess, saver, cumulate_steps):
-                yield score
+            if counter > config.pretrain_d_times:
+                # train ppo
+                cumulate_steps += total_steps
+                for score in loop.run(sess, saver, cumulate_steps):
+                    yield score
     batch_env.close()
     vanilla_env.close()
     env.close()
