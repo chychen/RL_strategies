@@ -32,14 +32,14 @@ def get_var_list(prefix):
 class Discriminator(object):
     __instance = None
 
-    def __new__(cls, agent_s=None, agent_a=None, config=None):
+    def __new__(cls, agent_s=None, agent_a=None, expert_s=None, expert_a=None, config=None):
         if Discriminator.__instance is None:
             Discriminator.__instance = object.__new__(cls)
         else:
             print("Instance Exists! :D")
         return Discriminator.__instance
 
-    def __init__(self, agent_s=None, agent_a=None, config=None):
+    def __init__(self, agent_s=None, agent_a=None, expert_s=None, expert_a=None, config=None):
         """
         state is composed of offense(condition) and defense
         """
@@ -51,13 +51,15 @@ class Discriminator(object):
                 self._steps = tf.get_variable('D_steps', shape=[
                 ], dtype=tf.int32, initializer=tf.zeros_initializer(dtype=tf.int32), trainable=False)
                 # state shape = [batch_size, buffer_size, 14, 2]
-                self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
-                                                None, None] + list(env.observation_space.shape[1:]))
+                # self._expert_s = tf.placeholder(dtype=tf.float32, shape=[
+                #                                 None, None] + list(env.observation_space.shape[1:]))
+                self._expert_s = expert_s
                 self._agent_s_ph = tf.placeholder(dtype=tf.float32, shape=[
                     None, None] + list(env.observation_space.shape[1:]))
                 self._agent_s = agent_s
-                self._expert_a = tf.placeholder(dtype=tf.float32, shape=[
-                                                None, None, 5, 2])
+                # self._expert_a = tf.placeholder(dtype=tf.float32, shape=[
+                #                                 None, None, 5, 2])
+                self._expert_a = expert_a
                 self._agent_a_ph = tf.placeholder(dtype=tf.float32, shape=[
                     None, None, 5, 2])
                 self._agent_a = agent_a
@@ -89,13 +91,14 @@ class Discriminator(object):
             X_act_inter = epsilon * self._expert_a + \
                 (1.0 - epsilon) * self._agent_a
             # add back the conditions
-            # X_inter = tf.concat(
-            #     [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:14]], axis=2)
+            X_inter = tf.concat(
+                [self._expert_s[:, :, 0:6], X_inter[:, :, 6:11], self._expert_s[:, :, 11:14]], axis=2)
             # if self._config.if_back_real:
             #     X_inter = tf.concat(
             #         [self._expert_s[:, :self._buffer_size - 1, :], X_inter[:, -1:, :]], axis=1)
-            grad_obs, grad_act = tf.gradients(self._config.d_network(
-                X_inter, X_act_inter, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail), [X_inter, X_act_inter])
+            d_out_inter, _ = self._config.d_network(
+                X_inter, X_act_inter, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
+            grad_obs, grad_act = tf.gradients(d_out_inter, [X_inter, X_act_inter])
             grad_obs = tf.reshape(grad_obs, shape=[self._batch_size, -1])
             grad_act = tf.reshape(grad_act, shape=[self._batch_size, -1])
             grad = tf.concat([grad_obs, grad_act], axis=1)
@@ -104,9 +107,9 @@ class Discriminator(object):
             grad_norm = tf.sqrt(sum_)
             grad_pen = self._config.wgan_penalty_lambda * tf.reduce_mean(
                 tf.square(grad_norm - 1.0))
-            fake_scores = self._config.d_network(
+            fake_scores, _ = self._config.d_network(
                 self._agent_s, self._agent_a, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
-            real_scores = self._config.d_network(
+            real_scores, _ = self._config.d_network(
                 self._expert_s, self._expert_a, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
             f_fake = tf.reduce_mean(fake_scores)
             f_real = tf.reduce_mean(real_scores)
@@ -115,32 +118,33 @@ class Discriminator(object):
 
             return loss, f_fake, f_real, em_distance, grad_pen
 
-    def train(self, agent_s, expert_s, agent_a, expert_a):
-        feed_dict = {
-            self._expert_s: expert_s,
-            self._agent_s: agent_s,
-            self._expert_a: expert_a,
-            self._agent_a: agent_a
-        }
-        global_step, _, summary = tf.get_default_session().run(
-            [self._global_steps, self._train_op, self._summary_op], feed_dict=feed_dict)
-        self.summary_writer.add_summary(summary, global_step=global_step)
+    # def train(self, agent_s, expert_s, agent_a, expert_a):
+    #     feed_dict = {
+    #         self._expert_s: expert_s,
+    #         self._agent_s: agent_s,
+    #         self._expert_a: expert_a,
+    #         self._agent_a: agent_a
+    #     }
+    #     global_step, _, summary = tf.get_default_session().run(
+    #         [self._global_steps, self._train_op, self._summary_op], feed_dict=feed_dict)
+    #     self.summary_writer.add_summary(summary, global_step=global_step)
 
-    def validate(self, agent_s, expert_s, agent_a, expert_a):
-        feed_dict = {
-            self._expert_s: expert_s,
-            self._agent_s: agent_s,
-            self._expert_a: expert_a,
-            self._agent_a: agent_a
-        }
-        global_step, summary = tf.get_default_session().run(
-            [self._global_steps, self._summary_valid_op], feed_dict=feed_dict)
-        self.valid_summary_writer.add_summary(summary, global_step=global_step)
+    # def validate(self, agent_s, expert_s, agent_a, expert_a):
+    #     feed_dict = {
+    #         self._expert_s: expert_s,
+    #         self._agent_s: agent_s,
+    #         self._expert_a: expert_a,
+    #         self._agent_a: agent_a
+    #     }
+    #     global_step, summary = tf.get_default_session().run(
+    #         [self._global_steps, self._summary_valid_op], feed_dict=feed_dict)
+    #     self.valid_summary_writer.add_summary(summary, global_step=global_step)
 
     @classmethod
     def get_rewards(cls, state, action, config):
         with tf.variable_scope('Discriminator'):
-            return config.d_network(state, action, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
+            rewards, _ = config.d_network(state, action, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
+            return rewards
 
     def get_rewards_value(self, state, action):
         feed_dict = {
@@ -148,9 +152,9 @@ class Discriminator(object):
             self._agent_a_ph: action
         }
         with tf.variable_scope('Discriminator'):
-            fake_scores = self._config.d_network(
+            _, fake_scores_by_frame = self._config.d_network(
                 self._agent_s_ph, self._agent_a_ph, reuse=tf.AUTO_REUSE, is_gail=self._config.is_gail)
-            return tf.get_default_session().run(fake_scores, feed_dict=feed_dict)
+            return tf.get_default_session().run(fake_scores_by_frame, feed_dict=feed_dict)
 
 
 def main():

@@ -100,13 +100,12 @@ class GAIL_DEF_PPO(object):
             with tf.control_dependencies([reset_state, reset_buffer]):
                 return tf.constant('')
 
-    def perform(self, agent_indices, observ, turn_info):
+    def perform(self, agent_indices, observ):
         """Compute batch of actions and a summary for a batch of observation.
 
         Args:
           agent_indices: Tensor containing current batch indices.
           observ: Tensor of a batch of observations for all agents.
-          turn_info : whose turn, offense or defense. (first must be offense)
 
         Returns:
           Tuple of action batch tensor and summary tensor.
@@ -167,7 +166,7 @@ class GAIL_DEF_PPO(object):
                 return action[:, 0], tf.identity(summary)
 
     def experience(
-            self, agent_indices, observ, action, reward, unused_done, unused_nextob, turn_info):
+            self, agent_indices, observ, action, reward, unused_done, unused_nextob, expert_s, expert_a):
         """Process the transition tuple of the current step.
 
         When training, add the current transition tuple to the memory and update
@@ -182,7 +181,7 @@ class GAIL_DEF_PPO(object):
           reward: Batch tensor of rewards.
           unused_done: Batch tensor of done flags.
           unused_nextob: Batch tensor of successor observations.
-          turn_info: Batch tensor of whose turn is it.
+          expert_s=batch_env.expert_s, expert_a=batch_env.expert_a: 
 
         Returns:
           Summary tensor.
@@ -192,9 +191,9 @@ class GAIL_DEF_PPO(object):
                 self._is_training,
                 # pylint: disable=g-long-lambda
                 lambda: self._define_experience(
-                    agent_indices, observ, action, reward, turn_info=turn_info), str)
+                    agent_indices, observ, action, reward, expert_s=expert_s, expert_a=expert_a), str)
 
-    def _define_experience(self, agent_indices, observ, action, reward, turn_info):
+    def _define_experience(self, agent_indices, observ, action, reward, expert_s, expert_a):
         """Implement the branch of experience() entered during training."""
         update_filters = tf.summary.merge([
             self._observ_filter.update(observ),
@@ -205,7 +204,7 @@ class GAIL_DEF_PPO(object):
                 action = self._last_action
             policy = tools.nested.map(
                 lambda x: tf.gather(x, agent_indices), self._last_policy)
-            batch = (observ, action, policy, reward)
+            batch = (observ, action, policy, reward, expert_s, expert_a)
             append = self._current_episodes.append(batch, agent_indices)
         with tf.control_dependencies([append]):
             norm_observ = self._observ_filter.transform(observ)
@@ -304,7 +303,10 @@ class GAIL_DEF_PPO(object):
             self._batch_env.observ[0],
             self._batch_env.action[0],
             tools.nested.map(lambda x: x[0, 0], policy_params),
-            self._batch_env.reward[0])
+            self._batch_env.reward[0],
+            self._batch_env.expert_s[0],
+            self._batch_env.expert_a[0]
+        )
         with tf.variable_scope('ppo_temporary'):
             with tf.device('/gpu:0'):
                 self._current_episodes = parts.EpisodeMemory(
@@ -349,7 +351,8 @@ class GAIL_DEF_PPO(object):
                 with tf.control_dependencies([assert_full]):
                     data = self._finished_episodes.data(
                         tf.range(self._config.update_every))
-                (observ, action, old_policy_params, reward), length = data
+                (observ, action, old_policy_params,
+                 reward, expert_s, expert_a), length = data
                 # We set padding frames of the parameters to ones to prevent Gaussians
                 # with zero variance. This would result in an inifite KL divergence,
                 # which, even if masked out, would result in NaN gradients.
@@ -391,37 +394,98 @@ class GAIL_DEF_PPO(object):
                 with tf.control_dependencies([assert_full]):
                     data = self._finished_episodes.data(
                         tf.range(self._config.episodes_per_batch))
-                    (observ, action, old_policy_params, reward), length = data
+                    (observ, action, old_policy_params,
+                     reward, expert_s, expert_a), length = data
+                    from bball_strategies import gym_bball
+                    import gym
+                    env = gym.make(self._config.env)
+
+                    def normalize_observ(observ):
+                        min_ = env.observation_space.low[0, 0]
+                        max_ = env.observation_space.high[0, 0]
+                        observ = 2.0 * (observ - min_) / \
+                            (max_ - min_) - 1.0
+                        return observ
+
+                    def normalize_action(act):
+                        min_ = env.action_space[3].low
+                        max_ = env.action_space[3].high
+                        act = 2.0 * (act - min_) / (max_ - min_) - 1.0
+                        return act
+
+                    expert_s = normalize_observ(expert_s)
+                    expert_a = normalize_action(expert_a)
                     observ = self._observ_filter.transform(observ)
                     reward = self._reward_filter.transform(reward)
                 if self._config.is_double_curiculum:
                     if self._config.use_padding:
                         # 1. padding with buffer
-                        buffer = observ[:, 0, :-1]
-                        padded_observ = tf.concat(
-                            [buffer, observ[:, :, -1]], axis=1)
+                        # buffer = observ[:, 0, :-1]
+                        # padded_observ = tf.concat(
+                        #     [buffer, observ[:, :, -1]], axis=1)
+                        # reshape_act = tf.reshape(action[:, :, 13:23], [
+                        #                          tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+                        # padded_act = tf.concat(
+                        #     [tf.zeros(shape=[tf.shape(reshape_act)[0], 9, 5, 2]), reshape_act], axis=1)
+                        # print(padded_observ)
+                        # print(padded_act)
+                        # real_buffer = tf.concat([buffer[:, :, 0:6], tf.tile(expert_s[:, 0], [1, 9]), buffer[:, :, 11:14]], axis=2)
+                        # real_observ = tf.concat([observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
+                        # real_padded_observ = tf.concat(
+                        #     [real_buffer, real_observ], axis=1)
+                        # real_padded_act = tf.concat(
+                        #     [tf.zeros(shape=[tf.shape(reshape_act)[0], 9, 5, 2]), reshape_act], axis=1)
+                        # print(real_padded_observ)
+                        # print(real_padded_act)
+                        # exit() # NOTE the it's very weird to pad zeros.
+                        # # 2. split the whole episode into training data of Discriminator with length=config.D_len
+                        # training_obs = []
+                        # training_act = []
+                        # for i in range(self._config.max_length-self._config.D_len+10):
+                        #     training_obs.append(
+                        #         padded_observ[:, i:i+self._config.D_len])
+                        #     training_act.append(
+                        #         padded_act[:, i:i+self._config.D_len])
+                        # training_obs = tf.concat(training_obs, axis=0)
+                        # training_act = tf.concat(training_act, axis=0)
+                        # print(training_obs)
+                        # print(training_act)
+                        # self.D = Discriminator(
+                        #     training_obs, training_act, self._config)
+                        pass
+                    else:
                         reshape_act = tf.reshape(action[:, :, 13:23], [
                                                  tf.shape(action)[0], tf.shape(action)[1], 5, 2])
-                        padded_act = tf.concat(
-                            [tf.zeros(shape=[tf.shape(reshape_act)[0], 9, 5, 2]), reshape_act], axis=1)
-                        print(padded_observ)
-                        print(padded_act)
-                        # 2. split the whole episode into training data of Discriminator with length=config.D_len
+                        # split the whole episode into training data of Discriminator with length=config.D_len
                         training_obs = []
                         training_act = []
-                        for i in range(self._config.max_length-self._config.D_len+10):
+                        real_training_obs = []
+                        real_training_act = []
+                        if self._config.max_length - self._config.D_len == 0:
+                            num_data = 1
+                        else:
+                            num_data = self._config.max_length - self._config.D_len
+                        for i in range(num_data):
                             training_obs.append(
-                                padded_observ[:, i:i+self._config.D_len])
+                                observ[:, i:i + self._config.D_len, -1])
                             training_act.append(
-                                padded_act[:, i:i+self._config.D_len])
+                                reshape_act[:, i:i + self._config.D_len])
+                            real_training_obs.append(tf.concat(
+                                [observ[:, i:i + self._config.D_len, -1, 0:6], expert_s[:, i:i + self._config.D_len], observ[:, i:i + self._config.D_len, -1, 11:14]], axis=2))
+                            real_training_act.append(
+                                expert_a[:, i:i + self._config.D_len])
                         training_obs = tf.concat(training_obs, axis=0)
                         training_act = tf.concat(training_act, axis=0)
+                        real_training_obs = tf.concat(
+                            real_training_obs, axis=0)
+                        real_training_act = tf.concat(
+                            real_training_act, axis=0)
                         print(training_obs)
                         print(training_act)
+                        print(real_training_obs)
+                        print(real_training_act)
                         self.D = Discriminator(
-                            training_obs, training_act, self._config)
-                    else:
-                        pass
+                            training_obs, training_act, real_training_obs, real_training_act, self._config)
                 else:
                     self.D = Discriminator(
                         observ[:, :, -1], tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2]), self._config)
@@ -442,7 +506,15 @@ class GAIL_DEF_PPO(object):
                     grad_pen = tf.summary.scalar(
                         'grad_pen', self.D.grad_pen, collections=['D'])
                     summary_op = tf.summary.merge(
-                        [d_loss, f_real, f_fake, em_distance, grad_pen])
+                        [d_loss, f_real, f_fake, em_distance, grad_pen,
+                         tf.summary.histogram(
+                             'D_REAL_DEF_ACT', expert_a),
+                         tf.summary.histogram(
+                             'D_REAL_DEF_OBS', expert_s),
+                         tf.summary.histogram(
+                             'D_FAKE_DEF_ACT', action[:, :, 13:23]),
+                         tf.summary.histogram(
+                             'D_FAKE_DEF_OBS', observ[:, :, -1, 6:11])])
                     return summary_op
 
     def _perform_update_steps(
