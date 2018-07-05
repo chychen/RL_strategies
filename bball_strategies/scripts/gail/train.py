@@ -302,7 +302,7 @@ def train(config, env_processes, outdir):
             # train Discriminator
             gail_timer = time.time()
             if counter > config.pretrain_d_times:
-                num_d_to_train = config.train_d_per_pp
+                num_d_to_train = config.train_d_per_ppo
             else:
                 num_d_to_train = config.pretrain_d_per_ppo
             for _ in range(num_d_to_train):
@@ -329,7 +329,7 @@ def train(config, env_processes, outdir):
                     gail_counter += 1
                 counter += 1
             print('Time Cost of Discriminator per Update: {}'.format(
-                (time.time() - gail_timer) / num_d_to_train))
+                (time.time() - gail_timer) / config.train_d_per_ppo))
             # train ppo
             cumulate_steps += total_steps
             for score in loop.run(sess, saver, cumulate_steps):
