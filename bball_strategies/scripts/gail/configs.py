@@ -84,8 +84,9 @@ def double_curiculum():
     # no need to divide num_agent because they maintain steps made in class Loop
     steps = update_every * max_length
     # wgan
-    train_d_per_ppo = 3
-    pretrain_d_times = 30
+    train_d_per_ppo = 5
+    pretrain_d_per_ppo = 20
+    pretrain_d_times = pretrain_d_per_ppo*50
     # one episode can generate 'max_length' episodes, d_batch_size must be the multiple of num_agents
     d_batch_size = 200
     if use_padding:
@@ -95,6 +96,8 @@ def double_curiculum():
             episodes_per_batch = d_batch_size
         else:
             episodes_per_batch = d_batch_size // (max_length - D_len)
-
     gail_steps = episodes_per_batch * max_length // num_agents
+    # Vis
+    vis_testing_freq = train_d_per_ppo * 250 // max_length
+    tally_line_chart_freq = vis_testing_freq*2
     return locals()

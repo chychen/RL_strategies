@@ -299,16 +299,21 @@ def train(config, env_processes, outdir):
         cumulate_steps = sess.run(graph.step)
         counter = 0
         while True:
-            # # testing
-            if counter % (config.train_d_per_ppo * 500 // config.max_length) == 0:
-                test_policy(config, vanilla_env, sess.run(graph.algo.D._steps), ppo_policy,
-                            graph.algo.D, denormalize_observ)
-            if counter % (config.train_d_per_ppo * 1000 // config.max_length) == 0:
-                tally_reward_line_chart(config, sess.run(
-                    graph.algo.D._steps), ppo_policy, graph.algo.D, denormalize_observ, normalize_observ, normalize_action)
-            # # train Discriminator
+            # train Discriminator
             gail_timer = time.time()
-            for _ in range(config.train_d_per_ppo):
+            if counter > config.pretrain_d_times:
+                num_d_to_train = config.train_d_per_pp
+            else:
+                num_d_to_train = config.pretrain_d_per_ppo
+            for _ in range(num_d_to_train):
+                # testing
+                if counter % (config.vis_testing_freq) == 0:
+                    test_policy(config, vanilla_env, sess.run(graph.algo.D._steps), ppo_policy,
+                                graph.algo.D, denormalize_observ)
+                if counter % (config.tally_line_chart_freq) == 0:
+                    tally_reward_line_chart(config, sess.run(
+                        graph.algo.D._steps), ppo_policy, graph.algo.D, denormalize_observ, normalize_observ, normalize_action)
+                # train D
                 feed_dict = {
                     graph.is_training: True,
                     graph.should_log: True,
@@ -324,12 +329,11 @@ def train(config, env_processes, outdir):
                     gail_counter += 1
                 counter += 1
             print('Time Cost of Discriminator per Update: {}'.format(
-                (time.time() - gail_timer) / config.train_d_per_ppo))
-            if counter > config.pretrain_d_times:
-                # train ppo
-                cumulate_steps += total_steps
-                for score in loop.run(sess, saver, cumulate_steps):
-                    yield score
+                (time.time() - gail_timer) / num_d_to_train))
+            # train ppo
+            cumulate_steps += total_steps
+            for score in loop.run(sess, saver, cumulate_steps):
+                yield score
     batch_env.close()
     vanilla_env.close()
     env.close()
