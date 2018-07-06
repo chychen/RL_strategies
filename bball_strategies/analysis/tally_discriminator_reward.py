@@ -40,6 +40,13 @@ def vis_line_chart(real_rewards, fake_rewards, root_path, post_fix):
             name='fake defense'
         )
     )
+    all_trace.append(
+        go.Scatter(
+            x=np.arange(0, fake_rewards.shape[1]),
+            y=np.mean(real_rewards, axis=0) - np.mean(fake_rewards, axis=0),
+            name='EM Distance'
+        )
+    )
 
     layout = go.Layout(
         title='mean_reward_from_discriminator',
