@@ -86,6 +86,7 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
     - draw episode into mpeg video
     - collect episdoe and each state scores into numpy
     """
+    timer = time.time()
     numpy_collector = []
     act_collector = []
     vanilla_obs = vanilla_env.reset()
@@ -113,11 +114,13 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
     numpy_collector = denormalize_observ(numpy_collector)
     np.savez(os.path.join(config.logdir, 'gail_testing_G{}_D{}/episode_{}.npz'.format(config.max_length, config.D_len, steps)),
              STATE=numpy_collector[:, -1], REWARD=reward_collector[0])
+    print('test_policy time cost: {}'.format(time.time() - timer))
 
 
-def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, normalize_observ, normalize_action):
+def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, normalize_action):
     """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
     """
+    timer = time.time()
     episode_amount = 100
     # env
     vanilla_env = gym.make(config.env)
@@ -152,7 +155,7 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, no
             epi_obs.append(vanilla_obs[-1])
             epi_act.append(vanilla_act.reshape([5, 2]))
             real_epi_obs.append(np.concatenate(
-                [vanilla_obs[-1, 0:6], info['expert_s'], vanilla_obs[-1, 11:14]], axis=0))
+                [vanilla_obs[-1, 0:6], normalize_observ(info['expert_s']), vanilla_obs[-1, 11:14]], axis=0))
             real_epi_act.append(info['expert_a'])
         numpy_collector.append(epi_obs)
         act_collector.append(epi_act)
@@ -164,12 +167,12 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, denormalize_observ, no
     real_act_collector = np.array(real_act_collector)
     fake_rewards = D.get_rewards_value(
         numpy_collector, act_collector)
-    real_numpy_collector = normalize_observ(real_numpy_collector)
     real_act_collector = normalize_action(real_act_collector)
     real_rewards = D.get_rewards_value(
         real_numpy_collector, real_act_collector)
     # vis
     vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
+    print('tally_reward_line_chart time cost: {}'.format(time.time() - timer))
 
 
 def capped_video_schedule(episode_id):
@@ -222,8 +225,8 @@ def train(config, env_processes, outdir):
     dummy_env = gym.make(config.env)
 
     def normalize_observ(observ):
-        min_ = dummy_env.observation_space.low[0]
-        max_ = dummy_env.observation_space.high[0]
+        min_ = dummy_env.observation_space.low[0, 0]
+        max_ = dummy_env.observation_space.high[0, 0]
         observ = 2.0 * (observ - min_) / (max_ - min_) - 1.0
         return observ
 
@@ -293,7 +296,7 @@ def train(config, env_processes, outdir):
         # visulization stuff
         if FLAGS.tally_only:
             tally_reward_line_chart(config, sess.run(
-                graph.algo.D._steps), ppo_policy, D, denormalize_observ, normalize_observ, normalize_action)
+                graph.algo.D._steps), ppo_policy, D, normalize_observ, normalize_action)
             exit()
         # GAIL
         cumulate_steps = sess.run(graph.step)
@@ -306,13 +309,6 @@ def train(config, env_processes, outdir):
             else:
                 num_d_to_train = config.pretrain_d_per_ppo
             for _ in range(num_d_to_train):
-                # testing
-                if counter % (config.vis_testing_freq) == 0:
-                    test_policy(config, vanilla_env, sess.run(graph.algo.D._steps), ppo_policy,
-                                graph.algo.D, denormalize_observ)
-                if counter % (config.tally_line_chart_freq) == 0:
-                    tally_reward_line_chart(config, sess.run(
-                        graph.algo.D._steps), ppo_policy, graph.algo.D, denormalize_observ, normalize_observ, normalize_action)
                 # train D
                 feed_dict = {
                     graph.is_training: True,
@@ -327,6 +323,13 @@ def train(config, env_processes, outdir):
                         summary_writer.add_summary(
                             gail_summary, global_step=sess.run(graph.algo.D._steps))
                     gail_counter += 1
+                # testing
+                if counter % (config.vis_testing_freq) == 0:
+                    test_policy(config, vanilla_env, sess.run(graph.algo.D._steps), ppo_policy,
+                                graph.algo.D, denormalize_observ)
+                if counter % (config.tally_line_chart_freq) == 0:
+                    tally_reward_line_chart(config, sess.run(
+                        graph.algo.D._steps), ppo_policy, graph.algo.D, normalize_observ, normalize_action)
                 counter += 1
             print('Time Cost of Discriminator per Update: {}'.format(
                 (time.time() - gail_timer) / num_d_to_train))

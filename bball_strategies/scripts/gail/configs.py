@@ -98,6 +98,6 @@ def double_curiculum():
             episodes_per_batch = d_batch_size // (max_length - D_len)
     gail_steps = episodes_per_batch * max_length // num_agents
     # Vis
-    vis_testing_freq = train_d_per_ppo * 250 // max_length
+    vis_testing_freq = train_d_per_ppo * 2500 // max_length
     tally_line_chart_freq = vis_testing_freq*2
     return locals()
