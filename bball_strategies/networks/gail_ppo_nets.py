@@ -21,7 +21,7 @@ def gail_def_gaussian(config, action_space, observations, unused_length, state=N
         input_ = tf.reshape(observations, shape=[batch_size, episode_len, observations.shape.as_list()[
                             2], functools.reduce(operator.mul, observations.shape.as_list()[3:], 1)])
         init_xavier_weights = tf.variance_scaling_initializer(
-            scale=1.0, mode='fan_avg', distribution='uniform')
+            scale=0.1, mode='fan_avg', distribution='uniform')
         init_output_weights = tf.variance_scaling_initializer(
             scale=config.init_output_factor, mode='fan_in', distribution='normal')
 

@@ -32,7 +32,7 @@ def default():
     weight_summaries = dict(
         all=r'.*', policy=r'.*/policy/.*', value=r'.*/value/.*')
     init_output_factor = 0.1
-    init_std = 0.35
+    init_std = 0.15
     # Optimization
     update_every = 40
     update_epochs = 25

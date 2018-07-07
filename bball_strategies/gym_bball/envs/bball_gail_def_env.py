@@ -68,7 +68,7 @@ class BBallGailDefEnv(gym.Env):
         self.pl_max_speed = 38.9379818754 / FPS
         # cost at least one second to cross over the opponent
         self.pl_collision_speed = self.screen_radius / FPS
-        self.pl_max_power = 24.5810950984 / FPS
+        self.pl_max_power = 24.5810950984 / FPS * 2
         self.ball_max_speed = 40.0 / FPS
         # reward
         self.len2pi_weight = np.pi / 8  # 1 feet <-> 45 degrees
