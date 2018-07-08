@@ -53,7 +53,7 @@ class GAIL_DEF_PPO(object):
             name='normalize_observ')
         # because the Wgan's Critic scale and center will differ from time to time #TODO center=False, scale=False
         self._reward_filter = parts.StreamingNormalize(
-            self._batch_env.reward[0], center=False, scale=False, clip=None,
+            self._batch_env.reward[0], center=False, scale=True, clip=None,
             name='normalize_reward')
         self._use_gpu = self._config.use_gpu and utility.available_gpus()
         policy_params, state = self._initialize_policy()
@@ -196,8 +196,10 @@ class GAIL_DEF_PPO(object):
     def _define_experience(self, agent_indices, observ, action, reward, expert_s, expert_a):
         """Implement the branch of experience() entered during training."""
         update_filters = tf.summary.merge([
-            self._observ_filter.update(observ),
-            self._reward_filter.update(reward)])
+            self._observ_filter.update(observ)])
+        # update_filters = tf.summary.merge([
+        #     self._observ_filter.update(observ),
+        #     self._reward_filter.update(reward)])
         with tf.control_dependencies([update_filters]):
             if self._config.train_on_agent_action:
                 # NOTE: Doesn't seem to change much.
@@ -336,15 +338,27 @@ class GAIL_DEF_PPO(object):
 
     def _define_end_episode(self, agent_indices):
         """Implement the branch of end_episode() entered during training."""
-        episodes, length = self._current_episodes.data(agent_indices)
-        space_left = self._max_memory_size - self._num_finished_episodes
-        use_episodes = tf.range(tf.minimum(
-            tf.shape(agent_indices)[0], space_left))
-        episodes = tools.nested.map(
-            lambda x: tf.gather(x, use_episodes), episodes)
-        append = self._finished_episodes.replace(
-            episodes, tf.gather(length, use_episodes),
-            use_episodes + self._num_finished_episodes)
+        (observ, action, old_policy_params, _, expert_s,
+         expert_a), length = self._current_episodes.data(agent_indices)
+        # scored by Discriminator, replace the reward returned from env
+        def_action = tf.reshape(action[:, :, 13:23], shape=[
+            tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+        return_ = Discriminator.get_rewards(
+            observ[:, :, -1], def_action, self._config)
+        return_ = tf.tile(return_[:, None], [1, self._config.max_length])
+        update_reward = self._reward_filter.update(return_)
+        with tf.control_dependencies([update_reward]):
+            # return_ = tf.concat([tf.zeros(shape=[tf.shape(return_)[0], self._config.max_length-1]), return_[:, None]], axis=1)
+            episodes = (observ, action, old_policy_params,
+                        return_, expert_s, expert_a)
+            space_left = self._max_memory_size - self._num_finished_episodes
+            use_episodes = tf.range(tf.minimum(
+                tf.shape(agent_indices)[0], space_left))
+            episodes = tools.nested.map(
+                lambda x: tf.gather(x, use_episodes), episodes)
+            append = self._finished_episodes.replace(
+                episodes, tf.gather(length, use_episodes),
+                use_episodes + self._num_finished_episodes)
         with tf.control_dependencies([append]):
             increment_index = self._num_finished_episodes.assign_add(
                 tf.shape(use_episodes)[0])
@@ -546,28 +560,30 @@ class GAIL_DEF_PPO(object):
           Summary tensor.
         """
         value = self._network(observ, length).value
-        if self._config.is_gail:
-            return_ = utility.discounted_return(
-                reward, length, self._config.discount)
-            if self._config.gae_lambda:  # NOTE
-                advantage = utility.lambda_advantage(
-                    reward, value, length, self._config.discount,
-                    self._config.gae_lambda)
-            else:
-                advantage = return_ - value
-        else:
-            def_action = tf.reshape(action[:, :, 13:23], shape=[
-                tf.shape(action)[0], tf.shape(action)[1], 5, 2])
-            with tf.device('/gpu:0'):
-                expert_s_concat = tf.concat(
-                    [observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
-                return_ = Discriminator.get_rewards(
-                    observ[:, :, -1], def_action, self._config)
-                # return_ = Discriminator.get_rewards(
-                #     observ[:, :, -1], def_action, expert_s_concat, expert_a, self._config)
-                return_ = tf.reshape(return_, [-1, 1])
-                return_ = tf.tile(return_, [1, self._config.max_length])
-            advantage = return_ - value
+        return_ = reward
+        advantage = return_ - value
+        # if self._config.is_gail:
+        #     return_ = utility.discounted_return(
+        #         reward, length, self._config.discount)
+        #     if self._config.gae_lambda:  # NOTE
+        #         advantage = utility.lambda_advantage(
+        #             reward, value, length, self._config.discount,
+        #             self._config.gae_lambda)
+        #     else:
+        #         advantage = return_ - value
+        # else:
+        #     def_action = tf.reshape(action[:, :, 13:23], shape=[
+        #         tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+        #     with tf.device('/gpu:0'):
+        #         expert_s_concat = tf.concat(
+        #             [observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
+        #         return_ = Discriminator.get_rewards(
+        #             observ[:, :, -1], def_action, self._config)
+        #         # return_ = Discriminator.get_rewards(
+        #         #     observ[:, :, -1], def_action, expert_s_concat, expert_a, self._config)
+        #         return_ = tf.reshape(return_, [-1, 1])
+        #         return_ = tf.tile(return_, [1, self._config.max_length])
+        #     advantage = return_ - value
         mean, variance = tf.nn.moments(
             advantage, axes=[0, 1], keep_dims=True)
         advantage = (advantage - mean) / (tf.sqrt(variance) + 1e-8)
@@ -590,7 +606,9 @@ class GAIL_DEF_PPO(object):
             tf.Print(0, [tf.reduce_mean(value_loss)], 'value loss: '),
             tf.Print(0, [tf.reduce_mean(policy_loss)], 'policy loss: '))
         with tf.control_dependencies([value_loss, policy_loss, print_losses]):
-            return tf.summary.merge([summary[self._config.update_epochs // 2], tf.summary.scalar('scores_summary', tf.reduce_mean(return_))])
+            return tf.summary.merge(
+                [summary[self._config.update_epochs // 2],
+                 tf.summary.scalar('normed_accumulated_reward', tf.reduce_mean(return_))])
 
     def _update_step(self, sequence):
         """Compute the current combined loss and perform a gradient update step.
@@ -644,21 +662,22 @@ class GAIL_DEF_PPO(object):
         """
         with tf.name_scope('value_loss'):
             value = self._network(observ, length).value
-            if self._config.is_gail:
-                return_ = utility.discounted_return(
-                    reward, length, self._config.discount)
-            else:
-                def_action = tf.reshape(action[:, :, 13:23], shape=[
-                    tf.shape(action)[0], tf.shape(action)[1], 5, 2])
-                with tf.device('/gpu:0'):
-                    expert_s_concat = tf.concat(
-                        [observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
-                    return_ = Discriminator.get_rewards(
-                        observ[:, :, -1], def_action, self._config)
-                    # return_ = Discriminator.get_rewards(
-                    #     observ[:, :, -1], def_action, expert_s_concat, expert_a, self._config)
-                    return_ = tf.reshape(return_, [-1, 1])
-                    return_ = tf.tile(return_, [1, self._config.max_length])
+            return_ = reward
+            # if self._config.is_gail:
+            #     return_ = utility.discounted_return(
+            #         reward, length, self._config.discount)
+            # else:
+            #     def_action = tf.reshape(action[:, :, 13:23], shape=[
+            #         tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+            #     with tf.device('/gpu:0'):
+            #         expert_s_concat = tf.concat(
+            #             [observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
+            #         return_ = Discriminator.get_rewards(
+            #             observ[:, :, -1], def_action, self._config)
+            #         # return_ = Discriminator.get_rewards(
+            #         #     observ[:, :, -1], def_action, expert_s_concat, expert_a, self._config)
+            #         return_ = tf.reshape(return_, [-1, 1])
+            #         return_ = tf.tile(return_, [1, self._config.max_length])
             advantage = return_ - value
             value_loss = 0.5 * self._mask(advantage ** 2, length)
             summary = tf.summary.merge([

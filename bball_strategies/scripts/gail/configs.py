@@ -80,6 +80,7 @@ def double_curiculum():
     ########################################################
     num_agents = 20
     # ppo
+    discount = 1.0
     update_every = 100
     # no need to divide num_agent because they maintain steps made in class Loop
     steps = update_every * max_length

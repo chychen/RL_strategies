@@ -73,7 +73,7 @@ class Discriminator(object):
                     # assign_add_ = tf.assign_add(self._steps, 1)
                     # with tf.control_dependencies([assign_add_]):
                     self.optimizer = self._config.optimizer(
-                        learning_rate=self._config.learning_rate, beta1=0.0, beta2=0.9)  # TODO beta1=0.5, beta2=0.9
+                        learning_rate=self._config.learning_rate)  # TODO beta1=0.5, beta2=0.9 recommended by WGAN-GP
                     grads = tf.gradients(self._loss, theta)
                     grads = list(zip(grads, theta))
                     self._train_op = self.optimizer.apply_gradients(

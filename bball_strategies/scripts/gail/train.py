@@ -75,7 +75,7 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
         'eval_offense', graph.done, graph.score, graph.summary, eval_steps,
         report_every=eval_steps,
         log_every=eval_steps,
-        checkpoint_every=200 * eval_steps,
+        checkpoint_every=150 * eval_steps,
         feed={graph.is_training: False,
               graph.is_optimizing_offense: True})
     return loop
