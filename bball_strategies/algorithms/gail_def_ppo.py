@@ -204,6 +204,25 @@ class GAIL_DEF_PPO(object):
                 action = self._last_action
             policy = tools.nested.map(
                 lambda x: tf.gather(x, agent_indices), self._last_policy)
+            from bball_strategies import gym_bball
+            import gym
+            env = gym.make(self._config.env)
+
+            def normalize_observ(observ):
+                min_ = env.observation_space.low[0, 0]
+                max_ = env.observation_space.high[0, 0]
+                observ = 2.0 * (observ - min_) / \
+                    (max_ - min_) - 1.0
+                return observ
+
+            def normalize_action(act):
+                min_ = env.action_space[3].low
+                max_ = env.action_space[3].high
+                act = 2.0 * (act - min_) / (max_ - min_) - 1.0
+                return act
+
+            expert_s = normalize_observ(expert_s)
+            expert_a = normalize_action(expert_a)
             batch = (observ, action, policy, reward, expert_s, expert_a)
             append = self._current_episodes.append(batch, agent_indices)
         with tf.control_dependencies([append]):
@@ -363,7 +382,7 @@ class GAIL_DEF_PPO(object):
                 observ = self._observ_filter.transform(observ)
                 reward = self._reward_filter.transform(reward)
                 update_summary = self._perform_update_steps(
-                    observ, action, old_policy_params, reward, length)
+                    observ, action, old_policy_params, reward, length, expert_s, expert_a)
                 with tf.control_dependencies([update_summary]):
                     penalty_summary = self._adjust_penalty(
                         observ, old_policy_params, length)
@@ -396,25 +415,6 @@ class GAIL_DEF_PPO(object):
                         tf.range(self._config.episodes_per_batch))
                     (observ, action, old_policy_params,
                      reward, expert_s, expert_a), length = data
-                    from bball_strategies import gym_bball
-                    import gym
-                    env = gym.make(self._config.env)
-
-                    def normalize_observ(observ):
-                        min_ = env.observation_space.low[0, 0]
-                        max_ = env.observation_space.high[0, 0]
-                        observ = 2.0 * (observ - min_) / \
-                            (max_ - min_) - 1.0
-                        return observ
-
-                    def normalize_action(act):
-                        min_ = env.action_space[3].low
-                        max_ = env.action_space[3].high
-                        act = 2.0 * (act - min_) / (max_ - min_) - 1.0
-                        return act
-
-                    expert_s = normalize_observ(expert_s)
-                    expert_a = normalize_action(expert_a)
                     observ = self._observ_filter.transform(observ)
                     reward = self._reward_filter.transform(reward)
                 if self._config.is_double_curiculum:
@@ -516,7 +516,7 @@ class GAIL_DEF_PPO(object):
                              'D_REAL_DEF_OBS_X', expert_s[:, :, :, 0]),
                          tf.summary.histogram(
                              'D_REAL_DEF_OBS_Y', expert_s[:, :, :, 1]),
-                        # FAKE
+                         # FAKE
                          tf.summary.histogram(
                              'D_FAKE_DEF_ACT_X', action[:, :, 13:23:2]),
                          tf.summary.histogram(
@@ -528,7 +528,7 @@ class GAIL_DEF_PPO(object):
                     return summary_op
 
     def _perform_update_steps(
-            self, observ, action, old_policy_params, reward, length):
+            self, observ, action, old_policy_params, reward, length, expert_s, expert_a):
         """Perform multiple update steps of value function and policy.
 
         The advantage is computed once at the beginning and shared across
@@ -545,48 +545,52 @@ class GAIL_DEF_PPO(object):
         Returns:
           Summary tensor.
         """
-        value=self._network(observ, length).value
+        value = self._network(observ, length).value
         if self._config.is_gail:
-            return_=utility.discounted_return(
+            return_ = utility.discounted_return(
                 reward, length, self._config.discount)
             if self._config.gae_lambda:  # NOTE
-                advantage=utility.lambda_advantage(
+                advantage = utility.lambda_advantage(
                     reward, value, length, self._config.discount,
                     self._config.gae_lambda)
             else:
-                advantage=return_ - value
+                advantage = return_ - value
         else:
-            def_action=tf.reshape(action[:, :, 13:23], shape = [
-                                    tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+            def_action = tf.reshape(action[:, :, 13:23], shape=[
+                tf.shape(action)[0], tf.shape(action)[1], 5, 2])
             with tf.device('/gpu:0'):
-                return_=Discriminator.get_rewards(
+                expert_s_concat = tf.concat(
+                    [observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
+                return_ = Discriminator.get_rewards(
                     observ[:, :, -1], def_action, self._config)
-                return_=tf.reshape(return_, [-1, 1])
-                return_=tf.tile(return_, [1, self._config.max_length])
-            advantage=return_ - value
-        mean, variance=tf.nn.moments(
-            advantage, axes = [0, 1], keep_dims = True)
-        advantage=(advantage - mean) / (tf.sqrt(variance) + 1e-8)
-        advantage=tf.Print(
+                # return_ = Discriminator.get_rewards(
+                #     observ[:, :, -1], def_action, expert_s_concat, expert_a, self._config)
+                return_ = tf.reshape(return_, [-1, 1])
+                return_ = tf.tile(return_, [1, self._config.max_length])
+            advantage = return_ - value
+        mean, variance = tf.nn.moments(
+            advantage, axes=[0, 1], keep_dims=True)
+        advantage = (advantage - mean) / (tf.sqrt(variance) + 1e-8)
+        advantage = tf.Print(
             advantage, [tf.reduce_mean(return_), tf.reduce_mean(value)],
             'return and value: ')
-        advantage=tf.Print(
+        advantage = tf.Print(
             advantage, [tf.reduce_mean(advantage)],
             'normalized advantage: ')
-        episodes=(observ, action,
+        episodes = (observ, action,
                     old_policy_params[ACT['DEF_DASH']],
-                    reward, advantage)
-        value_loss, policy_loss, summary=parts.iterate_sequences(
+                    reward, advantage, expert_s, expert_a)
+        value_loss, policy_loss, summary = parts.iterate_sequences(
             self._update_step, [0., 0., ''], episodes, length,
             self._config.chunk_length,
             self._config.batch_size,
             self._config.update_epochs,
-            padding_value = 1)
-        print_losses=tf.group(
+            padding_value=1)
+        print_losses = tf.group(
             tf.Print(0, [tf.reduce_mean(value_loss)], 'value loss: '),
             tf.Print(0, [tf.reduce_mean(policy_loss)], 'policy loss: '))
         with tf.control_dependencies([value_loss, policy_loss, print_losses]):
-            return summary[self._config.update_epochs // 2]
+            return tf.summary.merge([summary[self._config.update_epochs // 2], tf.summary.scalar('scores_summary', tf.reduce_mean(return_))])
 
     def _update_step(self, sequence):
         """Compute the current combined loss and perform a gradient update step.
@@ -601,22 +605,22 @@ class GAIL_DEF_PPO(object):
         Returns:
           Tuple of value loss, policy loss, and summary tensor.
         """
-        observ, action, DEF_DASH, reward, advantage=sequence[
+        observ, action, DEF_DASH, reward, advantage, expert_s, expert_a = sequence[
             'sequence']
         length = sequence['length']
         old_policy = []
         old_policy.append(self._policy_type[ACT['DEF_DASH']](**DEF_DASH))
         value_loss, value_summary = self._value_loss(
-            observ, reward, length, action)
-        network=self._network(observ, length)
-        policy_loss, policy_summary=self._policy_loss(
+            observ, reward, length, action, expert_s, expert_a)
+        network = self._network(observ, length)
+        policy_loss, policy_summary = self._policy_loss(
             old_policy, network.policy, action, advantage, length)
-        loss=policy_loss + value_loss + network.get('loss', 0)
-        gradients, variables=(
+        loss = policy_loss + value_loss + network.get('loss', 0)
+        gradients, variables = (
             zip(*self._optimizer.compute_gradients(loss)))
-        optimize=self._optimizer.apply_gradients(
+        optimize = self._optimizer.apply_gradients(
             zip(gradients, variables))
-        summary=tf.summary.merge([
+        summary = tf.summary.merge([
             value_summary, policy_summary,
             tf.summary.histogram('network_loss', network.get('loss', 0)),
             tf.summary.scalar('gradient_norm', tf.global_norm(gradients)),
@@ -624,7 +628,7 @@ class GAIL_DEF_PPO(object):
         with tf.control_dependencies([optimize]):
             return [tf.identity(x) for x in (value_loss, policy_loss, summary)]
 
-    def _value_loss(self, observ, reward, length, action):
+    def _value_loss(self, observ, reward, length, action, expert_s, expert_a):
         """Compute the loss function for the value baseline.
 
         The value loss is the difference between empirical and approximated returns
@@ -639,24 +643,28 @@ class GAIL_DEF_PPO(object):
           Tuple of loss tensor and summary tensor.
         """
         with tf.name_scope('value_loss'):
-            value=self._network(observ, length).value
+            value = self._network(observ, length).value
             if self._config.is_gail:
-                return_=utility.discounted_return(
+                return_ = utility.discounted_return(
                     reward, length, self._config.discount)
             else:
-                def_action=tf.reshape(action[:, :, 13:23], shape = [
-                                        tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+                def_action = tf.reshape(action[:, :, 13:23], shape=[
+                    tf.shape(action)[0], tf.shape(action)[1], 5, 2])
                 with tf.device('/gpu:0'):
-                    return_=Discriminator.get_rewards(
+                    expert_s_concat = tf.concat(
+                        [observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
+                    return_ = Discriminator.get_rewards(
                         observ[:, :, -1], def_action, self._config)
-                    return_=tf.reshape(return_, [-1, 1])
-                    return_=tf.tile(return_, [1, self._config.max_length])
-            advantage=return_ - value
-            value_loss=0.5 * self._mask(advantage ** 2, length)
-            summary=tf.summary.merge([
+                    # return_ = Discriminator.get_rewards(
+                    #     observ[:, :, -1], def_action, expert_s_concat, expert_a, self._config)
+                    return_ = tf.reshape(return_, [-1, 1])
+                    return_ = tf.tile(return_, [1, self._config.max_length])
+            advantage = return_ - value
+            value_loss = 0.5 * self._mask(advantage ** 2, length)
+            summary = tf.summary.merge([
                 tf.summary.histogram('value_loss', value_loss),
                 tf.summary.scalar('avg_value_loss', tf.reduce_mean(value_loss))])
-            value_loss=tf.reduce_mean(value_loss)
+            value_loss = tf.reduce_mean(value_loss)
             return tf.check_numerics(value_loss, 'value_loss'), summary
 
     def _policy_loss(
@@ -683,33 +691,33 @@ class GAIL_DEF_PPO(object):
         with tf.name_scope('policy_loss'):
             # only need to compare the kl divergence between the same policy, offense or defense
             # action.shape=(batch_size,episode_len,11,2)
-            batch_size=tf.shape(action)[0]
-            episode_len=action.shape.as_list()[1]
-            def_dash_policy_format=action[:, :, 13:]
-            action_policy_format=[]
+            batch_size = tf.shape(action)[0]
+            episode_len = action.shape.as_list()[1]
+            def_dash_policy_format = action[:, :, 13:]
+            action_policy_format = []
             action_policy_format.append(def_dash_policy_format)
 
             def get_policy_gradient(category):
                 return tf.exp(policy[category].log_prob(action_policy_format[category]) - old_policy[category].log_prob(action_policy_format[category]))
-            policy_gradient=get_policy_gradient(ACT['DEF_DASH'])
+            policy_gradient = get_policy_gradient(ACT['DEF_DASH'])
 
             def get_kl_divergence(category):
                 return tf.contrib.distributions.kl_divergence(old_policy[category], policy[category])
 
-            kl=get_kl_divergence(ACT['DEF_DASH'])
+            kl = get_kl_divergence(ACT['DEF_DASH'])
             # Infinite values in the KL, even for padding frames that we mask out,
             # cause NaN gradients since TensorFlow computes gradients with respect to
             # the whole input tensor.
-            kl=tf.check_numerics(kl, 'kl')
-            kl=tf.reduce_mean(self._mask(kl, length), 1)
+            kl = tf.check_numerics(kl, 'kl')
+            kl = tf.reduce_mean(self._mask(kl, length), 1)
 
-            surrogate_loss=-tf.reduce_mean(self._mask(
+            surrogate_loss = -tf.reduce_mean(self._mask(
                 policy_gradient * tf.stop_gradient(advantage), length), 1)
-            surrogate_loss=tf.check_numerics(
+            surrogate_loss = tf.check_numerics(
                 surrogate_loss, 'surrogate_loss')
-            kl_penalty=self._penalty * kl
-            cutoff_threshold=self._config.kl_target * self._config.kl_cutoff_factor
-            cutoff_count=tf.reduce_sum(
+            kl_penalty = self._penalty * kl
+            cutoff_threshold = self._config.kl_target * self._config.kl_cutoff_factor
+            cutoff_count = tf.reduce_sum(
                 tf.cast(kl > cutoff_threshold, tf.int32))
             with tf.control_dependencies([tf.cond(
                     cutoff_count > 0,
@@ -718,17 +726,17 @@ class GAIL_DEF_PPO(object):
                     self._config.kl_cutoff_coef *
                     tf.cast(kl > cutoff_threshold, tf.float32) *
                     (kl - cutoff_threshold) ** 2)
-            policy_loss=surrogate_loss + kl_penalty + kl_cutoff
+            policy_loss = surrogate_loss + kl_penalty + kl_cutoff
 
             # def get_entropy(category):
             #     return policy[category].entropy()
             # TODO shape mismatched!!!!!!!!!!! between entropy(?,?) and policy_loss(?), bugs in original code?
             def get_entropy(category):
-                return tf.reduce_mean(policy[category].entropy(), axis = 1)
-            entropy=get_entropy(ACT['DEF_DASH'])
+                return tf.reduce_mean(policy[category].entropy(), axis=1)
+            entropy = get_entropy(ACT['DEF_DASH'])
             if self._config.entropy_regularization:
                 policy_loss -= self._config.entropy_regularization * entropy
-            summary=tf.summary.merge([
+            summary = tf.summary.merge([
                 tf.summary.histogram('entropy', entropy),
                 tf.summary.histogram('surrogate_loss', surrogate_loss),
                 # policy gradient # importance sampling
@@ -746,7 +754,7 @@ class GAIL_DEF_PPO(object):
                 tf.summary.scalar('avg_kl_penalty',
                                   tf.reduce_mean(kl_penalty)),
                 tf.summary.scalar('avg_policy_loss', tf.reduce_mean(policy_loss))])
-            policy_loss=tf.reduce_mean(policy_loss, 0)
+            policy_loss = tf.reduce_mean(policy_loss, 0)
             return tf.check_numerics(policy_loss, 'policy_loss'), summary
 
     def _adjust_penalty(self, observ, old_policy_params, length):
@@ -764,28 +772,28 @@ class GAIL_DEF_PPO(object):
         Returns:
           Summary tensor.
         """
-        old_policy=[]
+        old_policy = []
         for i in range(1):
             old_policy.append(self._policy_type[i](**(old_policy_params[i])))
         with tf.name_scope('adjust_penalty'):
-            network=self._network(observ, length)
+            network = self._network(observ, length)
 
             def get_kl_divergence(category):
                 return tf.contrib.distributions.kl_divergence(old_policy[category], network.policy[category])
-            kl=get_kl_divergence(ACT['DEF_DASH'])
-            print_penalty=tf.Print(0, [self._penalty], 'current penalty: ')
+            kl = get_kl_divergence(ACT['DEF_DASH'])
+            print_penalty = tf.Print(0, [self._penalty], 'current penalty: ')
             with tf.control_dependencies([print_penalty]):
-                kl_change=tf.reduce_mean(self._mask(
+                kl_change = tf.reduce_mean(self._mask(
                     kl,
                     length))
-                kl_change=tf.Print(kl_change, [kl_change], 'kl change: ')
-                maybe_increase=tf.cond(
+                kl_change = tf.Print(kl_change, [kl_change], 'kl change: ')
+                maybe_increase = tf.cond(
                     kl_change > 1.3 * self._config.kl_target,
                     # pylint: disable=g-long-lambda
                     lambda: tf.Print(self._penalty.assign(
                         self._penalty * 1.5), [self._penalty], 'increase penalty '),
                     float)
-                maybe_decrease=tf.cond(
+                maybe_decrease = tf.cond(
                     kl_change < 0.7 * self._config.kl_target,
                     # pylint: disable=g-long-lambda
                     # + 1e-8 prevent vanished
@@ -797,7 +805,7 @@ class GAIL_DEF_PPO(object):
                     tf.summary.scalar('kl_change', kl_change),
                     tf.summary.scalar('penalty', self._penalty)])
 
-    def _mask(self, tensor, length, padding_value = 0):
+    def _mask(self, tensor, length, padding_value=0):
         """Set padding elements of a batch of sequences to a constant.
 
         Useful for setting padding elements to zero before summing along the time
@@ -812,19 +820,17 @@ class GAIL_DEF_PPO(object):
           Masked sequences.
         """
         with tf.name_scope('mask'):
-            range_=tf.range(tensor.shape[1].value)
-            mask=range_[None, :] < length[:, None]
+            range_ = tf.range(tensor.shape[1].value)
+            mask = range_[None, :] < length[:, None]
             if tensor.shape.ndims > 2:
                 for _ in range(tensor.shape.ndims - 2):
-                    mask=mask[..., None]
-                mask=tf.tile(mask, [1, 1] + tensor.shape[2:].as_list())
-            masked=tf.where(mask, tensor, padding_value *
+                    mask = mask[..., None]
+                mask = tf.tile(mask, [1, 1] + tensor.shape[2:].as_list())
+            masked = tf.where(mask, tensor, padding_value *
                               tf.ones_like(tensor))
             return tf.check_numerics(masked, 'masked')
 
 
-ACT={
+ACT = {
     'DEF_DASH': 0
-
-
 }

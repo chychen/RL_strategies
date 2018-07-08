@@ -287,12 +287,12 @@ def train(config, env_processes, outdir):
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
         # NOTE reset variables in optimizer
-        # opt_reset_D = tf.group(
-        #     [v.initializer for v in graph.algo.D.optimizer.variables()])
-        # # reset PPO optimizer
-        # opt_reset = tf.group(
-        #     [v.initializer for v in graph.algo._optimizer.variables()])
-        # sess.run([opt_reset, opt_reset_D])
+        opt_reset_D = tf.group(
+            [v.initializer for v in graph.algo.D.optimizer.variables()])
+        # reset PPO optimizer
+        opt_reset = tf.group(
+            [v.initializer for v in graph.algo._optimizer.variables()])
+        sess.run([opt_reset, opt_reset_D])
         # visulization stuff
         if FLAGS.tally_only:
             tally_reward_line_chart(config, sess.run(

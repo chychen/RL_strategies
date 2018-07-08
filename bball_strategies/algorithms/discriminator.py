@@ -73,7 +73,7 @@ class Discriminator(object):
                     # assign_add_ = tf.assign_add(self._steps, 1)
                     # with tf.control_dependencies([assign_add_]):
                     self.optimizer = self._config.optimizer(
-                        learning_rate=self._config.learning_rate)  # TODO beta1=0.5, beta2=0.9
+                        learning_rate=self._config.learning_rate, beta1=0.0, beta2=0.9)  # TODO beta1=0.5, beta2=0.9
                     grads = tf.gradients(self._loss, theta)
                     grads = list(zip(grads, theta))
                     self._train_op = self.optimizer.apply_gradients(
@@ -145,6 +145,19 @@ class Discriminator(object):
         with tf.variable_scope('Discriminator'):
             rewards, _ = config.d_network(state, action, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
             return rewards
+
+    # @classmethod
+    # def get_rewards(cls, agent_s, agent_a, expert_s, expert_a, config):
+    #     with tf.variable_scope('Discriminator'):
+    #         # rewards, _ = config.d_network(agent_s, agent_a, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
+    #         fake_scores, _ = config.d_network(
+    #             agent_s, agent_a, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
+    #         real_scores, _ = config.d_network(
+    #             expert_s, expert_a, reuse=tf.AUTO_REUSE, is_gail=config.is_gail)
+    #         f_fake = tf.reduce_mean(fake_scores)
+    #         f_real = tf.reduce_mean(real_scores)
+    #         em_distance = f_real - f_fake
+    #         return -em_distance
 
     def get_rewards_value(self, state, action):
         feed_dict = {
