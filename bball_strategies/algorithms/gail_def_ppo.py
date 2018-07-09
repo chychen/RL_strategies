@@ -345,9 +345,9 @@ class GAIL_DEF_PPO(object):
             tf.shape(action)[0], tf.shape(action)[1], 5, 2])
         return_ = Discriminator.get_rewards(
             observ[:, :, -1], def_action, self._config)
-        return_ = tf.tile(return_[:, None], [1, self._config.max_length])
         update_reward = self._reward_filter.update(return_)
         with tf.control_dependencies([update_reward]):
+            return_ = tf.tile(return_[:, None], [1, self._config.max_length])
             # return_ = tf.concat([tf.zeros(shape=[tf.shape(return_)[0], self._config.max_length-1]), return_[:, None]], axis=1)
             episodes = (observ, action, old_policy_params,
                         return_, expert_s, expert_a)
