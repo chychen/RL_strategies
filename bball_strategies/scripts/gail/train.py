@@ -171,7 +171,8 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, norm
     real_rewards = D.get_rewards_value(
         real_numpy_collector, real_act_collector)
     # vis
-    vis_line_chart(real_rewards, fake_rewards, config.logdir, str(steps))
+    save_path = os.path.join(config.logdir, 'gail_testing_G{}_D{}'.format(config.max_length, config.D_len))
+    vis_line_chart(real_rewards, fake_rewards, save_path, str(steps))
     print('tally_reward_line_chart time cost: {}'.format(time.time() - timer))
 
 
