@@ -280,7 +280,7 @@ def train(config, env_processes, outdir):
     # TF Session
     # TODO _num_finished_episodes => Variable:0
     saver = utility.define_saver(
-        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0', r'.*Adam.*', r'.*beta.*'))
+        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0'))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True

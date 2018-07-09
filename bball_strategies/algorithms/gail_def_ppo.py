@@ -479,7 +479,7 @@ class GAIL_DEF_PPO(object):
                             num_data = 1
                         else:
                             num_data = self._config.max_length - self._config.D_len
-                        for i in range(num_data):
+                        for i in range(0, num_data, self._config.non_overlap_len):
                             training_obs.append(
                                 observ[:, i:i + self._config.D_len, -1])
                             training_act.append(
