@@ -91,12 +91,12 @@ def double_curiculum():
     # one episode can generate 'max_length' episodes, d_batch_size must be the multiple of num_agents
     d_batch_size = 200
     if use_padding:
-        episodes_per_batch = d_batch_size // (max_length - D_len + 10)
+        episodes_per_batch = d_batch_size // (max_length - D_len + 10) + 1
     else:
         if max_length == D_len:
             episodes_per_batch = d_batch_size
         else:
-            episodes_per_batch = d_batch_size // (max_length - D_len)
+            episodes_per_batch = d_batch_size // (max_length - D_len) + 1
     gail_steps = episodes_per_batch * max_length // num_agents
     # Vis
     vis_testing_freq = train_d_per_ppo * 2500 // max_length
