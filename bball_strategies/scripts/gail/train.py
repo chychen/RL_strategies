@@ -145,7 +145,7 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, norm
     episode_amount = 100
     # env
     vanilla_env = gym.make(config.env)
-    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/GAILTransitionData_52.hdf5', 'r'), init_mode=1, fps=config.FPS, if_back_real=False,
+    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/GAILTransitionData_522.hdf5', 'r'), init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=50)
     # fake
     numpy_collector = []
@@ -261,7 +261,7 @@ def train(config, env_processes, outdir):
 
     # env to testing
     vanilla_env = gym.make(config.env)
-    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/GAILTransitionData_52.hdf5', 'r'), init_mode=1, fps=config.FPS, if_back_real=False,
+    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/GAILTransitionData_522.hdf5', 'r'), init_mode=1, fps=config.FPS, if_back_real=False,
                                time_limit=50)
     vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_G{}_D{}/'.format(config.max_length, config.D_len)), if_back_real=False, video_callable=lambda _: True,
                                  # init from dataset
