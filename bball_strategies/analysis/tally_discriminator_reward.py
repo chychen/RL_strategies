@@ -8,21 +8,19 @@ import plotly.offline as py
 import plotly.graph_objs as go
 
 
-def vis_line_chart(real_rewards, fake_rewards, root_path, post_fix):
+def vis_line_chart(real_rewards, fake_rewards, save_path, post_fix):
     """
     real_rewards : float, shape=(num_of_episode, episode_lenth)
         rewards is formatted state by state
     fake_rewards : float, shape=(num_of_episode, episode_lenth)
         rewards is formatted state by state
-    root_path : str, 
-        line charts will be saved into the '{root_path}/line_chart'
+    save_path : str, 
+        where to save line chart
         (create new folder if not exist)
     post_fix: str
         post_fix to the line chart file
     """
 
-    save_path = os.path.join(
-        root_path, 'line_chart/')
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     all_trace = []

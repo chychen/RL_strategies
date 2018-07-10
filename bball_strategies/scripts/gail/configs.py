@@ -76,7 +76,7 @@ def double_curiculum():
     train_len = 12
     max_length = train_len - 2
     D_len = 10
-    non_overlap_len = 10
+    non_overlap_len = 5
     use_padding = False
     ########################################################
     num_agents = 20

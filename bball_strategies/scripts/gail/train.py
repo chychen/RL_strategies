@@ -117,7 +117,7 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
     print('test_policy time cost: {}'.format(time.time() - timer))
 
 
-def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, normalize_action):
+def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, normalize_action, stochastic=False):
     """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
     """
     timer = time.time()
@@ -139,7 +139,7 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, norm
         real_epi_act = []
         for _ in range(vanilla_env.time_limit):
             vanilla_act = ppo_policy.act(
-                np.array(vanilla_obs)[None, None], stochastic=False)
+                np.array(vanilla_obs)[None, None], stochastic=stochastic)
             vanilla_trans_act = [
                 # Discrete(3) must be int
                 int(0),
@@ -171,7 +171,10 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, norm
     real_rewards = D.get_rewards_value(
         real_numpy_collector, real_act_collector)
     # vis
-    save_path = os.path.join(config.logdir, 'gail_testing_G{}_D{}'.format(config.max_length, config.D_len))
+    if stochastic:
+        save_path = os.path.join(config.logdir, 'gail_testing_G{}_D{}'.format(config.max_length, config.D_len), 'line_chart_stochastic/')
+    else:
+        save_path = os.path.join(config.logdir, 'gail_testing_G{}_D{}'.format(config.max_length, config.D_len), 'line_chart/')
     vis_line_chart(real_rewards, fake_rewards, save_path, str(steps))
     print('tally_reward_line_chart time cost: {}'.format(time.time() - timer))
 
@@ -280,7 +283,7 @@ def train(config, env_processes, outdir):
     # TF Session
     # TODO _num_finished_episodes => Variable:0
     saver = utility.define_saver(
-        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0'))
+        exclude=(r'.*_temporary.*', r'.*memory.*'))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
@@ -298,6 +301,8 @@ def train(config, env_processes, outdir):
         if FLAGS.tally_only:
             tally_reward_line_chart(config, sess.run(
                 graph.algo.D._steps), ppo_policy, D, normalize_observ, normalize_action)
+            tally_reward_line_chart(config, sess.run(
+                graph.algo.D._steps), ppo_policy, D, normalize_observ, normalize_action, stochastic=True)
             exit()
         # GAIL
         cumulate_steps = sess.run(graph.step)
@@ -331,6 +336,8 @@ def train(config, env_processes, outdir):
                 if counter % (config.tally_line_chart_freq) == 0:
                     tally_reward_line_chart(config, sess.run(
                         graph.algo.D._steps), ppo_policy, graph.algo.D, normalize_observ, normalize_action)
+                    tally_reward_line_chart(config, sess.run(
+                        graph.algo.D._steps), ppo_policy, graph.algo.D, normalize_observ, normalize_action, stochastic=True)
                 counter += 1
             print('Time Cost of Discriminator per Update: {}'.format(
                 (time.time() - gail_timer) / num_d_to_train))
@@ -340,7 +347,6 @@ def train(config, env_processes, outdir):
                 yield score
     batch_env.close()
     vanilla_env.close()
-    env.close()
 
 
 def main(_):
