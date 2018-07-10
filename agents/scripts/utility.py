@@ -66,7 +66,7 @@ def define_simulation_graph(batch_env, algo_cls, config):
     return tools.AttrDict(locals())
 
 
-def define_batch_env(constructor, num_agents, env_processes, outdir=None, is_gail=True):
+def define_batch_env(constructor, num_agents, env_processes, outdir=None):
     """Create environments and apply all desired wrappers.
 
     Args:
@@ -96,7 +96,7 @@ def define_batch_env(constructor, num_agents, env_processes, outdir=None, is_gai
         else:
             envs = [constructor() for _ in range(num_agents)]
         batch_env = tools.BatchEnv(envs, blocking=not env_processes)
-        batch_env = tools.InGraphBatchEnv(batch_env, is_gail=is_gail)
+        batch_env = tools.InGraphBatchEnv(batch_env)
     return batch_env
 
 

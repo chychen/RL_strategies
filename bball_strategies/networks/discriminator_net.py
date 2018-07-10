@@ -55,7 +55,7 @@ def residual_block(name, inputs, n_filters, n_layers=2, residual_alpha=1.0, leak
         return next_input * residual_alpha + inputs
 
 
-def network(state, action, reuse=False, is_gail=True):
+def network(state, action, reuse=False):
     """
     network structure is alike the value estimation in ppo
     state : shape=[batch_size, length, 11, 2]
@@ -67,29 +67,17 @@ def network(state, action, reuse=False, is_gail=True):
         buffer_size = tf.shape(state)[1]
         input_ = tf.reshape(state, shape=[batch_size, buffer_size, functools.reduce(
             operator.mul, state.shape.as_list()[2:], 1)])
-        if is_gail:
-            action_ = tf.reshape(action, shape=[batch_size, 5*2])
-            hyper_action = tf.layers.dense(
-                inputs=action_,
-                units=functools.reduce(operator.mul, state.shape.as_list()[2:], 1),
-                activation=leaky_relu,
-                kernel_initializer=layers.xavier_initializer(),
-                bias_initializer=tf.zeros_initializer()
-            )
-            hyper_action = tf.reshape(hyper_action, shape=[
-                                    batch_size, 1, functools.reduce(operator.mul, state.shape.as_list()[2:], 1)])
-        else:
-            action_ = tf.reshape(action, shape=[batch_size, buffer_size, 5*2])
-            hyper_action = tf.layers.conv1d(
-                inputs=action_,
-                filters=functools.reduce(operator.mul, state.shape.as_list()[2:], 1),
-                kernel_size = 5,
-                strides = 1,
-                padding = 'same',
-                activation = leaky_relu,
-                kernel_initializer = layers.xavier_initializer(),
-                bias_initializer = tf.zeros_initializer()
-            )
+        action_ = tf.reshape(action, shape=[batch_size, buffer_size, 5*2])
+        hyper_action = tf.layers.conv1d(
+            inputs=action_,
+            filters=functools.reduce(operator.mul, state.shape.as_list()[2:], 1),
+            kernel_size = 5,
+            strides = 1,
+            padding = 'same',
+            activation = leaky_relu,
+            kernel_initializer = layers.xavier_initializer(),
+            bias_initializer = tf.zeros_initializer()
+        )
         sum_act_obs=tf.add(input_, hyper_action)
         conv_input=tf.layers.conv1d(
             inputs = sum_act_obs,

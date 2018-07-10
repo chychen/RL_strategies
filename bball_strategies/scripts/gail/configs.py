@@ -63,21 +63,16 @@ def default():
     episodes_per_batch = 5
     d_batch_size = max_length * episodes_per_batch
     train_d_per_ppo = 5
-    # Gail
-    is_gail = False # to be depregated
-    is_double_curiculum = False  # to be depregated
 
     return locals()
 
 def double_curiculum():
     locals().update(default())
     ########################################################
-    is_double_curiculum = True
     train_len = 12
     max_length = train_len - 2
     D_len = 10
     non_overlap_len = 5
-    use_padding = False
     ########################################################
     num_agents = 20
     # ppo

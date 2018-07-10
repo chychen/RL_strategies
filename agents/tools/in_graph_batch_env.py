@@ -33,14 +33,13 @@ class InGraphBatchEnv(object):
     flags are held in according variables.
     """
 
-    def __init__(self, batch_env, is_gail=True):
+    def __init__(self, batch_env):
         """Batch of environments inside the TensorFlow graph.
 
         Args:
           batch_env: Batch environment.
         """
         self._batch_env = batch_env
-        self._is_gail = is_gail
         observ_shape = self._parse_shape(self._batch_env.observation_space)
         observ_dtype = self._parse_dtype(self._batch_env.observation_space)
         action_shape = self._parse_shape(self._batch_env.action_space)
@@ -151,16 +150,6 @@ class InGraphBatchEnv(object):
     @property
     def reward(self):
         """Access the variable holding the current reward."""
-        # NOTE: modified
-        # if self._is_gail:
-        #     # omit env reward!!! use discriminator as reward insteaded!!!
-        #     def_action = tf.reshape(self._action[:, 13:23], shape=[
-        #                             len(self._batch_env), 1, 5, 2])
-        #     with tf.device('/gpu:0'):
-        #         reward = Discriminator().get_rewards(self._observ, def_action)
-        #     return reward
-        # else:
-        #     return self._reward
         return self._reward
 
     @property

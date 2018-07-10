@@ -431,78 +431,39 @@ class GAIL_DEF_PPO(object):
                      reward, expert_s, expert_a), length = data
                     observ = self._observ_filter.transform(observ)
                     reward = self._reward_filter.transform(reward)
-                if self._config.is_double_curiculum:
-                    if self._config.use_padding:
-                        # 1. padding with buffer
-                        # buffer = observ[:, 0, :-1]
-                        # padded_observ = tf.concat(
-                        #     [buffer, observ[:, :, -1]], axis=1)
-                        # reshape_act = tf.reshape(action[:, :, 13:23], [
-                        #                          tf.shape(action)[0], tf.shape(action)[1], 5, 2])
-                        # padded_act = tf.concat(
-                        #     [tf.zeros(shape=[tf.shape(reshape_act)[0], 9, 5, 2]), reshape_act], axis=1)
-                        # print(padded_observ)
-                        # print(padded_act)
-                        # real_buffer = tf.concat([buffer[:, :, 0:6], tf.tile(expert_s[:, 0], [1, 9]), buffer[:, :, 11:14]], axis=2)
-                        # real_observ = tf.concat([observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
-                        # real_padded_observ = tf.concat(
-                        #     [real_buffer, real_observ], axis=1)
-                        # real_padded_act = tf.concat(
-                        #     [tf.zeros(shape=[tf.shape(reshape_act)[0], 9, 5, 2]), reshape_act], axis=1)
-                        # print(real_padded_observ)
-                        # print(real_padded_act)
-                        # exit() # NOTE the it's very weird to pad zeros.
-                        # # 2. split the whole episode into training data of Discriminator with length=config.D_len
-                        # training_obs = []
-                        # training_act = []
-                        # for i in range(self._config.max_length-self._config.D_len+10):
-                        #     training_obs.append(
-                        #         padded_observ[:, i:i+self._config.D_len])
-                        #     training_act.append(
-                        #         padded_act[:, i:i+self._config.D_len])
-                        # training_obs = tf.concat(training_obs, axis=0)
-                        # training_act = tf.concat(training_act, axis=0)
-                        # print(training_obs)
-                        # print(training_act)
-                        # self.D = Discriminator(
-                        #     training_obs, training_act, self._config)
-                        pass
+                
+                    reshape_act = tf.reshape(action[:, :, 13:23], [
+                                                tf.shape(action)[0], tf.shape(action)[1], 5, 2])
+                    # split the whole episode into training data of Discriminator with length=config.D_len
+                    training_obs = []
+                    training_act = []
+                    real_training_obs = []
+                    real_training_act = []
+                    if self._config.max_length - self._config.D_len == 0:
+                        num_data = 1
                     else:
-                        reshape_act = tf.reshape(action[:, :, 13:23], [
-                                                 tf.shape(action)[0], tf.shape(action)[1], 5, 2])
-                        # split the whole episode into training data of Discriminator with length=config.D_len
-                        training_obs = []
-                        training_act = []
-                        real_training_obs = []
-                        real_training_act = []
-                        if self._config.max_length - self._config.D_len == 0:
-                            num_data = 1
-                        else:
-                            num_data = self._config.max_length - self._config.D_len
-                        for i in range(0, num_data, self._config.non_overlap_len):
-                            training_obs.append(
-                                observ[:, i:i + self._config.D_len, -1])
-                            training_act.append(
-                                reshape_act[:, i:i + self._config.D_len])
-                            real_training_obs.append(tf.concat(
-                                [observ[:, i:i + self._config.D_len, -1, 0:6], expert_s[:, i:i + self._config.D_len], observ[:, i:i + self._config.D_len, -1, 11:14]], axis=2))
-                            real_training_act.append(
-                                expert_a[:, i:i + self._config.D_len])
-                        training_obs = tf.concat(training_obs, axis=0)
-                        training_act = tf.concat(training_act, axis=0)
-                        real_training_obs = tf.concat(
-                            real_training_obs, axis=0)
-                        real_training_act = tf.concat(
-                            real_training_act, axis=0)
-                        print(training_obs)
-                        print(training_act)
-                        print(real_training_obs)
-                        print(real_training_act)
-                        self.D = Discriminator(
-                            training_obs, training_act, real_training_obs, real_training_act, self._config)
-                else:
+                        num_data = self._config.max_length - self._config.D_len
+                    for i in range(0, num_data, self._config.non_overlap_len):
+                        training_obs.append(
+                            observ[:, i:i + self._config.D_len, -1])
+                        training_act.append(
+                            reshape_act[:, i:i + self._config.D_len])
+                        real_training_obs.append(tf.concat(
+                            [observ[:, i:i + self._config.D_len, -1, 0:6], expert_s[:, i:i + self._config.D_len], observ[:, i:i + self._config.D_len, -1, 11:14]], axis=2))
+                        real_training_act.append(
+                            expert_a[:, i:i + self._config.D_len])
+                    training_obs = tf.concat(training_obs, axis=0)
+                    training_act = tf.concat(training_act, axis=0)
+                    real_training_obs = tf.concat(
+                        real_training_obs, axis=0)
+                    real_training_act = tf.concat(
+                        real_training_act, axis=0)
+                    print(training_obs)
+                    print(training_act)
+                    print(real_training_obs)
+                    print(real_training_act)
                     self.D = Discriminator(
-                        observ[:, :, -1], tf.reshape(action[:, :, 13:23], [tf.shape(action)[0], tf.shape(action)[1], 5, 2]), self._config)
+                        training_obs, training_act, real_training_obs, real_training_act, self._config)
                 with tf.control_dependencies([self.D._train_op]):
                     clear_memory = tf.group(
                         self._finished_episodes.clear(),
@@ -562,28 +523,6 @@ class GAIL_DEF_PPO(object):
         value = self._network(observ, length).value
         return_ = reward
         advantage = return_ - value
-        # if self._config.is_gail:
-        #     return_ = utility.discounted_return(
-        #         reward, length, self._config.discount)
-        #     if self._config.gae_lambda:  # NOTE
-        #         advantage = utility.lambda_advantage(
-        #             reward, value, length, self._config.discount,
-        #             self._config.gae_lambda)
-        #     else:
-        #         advantage = return_ - value
-        # else:
-        #     def_action = tf.reshape(action[:, :, 13:23], shape=[
-        #         tf.shape(action)[0], tf.shape(action)[1], 5, 2])
-        #     with tf.device('/gpu:0'):
-        #         expert_s_concat = tf.concat(
-        #             [observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
-        #         return_ = Discriminator.get_rewards(
-        #             observ[:, :, -1], def_action, self._config)
-        #         # return_ = Discriminator.get_rewards(
-        #         #     observ[:, :, -1], def_action, expert_s_concat, expert_a, self._config)
-        #         return_ = tf.reshape(return_, [-1, 1])
-        #         return_ = tf.tile(return_, [1, self._config.max_length])
-        #     advantage = return_ - value
         mean, variance = tf.nn.moments(
             advantage, axes=[0, 1], keep_dims=True)
         advantage = (advantage - mean) / (tf.sqrt(variance) + 1e-8)
@@ -663,21 +602,6 @@ class GAIL_DEF_PPO(object):
         with tf.name_scope('value_loss'):
             value = self._network(observ, length).value
             return_ = reward
-            # if self._config.is_gail:
-            #     return_ = utility.discounted_return(
-            #         reward, length, self._config.discount)
-            # else:
-            #     def_action = tf.reshape(action[:, :, 13:23], shape=[
-            #         tf.shape(action)[0], tf.shape(action)[1], 5, 2])
-            #     with tf.device('/gpu:0'):
-            #         expert_s_concat = tf.concat(
-            #             [observ[:, :, -1, 0:6], expert_s, observ[:, :, -1, 11:14]], axis=2)
-            #         return_ = Discriminator.get_rewards(
-            #             observ[:, :, -1], def_action, self._config)
-            #         # return_ = Discriminator.get_rewards(
-            #         #     observ[:, :, -1], def_action, expert_s_concat, expert_a, self._config)
-            #         return_ = tf.reshape(return_, [-1, 1])
-            #         return_ = tf.tile(return_, [1, self._config.max_length])
             advantage = return_ - value
             value_loss = 0.5 * self._mask(advantage ** 2, length)
             summary = tf.summary.merge([

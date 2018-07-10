@@ -32,7 +32,7 @@ from bball_strategies.analysis.tally_discriminator_reward import vis_line_chart
 
 
 def _create_environment(config):
-    """Constructor for an instance of the environment.
+    """ Constructor for an instance of the environment.
 
     Args
     -----
@@ -50,16 +50,18 @@ def _create_environment(config):
 
 
 def _define_loop(graph, logdir, train_steps, eval_steps):
-    """Create and configure a training loop with training and evaluation phases.
+    """ Create and configure a training loop with training and evaluation phases.
 
-    Args:
-      graph: Object providing graph elements via attributes.
-      logdir: Log directory for storing checkpoints and summaries.
-      train_steps: Number of training steps per epoch.
-      eval_steps: Number of evaluation steps per epoch.
+    Args
+    -----
+    graph : Object providing graph elements via attributes.
+    logdir : Log directory for storing checkpoints and summaries.
+    train_steps : Number of training steps per epoch.
+    eval_steps : Number of evaluation steps per epoch.
 
-    Returns:
-      Loop object.
+    Returns
+    -------
+    Loop object.
     """
     loop = tools.Loop(
         logdir, graph.step, graph.should_log, graph.do_report,
@@ -84,7 +86,16 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
 def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
     """ test policy
     - draw episode into mpeg video
-    - collect episdoe and each state scores into numpy
+    - collect episode with scores on each frame into .npz file (for out customized player)
+
+    Args
+    -----
+    config : object, providing configurations via attributes.
+    vanilla_env : object, env
+    steps : int, to name the file with number of iterations of Discriminator
+    ppo_policy : object, policy to generate actions
+    D : object, discriminator to judge realistic
+    denormalize_observ : function, denorm the returned observation
     """
     timer = time.time()
     numpy_collector = []
@@ -118,7 +129,17 @@ def test_policy(config, vanilla_env, steps, ppo_policy, D, denormalize_observ):
 
 
 def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, normalize_action, stochastic=False):
-    """ tally 100 episodes as line chart to show how well the discriminator judge on each state of real and fake episode
+    """ tally a line chart by 100 episodes to show how well the discriminator judge on each state
+
+    Args
+    -----
+    config : object, providing configurations via attributes.
+    steps : int, to name the file with number of iterations of Discriminator
+    ppo_policy : object, policy to generate actions
+    D : object, discriminator to judge realistic
+    normalize_observ : function, norm the states of real data
+    normalize_action : function, norm the actions of real data
+    stochastic : bool, decide the methods to generate actions, True->sampled, False->select mode
     """
     timer = time.time()
     episode_amount = 100
@@ -143,11 +164,11 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, norm
             vanilla_trans_act = [
                 # Discrete(3) must be int
                 int(0),
-                # Box(2,)
+                # Box(2,), ball
                 np.array([0.0, 0.0], dtype=np.float32),
-                # Box(5, 2)
+                # Box(5, 2), offense
                 np.zeros(shape=[5, 2], dtype=np.float32),
-                # Box(5, 2)
+                # Box(5, 2), defense
                 np.reshape(vanilla_act, [5, 2])
             ]
             vanilla_obs, _, _, info = vanilla_env.step(
@@ -172,20 +193,20 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, norm
         real_numpy_collector, real_act_collector)
     # vis
     if stochastic:
-        save_path = os.path.join(config.logdir, 'gail_testing_G{}_D{}'.format(config.max_length, config.D_len), 'line_chart_stochastic/')
+        save_path = os.path.join(config.logdir, 'gail_testing_G{}_D{}'.format(
+            config.max_length, config.D_len), 'line_chart_stochastic/')
     else:
-        save_path = os.path.join(config.logdir, 'gail_testing_G{}_D{}'.format(config.max_length, config.D_len), 'line_chart/')
+        save_path = os.path.join(config.logdir, 'gail_testing_G{}_D{}'.format(
+            config.max_length, config.D_len), 'line_chart/')
     vis_line_chart(real_rewards, fake_rewards, save_path, str(steps))
     print('tally_reward_line_chart time cost: {}'.format(time.time() - timer))
 
 
-def capped_video_schedule(episode_id):
-    return episode_id % 500 == 0
-
-
 class MonitorWrapper(gym.wrappers.Monitor):
-    # init_mode 0 : init by default
-    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./test/', if_back_real=False, video_callable=capped_video_schedule):
+    """ class wrapper to record the interaction between policy and environment
+    """
+
+    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./test/', if_back_real=False, video_callable=lambda _: True):
         super(MonitorWrapper, self).__init__(env=env, directory=directory,
                                              video_callable=video_callable, force=True)
         self._env = env
@@ -198,14 +219,6 @@ class MonitorWrapper(gym.wrappers.Monitor):
 
     def __getattr__(self, name):
         return getattr(self._env, name)
-
-    @property
-    def data(self):
-        return self._env.data
-
-    @data.setter
-    def data(self, value):
-        self._env.data = value
 
 
 def train(config, env_processes, outdir):
@@ -253,20 +266,14 @@ def train(config, env_processes, outdir):
     vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_G{}_D{}/'.format(config.max_length, config.D_len)), if_back_real=False, video_callable=lambda _: True,
                                  # init from dataset
                                  init_mode=1)
-    # env to generate fake state
-    # env = gym.make(config.env)
-    # env = BBallWrapper(env, data=h5py.File('bball_strategies/data/GAILTransitionData_{}.hdf5'.format(config.train_len), 'r'), init_mode=1, fps=config.FPS, if_back_real=config.if_back_real,
-    #                    time_limit=config.max_length)
-    # env = MonitorWrapper(env, directory=os.path.join(config.logdir, 'gail_training/'), if_back_real=config.if_back_real,
-    #                      # init from dataset in order
-    #                      init_mode=1)
+
     # PPO graph
     if config.update_every % config.num_agents:
         tf.logging.warn('Number of agents should divide episodes per update.')
     with tf.device('/cpu:0'):
         batch_env = utility.define_batch_env(
             lambda: _create_environment(config),
-            config.num_agents, env_processes, outdir=outdir, is_gail=config.is_gail)
+            config.num_agents, env_processes, outdir=outdir)
         graph = utility.define_simulation_graph(
             batch_env, config.algorithm, config)
         loop = _define_loop(
@@ -281,16 +288,16 @@ def train(config, env_processes, outdir):
     # summary writer of Discriminator
     summary_writer = tf.summary.FileWriter(config.logdir + '/Disciminator')
     # TF Session
-    # TODO _num_finished_episodes => Variable:0
+    # NOTE: _num_finished_episodes => Variable:0
     saver = utility.define_saver(
-        exclude=(r'.*_temporary.*', r'.*memory.*'))
+        exclude=(r'.*_temporary.*', r'.*memory.*', r'Variable:0'))
     sess_config = tf.ConfigProto(
         allow_soft_placement=True, log_device_placement=config.log_device_placement)
     sess_config.gpu_options.allow_growth = True
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
             sess, saver, config.logdir, resume=FLAGS.resume)
-        # NOTE reset variables in optimizer
+        # NOTE reset variables in optimizer for different stages of curriculum learning
         opt_reset_D = tf.group(
             [v.initializer for v in graph.algo.D.optimizer.variables()])
         # reset PPO optimizer

@@ -46,14 +46,6 @@ class BBallWrapper(object):
     def reset(self):
         return self._env.reset()
 
-    @property
-    def data(self):
-        return self._env.data
-
-    @data.setter
-    def data(self, value):
-        self._env.data = value
-
 
 class ClipAction(object):
     """Clip out of range actions to the action space of the environment."""
@@ -78,14 +70,6 @@ class ClipAction(object):
                 raise ValueError(
                     'action space is not defined, {}'.format(action[i]))
         return self._env.step(action)
-
-    @property
-    def data(self):
-        return self._env.data
-
-    @data.setter
-    def data(self, value):
-        self._env.data = value
 
 
 class RangeNormalize(object):
@@ -127,23 +111,23 @@ class RangeNormalize(object):
                 spaces.Discrete(3),  # offensive decision
                 # ball theta
                 spaces.Box(-np.ones(space[1].shape),
-                        np.ones(space[1].shape), dtype=np.float32),
+                           np.ones(space[1].shape), dtype=np.float32),
                 # offense player DASH(power, direction)
                 spaces.Box(-np.ones(space[2].shape),
-                        np.ones(space[2].shape), dtype=np.float32),
+                           np.ones(space[2].shape), dtype=np.float32),
                 # defense player DASH(power, direction)
                 spaces.Box(-np.ones(space[3].shape),
-                        np.ones(space[3].shape), dtype=np.float32)
+                           np.ones(space[3].shape), dtype=np.float32)
             ))
         elif isinstance(space, tools.NDefActTuple):
             return tools.NDefActTuple((
                 spaces.Discrete(3),  # offensive decision
                 # ball theta
                 spaces.Box(-np.ones(space[1].shape),
-                        np.ones(space[1].shape), dtype=np.float32),
+                           np.ones(space[1].shape), dtype=np.float32),
                 # offense player DASH(power, direction)
                 spaces.Box(-np.ones(space[2].shape),
-                        np.ones(space[2].shape), dtype=np.float32)
+                           np.ones(space[2].shape), dtype=np.float32)
             ))
 
     def step(self, action):
@@ -185,14 +169,6 @@ class RangeNormalize(object):
                 check = check and np.isfinite(space[i].low).all(
                 ) and np.isfinite(space[i].high).all()  # Box
         return check
-
-    @property
-    def data(self):
-        return self._env.data
-
-    @data.setter
-    def data(self, value):
-        self._env.data = value
 
 
 class ConvertTo32Bit(object):
@@ -279,11 +255,3 @@ class ConvertTo32Bit(object):
         if not np.isfinite(reward).all():
             raise ValueError('Infinite reward encountered.')
         return np.array(reward, dtype=np.float32)
-
-    @property
-    def data(self):
-        return self._env.data
-
-    @data.setter
-    def data(self, value):
-        self._env.data = value
