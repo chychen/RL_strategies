@@ -43,24 +43,24 @@ def main():
 
     for ENV_CONDITION_LENGTH in ENV_CONDITION_LENGTH_LIST:
         # GAIL Env Data
-        gail_env_data = []
-        for i in range(data.shape[0]):
-            for len_idx in range(0, data_len[i] - ENV_CONDITION_LENGTH, NON_OVERLAP_LENGTH):
-                temp = data[i, len_idx: len_idx + ENV_CONDITION_LENGTH, :, 0:2]
-                temp = np.concatenate([
-                    temp,
-                    np.tile(RIGHT_BASKET_POS, [ENV_CONDITION_LENGTH, 1, 1]),
-                    np.tile([COURT_LENGTH / 2.0, 0.0],
-                            [ENV_CONDITION_LENGTH, 1, 1]),
-                    np.tile([COURT_LENGTH, COURT_WIDTH],
-                            [ENV_CONDITION_LENGTH, 1, 1])
-                ], axis=1)
-                gail_env_data.append(temp)
-        gail_env_data = np.array(gail_env_data)
-        np.save('GAILEnvData_' + str(ENV_CONDITION_LENGTH) +
-                '.npy', gail_env_data)
-        print('GAILEnvData', gail_env_data.shape)
-        print('Saved')
+        # gail_env_data = []
+        # for i in range(data.shape[0]):
+        #     for len_idx in range(0, data_len[i] - ENV_CONDITION_LENGTH, NON_OVERLAP_LENGTH):
+        #         temp = data[i, len_idx: len_idx + ENV_CONDITION_LENGTH, :, 0:2]
+        #         temp = np.concatenate([
+        #             temp,
+        #             np.tile(RIGHT_BASKET_POS, [ENV_CONDITION_LENGTH, 1, 1]),
+        #             np.tile([COURT_LENGTH / 2.0, 0.0],
+        #                     [ENV_CONDITION_LENGTH, 1, 1]),
+        #             np.tile([COURT_LENGTH, COURT_WIDTH],
+        #                     [ENV_CONDITION_LENGTH, 1, 1])
+        #         ], axis=1)
+        #         gail_env_data.append(temp)
+        # gail_env_data = np.array(gail_env_data)
+        # np.save('GAILEnvData_' + str(ENV_CONDITION_LENGTH) +
+        #         '.npy', gail_env_data)
+        # print('GAILEnvData', gail_env_data.shape)
+        # print('Saved')
 
         # # GAIL Transition Data
         # # padding by duplicating first frame
