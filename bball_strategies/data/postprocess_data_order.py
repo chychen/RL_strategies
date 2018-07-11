@@ -6,8 +6,7 @@ import h5py
 import numpy as np
 
 
-# ENV_CONDITION_LENGTH_LIST = [12, 22, 32, 42, 52]
-ENV_CONDITION_LENGTH_LIST = [52]
+ENV_CONDITION_LENGTH_LIST = [12, 22, 32, 42, 52]
 
 
 def length(vec, axis):
