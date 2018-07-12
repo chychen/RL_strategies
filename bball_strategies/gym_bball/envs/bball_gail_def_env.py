@@ -300,10 +300,7 @@ class BBallGailDefEnv(gym.Env):
                 # offensive players
                 for k in range(5):
                     off_player = rendering.make_circle(radius=2.)
-                    if k == 0:
-                        off_player.set_color(1, 1, 0)
-                    else:
-                        off_player.set_color(1, 0, 0)
+                    off_player.set_color(1, k*0.25, 0)
                     off_trans = rendering.Transform()
                     self.off_pl_transforms.append(off_trans)
                     off_player.add_attr(off_trans)
