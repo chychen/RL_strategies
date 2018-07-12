@@ -131,6 +131,7 @@ class BBallGailDefEnv(gym.Env):
         ball_pass_vel = action[ACTION_LOOKUP['BALL']]  # should be zeros
         off_pl_dash = action[ACTION_LOOKUP['OFF_DASH']]  # should be zeros
         def_pl_dash = action[ACTION_LOOKUP['DEF_DASH']]
+        # def_pl_dash = self.current_real_act[self.states.steps]
 
         # then offense to t+1
         self._update_offense_from_real_data()
@@ -297,9 +298,12 @@ class BBallGailDefEnv(gym.Env):
                         self.viewer.add_geom(def_player_screen)
                         self.viewer.add_geom(def_player_wingspan)
                 # offensive players
-                for _ in range(5):
+                for k in range(5):
                     off_player = rendering.make_circle(radius=2.)
-                    off_player.set_color(1, 0, 0)
+                    if k == 0:
+                        off_player.set_color(1, 1, 0)
+                    else:
+                        off_player.set_color(1, 0, 0)
                     off_trans = rendering.Transform()
                     self.off_pl_transforms.append(off_trans)
                     off_player.add_attr(off_trans)
@@ -328,7 +332,9 @@ class BBallGailDefEnv(gym.Env):
                 self.ball_transform = ball_trans
                 ball.add_attr(ball_trans)
                 self.viewer.add_geom(ball)
-
+            
+            for i in range(5):
+                self.viewer.draw_line(self.states.defense_positions[i], self.states.offense_positions[i])
             ### set translations ###
             # defensive players
             for trans, pos in zip(self.def_pl_transforms, self.states.defense_positions):

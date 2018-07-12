@@ -6,17 +6,17 @@ import h5py
 import numpy as np
 
 
-# ENV_CONDITION_LENGTH_LIST = [12, 22, 32, 42, 52]
-ENV_CONDITION_LENGTH_LIST = [52]
+ENV_CONDITION_LENGTH_LIST = [12, 22, 32, 42, 52]
 
 
 def length(vec, axis):
     return np.sqrt(np.sum(vec**2, axis=axis))
 
-    
+
 def main():
     for ENV_CONDITION_LENGTH in ENV_CONDITION_LENGTH_LIST:
-        data = h5py.File('GAILTransitionData_{}.hdf5'.format(ENV_CONDITION_LENGTH), 'r')
+        data = h5py.File('GAILTransitionData_{}.hdf5'.format(
+            ENV_CONDITION_LENGTH), 'r')
         data_obs = data['OBS'].value
         # shape = (?, ENV_CONDITION_LENGTH, 1, 14, 2)
         data_act = data['DEF_ACT'].value
@@ -24,15 +24,16 @@ def main():
         data_init_vel = data['DEF_INIT_VEL'].value
         # shape = (?, 5, 2)
 
-        # 1. find the priority of offensive players by the distance to ball at first frame , then we get an order (off_order).
-        off_ball_obs = data_obs[:, 0, 0, 0:1]
-        off_pl_obs_first = data_obs[:, 0, 0, 1:6]
-        len_ball_off = length(off_ball_obs-off_pl_obs_first, axis=-1)
+        # 1. find the priority of offensive players by summing the distance to ball, then we get an order (off_order).
+        off_ball_obs = data_obs[:, :, 0, 0:1]
+        off_pl_obs_first = data_obs[:, :, 0, 1:6]
+        len_ball_off = np.sum(
+            length(off_ball_obs-off_pl_obs_first, axis=-1), axis=1)
         off_order = np.argsort(len_ball_off, axis=-1)
         print(off_order.shape)
-        # 2. accumulate first 10 frame of length between 5 offensive players to each defensive player, then we get a 5(def)*5(off) matrix (acc_def_mat).
-        off_pl_obs = data_obs[:, 0:10, 0, 1:6]
-        def_pl_obs = data_obs[:, 0:10, 0, 6:11]
+        # 2. accumulate distance of the whole episode between 5 offensive players to each defensive player, then we get a 5(def)*5(off) matrix (acc_def_mat).
+        off_pl_obs = data_obs[:, :, 0, 1:6]
+        def_pl_obs = data_obs[:, :, 0, 6:11]
         acc_def_mat = []
         for def_pl_id in range(5):
             one_def_pl_obs = def_pl_obs[:, :, def_pl_id:def_pl_id+1]
@@ -64,12 +65,17 @@ def main():
         ori_data_init_vel = np.array(data_init_vel)
         for i in range(data_defense_obs.shape[0]):
             for def_id in range(5):
-                data_defense_obs[i, :, :, def_id] = ori_data_defense_obs[i, :, :, paired_def_order[i, def_id]]
-                data_act[i, :, def_id] = ori_data_act[i, :, paired_def_order[i, def_id]]
-                data_init_vel[i, def_id] = ori_data_init_vel[i, paired_def_order[i, def_id]]
-        assert (data_obs[:, :, :, 6:11] != ori_data_defense_obs).any(), "data_obs(defense) should be modified"
+                data_defense_obs[i, :, :, off_order[i, def_id]
+                                 ] = ori_data_defense_obs[i, :, :, paired_def_order[i, def_id]]
+                data_act[i, :, off_order[i, def_id]] = ori_data_act[i,
+                                                                    :, paired_def_order[i, def_id]]
+                data_init_vel[i, off_order[i, def_id]
+                              ] = ori_data_init_vel[i, paired_def_order[i, def_id]]
+        assert (data_obs[:, :, :, 6:11] != ori_data_defense_obs).any(
+        ), "data_obs(defense) should be modified"
         assert (data_act != ori_data_act).any(), "data_act should be modified"
-        assert (data_init_vel != ori_data_init_vel).any(), "data_init_vel should be modified"
+        assert (data_init_vel != ori_data_init_vel).any(
+        ), "data_init_vel should be modified"
         # 5. finally, we use (off_order) to permute the index in data.
         data_offense_obs = data_obs[:, :, :, 1:6]
         data_defense_obs = data_obs[:, :, :, 6:11]
@@ -79,24 +85,28 @@ def main():
         ori_data_init_vel = np.array(data_init_vel)
         for i in range(data_defense_obs.shape[0]):
             for off_id in range(5):
-                data_offense_obs[i, :, :, off_id] = ori_data_offense_obs[i, :, :, off_order[i, off_id]]
-                data_defense_obs[i, :, :, off_id] = ori_data_defense_obs[i, :, :, off_order[i, off_id]]
-                data_act[i, :, off_id] = ori_data_act[i, :, off_order[i, off_id]]
-                data_init_vel[i, off_id] = ori_data_init_vel[i, off_order[i, off_id]]
-        assert (data_obs[:, :, :, 1:6] != ori_data_offense_obs).any(), "data_obs(offense) should be modified"
-        assert (data_obs[:, :, :, 6:11] != ori_data_defense_obs).any(), "data_obs(defense) should be modified"
+                data_offense_obs[i, :, :, off_id] = ori_data_offense_obs[i,
+                                                                         :, :, off_order[i, off_id]]
+                data_defense_obs[i, :, :, off_id] = ori_data_defense_obs[i,
+                                                                         :, :, off_order[i, off_id]]
+                data_act[i, :, off_id] = ori_data_act[i,
+                                                      :, off_order[i, off_id]]
+                data_init_vel[i, off_id] = ori_data_init_vel[i,
+                                                             off_order[i, off_id]]
+        assert (data_obs[:, :, :, 1:6] != ori_data_offense_obs).any(
+        ), "data_obs(offense) should be modified"
+        assert (data_obs[:, :, :, 6:11] != ori_data_defense_obs).any(
+        ), "data_obs(defense) should be modified"
         assert (data_act != ori_data_act).any(), "data_act should be modified"
-        assert (data_init_vel != ori_data_init_vel).any(), "data_init_vel should be modified"
+        assert (data_init_vel != ori_data_init_vel).any(
+        ), "data_init_vel should be modified"
 
         # 6. save files into h5py
         with h5py.File('OrderedGAILTransitionData_{}.hdf5'.format(ENV_CONDITION_LENGTH), "w") as f:
-            dset = f.create_dataset('OBS', data=data_obs) # first is useless
+            dset = f.create_dataset('OBS', data=data_obs)  # first is useless
             dset = f.create_dataset('DEF_ACT', data=data_act)
             dset = f.create_dataset('DEF_INIT_VEL', data=data_init_vel)
         print('Saved')
-
-
-
 
 
 if __name__ == "__main__":

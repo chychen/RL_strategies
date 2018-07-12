@@ -38,7 +38,7 @@ class MonitorWrapper(gym.wrappers.Monitor):
     # init_mode 0 : init by default
     def __init__(self, env, data=h5py.File('bball_strategies/data/OrderedGAILTransitionData_52.hdf5', 'r'), init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None):
         super(MonitorWrapper, self).__init__(env=env, directory='./test/',
-                                             video_callable=lambda count: count % 1 != 0, force=True)
+                                             video_callable=lambda count: True, force=True)
         env.init_mode = init_mode
         env.data = data
         env.time_limit = 50
