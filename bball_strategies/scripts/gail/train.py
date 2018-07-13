@@ -296,7 +296,7 @@ def train(config, env_processes, outdir):
     sess_config.gpu_options.allow_growth = True
     with tf.Session(config=sess_config) as sess:
         utility.initialize_variables(
-            sess, saver, config.logdir, resume=FLAGS.resume)
+            sess, saver, config.logdir, checkpoint=FLAGS.checkpoint, resume=FLAGS.resume)
         # NOTE reset variables in optimizer for different stages of curriculum learning
         opt_reset_D = tf.group(
             [v.initializer for v in graph.algo.D.optimizer.variables()])
@@ -385,6 +385,9 @@ if __name__ == '__main__':
     tf.app.flags.DEFINE_string(
         'logdir', 'logdir/gail_defense',
         'Base directory to store logs.')
+    tf.app.flags.DEFINE_string(
+        'checkpoint', None,
+        'Checkpoint name to load; defaults to most recent.')
     tf.app.flags.DEFINE_string(
         'timestamp', datetime.datetime.now().strftime('%Y%m%dT%H%M%S'),
         'Sub directory to store logs.')
