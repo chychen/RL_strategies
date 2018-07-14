@@ -46,7 +46,7 @@ class BBallGailDefEnv(gym.Env):
         self.init_positions = None  # if_init_by_input
         self.if_vis_trajectory = False
         self.if_vis_visual_aid = False
-        self.if_back_real = False
+        self.if_use_real_act = False
         # for render()
         self.viewer = None
         self.def_pl_transforms = []
@@ -86,8 +86,7 @@ class BBallGailDefEnv(gym.Env):
         # init dataset
         self.episode_index = 0
         self.data = None
-        # self.data = h5py.File(
-        #     'bball_strategies/data/GAILTransitionData_51.hdf5', 'r')
+        self.ep_idx = None
         self.expert_data = None
         self.expert_action = None
         self.IS_FIRST = True
@@ -131,7 +130,8 @@ class BBallGailDefEnv(gym.Env):
         ball_pass_vel = action[ACTION_LOOKUP['BALL']]  # should be zeros
         off_pl_dash = action[ACTION_LOOKUP['OFF_DASH']]  # should be zeros
         def_pl_dash = action[ACTION_LOOKUP['DEF_DASH']]
-        # def_pl_dash = self.current_real_act[self.states.steps]
+        if self.if_use_real_act:
+            def_pl_dash = self.current_real_act[self.states.steps]
 
         # then offense to t+1
         self._update_offense_from_real_data()
@@ -144,7 +144,7 @@ class BBallGailDefEnv(gym.Env):
 
         # assert (self.current_real_act[self.states.steps - 1] < 50.0).all(), '{}\n{}\n{}\n'.format(
         #     self.current_cond[self.states.steps - 1:self.states.steps + 2, 6:11], self.current_real_act[self.states.steps - 1], self.states.steps - 1)
-        return self._get_obs(), 0, self.states.done, dict(expert_s=self.current_cond[self.states.steps, 6:11], expert_a=self.current_real_act[self.states.steps - 1])
+        return self._get_obs(), 0, self.states.done, dict(expert_s=self.current_cond[self.states.steps, 6:11], expert_a=self.current_real_act[self.states.steps - 1], data_idx=self.ep_idx)
 
     def _get_obs(self):
         """
@@ -177,11 +177,11 @@ class BBallGailDefEnv(gym.Env):
             self.expert_init_vel = self.data['DEF_INIT_VEL'].value
             self.IS_FIRST = False
         if self.init_mode == INIT_LOOKUP['DATASET']:
-            ep_idx = np.floor(self.np_random_generator.uniform(
+            self.ep_idx = np.floor(self.np_random_generator.uniform(
                 low=0.0, high=self.expert_data.shape[0])).astype(np.int)
-            self.current_cond = copy.deepcopy(self.expert_data[ep_idx, :, -1])
-            self.current_real_act = copy.deepcopy(self.expert_action[ep_idx])
-            self.current_init_vel = copy.deepcopy(self.expert_init_vel[ep_idx])
+            self.current_cond = copy.deepcopy(self.expert_data[self.ep_idx, :, -1])
+            self.current_real_act = copy.deepcopy(self.expert_action[self.ep_idx])
+            self.current_init_vel = copy.deepcopy(self.expert_init_vel[self.ep_idx])
             ball_pos = self.current_cond[0, 0, 0:2]
             off_positions = self.current_cond[0, 1:6, 0:2]
             def_positions = self.current_cond[0, 6:11, 0:2]
@@ -202,10 +202,10 @@ class BBallGailDefEnv(gym.Env):
         #     self.states.reset(
         #         self.init_positions, ball_handler_idx, buffer_size=self.buffer_size)
         # elif self.init_mode == INIT_LOOKUP['DATASET']:
-        #     ep_idx = np.floor(self.np_random_generator.uniform(
+        #     self.ep_idx = np.floor(self.np_random_generator.uniform(
         #         low=0.0, high=self.expert_data.shape[0])).astype(np.int)
-        #     self.current_cond = copy.deepcopy(self.expert_data[ep_idx, :, -1])
-        #     self.current_real_act = copy.deepcopy(self.expert_action[ep_idx])
+        #     self.current_cond = copy.deepcopy(self.expert_data[self.ep_idx, :, -1])
+        #     self.current_real_act = copy.deepcopy(self.expert_action[self.ep_idx])
         #     ball_pos = self.current_cond[0, 0, 0:2]
         #     off_positions = self.current_cond[0, 1:6, 0:2]
         #     def_positions = self.current_cond[0, 6:11, 0:2]
@@ -329,9 +329,10 @@ class BBallGailDefEnv(gym.Env):
                 self.ball_transform = ball_trans
                 ball.add_attr(ball_trans)
                 self.viewer.add_geom(ball)
-            
+
             for i in range(5):
-                self.viewer.draw_line(self.states.defense_positions[i], self.states.offense_positions[i])
+                self.viewer.draw_line(
+                    self.states.defense_positions[i], self.states.offense_positions[i])
             ### set translations ###
             # defensive players
             for trans, pos in zip(self.def_pl_transforms, self.states.defense_positions):

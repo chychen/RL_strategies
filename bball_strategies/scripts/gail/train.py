@@ -145,8 +145,7 @@ def tally_reward_line_chart(config, steps, ppo_policy, D, normalize_observ, norm
     episode_amount = 100
     # env
     vanilla_env = gym.make(config.env)
-    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/OrderedGAILTransitionData_522.hdf5', 'r'), init_mode=1, fps=config.FPS, if_back_real=False,
-                               time_limit=50)
+    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/OrderedGAILTransitionData_522.hdf5', 'r'), init_mode=1, fps=config.FPS, time_limit=50)
     # fake
     numpy_collector = []
     act_collector = []
@@ -206,7 +205,7 @@ class MonitorWrapper(gym.wrappers.Monitor):
     """ class wrapper to record the interaction between policy and environment
     """
 
-    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./test/', if_back_real=False, video_callable=lambda _: True):
+    def __init__(self, env, init_mode=None, if_vis_trajectory=False, if_vis_visual_aid=False, init_positions=None, init_ball_handler_idx=None, directory='./test/', video_callable=lambda _: True):
         super(MonitorWrapper, self).__init__(env=env, directory=directory,
                                              video_callable=video_callable, force=True)
         self._env = env
@@ -215,7 +214,6 @@ class MonitorWrapper(gym.wrappers.Monitor):
         self._env.if_vis_visual_aid = if_vis_visual_aid
         self._env.init_positions = init_positions
         self._env.init_ball_handler_idx = init_ball_handler_idx
-        self._env.if_back_real = if_back_real
 
     def __getattr__(self, name):
         return getattr(self._env, name)
@@ -261,9 +259,8 @@ def train(config, env_processes, outdir):
 
     # env to testing
     vanilla_env = gym.make(config.env)
-    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/OrderedGAILTransitionData_522.hdf5', 'r'), init_mode=1, fps=config.FPS, if_back_real=False,
-                               time_limit=50)
-    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_G{}_D{}/'.format(config.max_length, config.D_len)), if_back_real=False, video_callable=lambda _: True,
+    vanilla_env = BBallWrapper(vanilla_env, data=h5py.File('bball_strategies/data/OrderedGAILTransitionData_522.hdf5', 'r'), init_mode=1, fps=config.FPS, time_limit=50)
+    vanilla_env = MonitorWrapper(vanilla_env, directory=os.path.join(config.logdir, 'gail_testing_G{}_D{}/'.format(config.max_length, config.D_len)), video_callable=lambda _: True,
                                  # init from dataset
                                  init_mode=1)
 

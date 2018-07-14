@@ -56,7 +56,6 @@ def default():
     # data only have 50 length, if we step 50 times, cant find 51-th conidtion in data
     max_length = 11 - 1
     # make transitions buffer back to real
-    if_back_real = False
     steps = update_every * max_length
     # wgan
     wgan_penalty_lambda = 10.0

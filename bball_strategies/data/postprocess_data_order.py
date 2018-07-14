@@ -6,7 +6,7 @@ import h5py
 import numpy as np
 
 
-ENV_CONDITION_LENGTH_LIST = [12, 22, 32, 42, 52]
+ENV_CONDITION_LENGTH_LIST = ['Testing', 12, 22, 32, 42, 52]
 
 
 def length(vec, axis):
@@ -14,6 +14,7 @@ def length(vec, axis):
 
 
 def main():
+
     for ENV_CONDITION_LENGTH in ENV_CONDITION_LENGTH_LIST:
         data = h5py.File('GAILTransitionData_{}.hdf5'.format(
             ENV_CONDITION_LENGTH), 'r')
