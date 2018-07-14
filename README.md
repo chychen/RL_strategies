@@ -5,7 +5,8 @@
 - docker:
 
 ```bash
-nvidia-docker run --name jay -it -p 127.0.0.1:6006:6006 -v {repo_path}RL_strategies/:/RL_strategies -w /RL_strategies jay/bball_gail bash
+docker pull jaycase/bballgail
+nvidia-docker run --name {name} -it -p 127.0.0.1:6006:6006 -v {repo_path}RL_strategies/:/RL_strategies -w /RL_strategies jaycase/bballgail bash
 ```
 
 ## Getting Started
