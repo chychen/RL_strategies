@@ -179,6 +179,10 @@ class BBallGailDefEnv(gym.Env):
         if self.init_mode == INIT_LOOKUP['DATASET']:
             self.ep_idx = np.floor(self.np_random_generator.uniform(
                 low=0.0, high=self.expert_data.shape[0])).astype(np.int)
+            # if self.ep_idx is None:
+            #     self.ep_idx = 0
+            # else:
+            #     self.ep_idx = self.ep_idx + 1
             self.current_cond = copy.deepcopy(self.expert_data[self.ep_idx, :, -1])
             self.current_real_act = copy.deepcopy(self.expert_action[self.ep_idx])
             self.current_init_vel = copy.deepcopy(self.expert_init_vel[self.ep_idx])

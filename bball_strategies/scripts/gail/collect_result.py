@@ -83,7 +83,7 @@ def _define_loop(graph, logdir, train_steps, eval_steps):
     return loop
 
 
-def collect_results(config, steps, ppo_policy, D, denormalize_observ, generated_amount=10):
+def collect_results(config, steps, ppo_policy, D, denormalize_observ, generated_amount=100):
     """ test policy
     - draw episode into mpeg video
     - collect episode with scores on each frame into .npz file (for out customized player)
@@ -100,6 +100,7 @@ def collect_results(config, steps, ppo_policy, D, denormalize_observ, generated_
     timer = time.time()
     # read condition length
     data_len = np.load('bball_strategies/data/FixedFPS5Length.npy')
+    # data_len = np.load('bball_strategies/data/WGAN/all_model_results/length.npy')
     # env to testing
     vanilla_env = gym.make(config.env)
     vanilla_env = BBallWrapper(vanilla_env, data=h5py.File(
@@ -131,7 +132,6 @@ def collect_results(config, steps, ppo_policy, D, denormalize_observ, generated_
             vanilla_obs, _, _, info = vanilla_env.step(
                 vanilla_trans_act)
             numpy_collector.append(vanilla_obs)
-            print(info['data_idx'])
         index_list.append(info['data_idx'])
         numpy_collector = np.array(numpy_collector)
         act_collector = np.array(act_collector)
