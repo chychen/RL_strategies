@@ -34,6 +34,12 @@ def clip_state(pos):
 
 
 def main():
+    # # load file
+    # data = np.load('WGAN/all_model_results/real_data.npy')
+    # data = np.concatenate([data[:, :, :2], data[:, :, 3:]],
+    #                       axis=-1).reshape([data.shape[0], data.shape[1], 11, 2])
+    # data = clip_state(data)
+    # data_len = np.load('WGAN/all_model_results/length.npy')
     # load file
     data = np.load('FixedFPS5.npy')
     data = clip_state(data)
@@ -46,7 +52,7 @@ def main():
     for i in range(data.shape[0]):
         pad_data = data[i]
         episode = []
-        for k in range(data.shape[1]- OBSERVATION_LENGTH + 1):
+        for k in range(data.shape[1] - OBSERVATION_LENGTH + 1):
             buffer = pad_data[k:k + OBSERVATION_LENGTH, :, 0:2]
             buffer = np.concatenate([
                 buffer,
@@ -95,6 +101,7 @@ def main():
         dset = f.create_dataset('DEF_ACT', data=gail_def_action[:, :-1])
         dset = f.create_dataset('DEF_INIT_VEL', data=init_vel)
     print('Saved')
+    # exit()
 
     for ENV_CONDITION_LENGTH in ENV_CONDITION_LENGTH_LIST:
         # GAIL Transition Data

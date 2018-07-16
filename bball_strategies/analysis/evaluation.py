@@ -470,12 +470,13 @@ class EvaluationMatrix(object):
                     speed[i, :self._length[i] - 1].reshape([-1, ]))
             valid_speed = np.concatenate(valid_speed, axis=0)
             # remove outlier
-            valid_speed = valid_speed[valid_speed<self.SPEED_LIMITATION]
+            valid_speed = valid_speed[valid_speed < self.SPEED_LIMITATION]
 
             bin_size = 0.1
             max_v = np.amax(valid_speed)
             min_v = 0.0
-            num_bins = int((max_v - min_v) // bin_size) + 1
+            # num_bins = int((max_v - min_v) // bin_size) + 1
+            num_bins = 500
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_speed:
                 counter[int((v - min_v) // bin_size)] += 1
@@ -512,11 +513,12 @@ class EvaluationMatrix(object):
                 valid_acc.append(acc[i, :self._length[i] - 2].reshape([-1, ]))
             valid_acc = np.concatenate(valid_acc, axis=0)
             # remove outlier
-            valid_acc = valid_acc[valid_acc<self.ACC_LIMITATION]
+            valid_acc = valid_acc[valid_acc < self.ACC_LIMITATION]
             bin_size = 0.1
             max_v = np.amax(valid_acc)
             min_v = np.amin(valid_acc)
-            num_bins = int((max_v - min_v) // bin_size) + 1
+            # num_bins = int((max_v - min_v) // bin_size) + 1
+            num_bins = 500
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_acc:
                 counter[int((v - min_v) // bin_size)] += 1
@@ -598,39 +600,43 @@ class EvaluationMatrix(object):
                         h_row.append(hausdorff(P, Q))
                     h_matrix.append(h_row)
                 print_h_matrix(heat_map_mean_table_dict, h_matrix)
-                # # distance to basket
-                # h_matrix = []
-                # for key1, p in heat_map_mean_table_dict.items():
-                #     h_row = []
-                #     for key2, q in heat_map_mean_table_dict.items():
-                #         # transform to distance to basket coordinate
-                #         basket_x = 94 - 5.25
-                #         basket_y = 25
-                #         P = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
-                #         Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
-                #         for i in range(50):
-                #             for j in range(95):
-                #                 if j < 95/2:
-                #                     continue
-                #                 dist2basket = int(
-                #                     np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
-                #                 P[dist2basket] += p[i][j]
-                #                 Q[dist2basket] += q[i][j]
-                #         index_to_remain = []
-                #         for i in range(len(P)):
-                #             if P[i] != 0 or Q[i] != 0:
-                #                 index_to_remain.append(i)
-                #         P = P[index_to_remain]
-                #         Q = Q[index_to_remain]
-                #         idx = np.arange(len(P))
-                #         P = np.vstack((idx, P)).T
-                #         Q = np.vstack((idx, Q)).T
-                #         P = P.copy(order='C')
-                #         Q = Q.copy(order='C')
-                #         #h_row.append(max(directed_hausdorff(P, Q)[0],directed_hausdorff(Q, P)[0]))
-                #         h_row.append(hausdorff(P, Q))
-                #     h_matrix.append(h_row)
-                # print_h_matrix(heat_map_mean_table_dict, h_matrix)
+                # distance to basket
+                h_matrix = []
+                for key1, p in heat_map_mean_table_dict.items():
+                    h_row = []
+                    for key2, q in heat_map_mean_table_dict.items():
+                        # transform to distance to basket coordinate
+                        basket_x = 94 - 5.25
+                        basket_y = 25
+                        P = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
+                        Q = np.zeros(shape=[int(np.sqrt((94/2)**2+(50/2)**2))])
+                        for i in range(50):
+                            for j in range(95):
+                                if j < 95/2:
+                                    continue
+                                dist2basket = int(
+                                    np.sqrt((i-basket_y)**2 + (j-basket_x)**2))
+                                counter[dist2basket] += 1
+                                P[dist2basket] += p[i][j]
+                                Q[dist2basket] += q[i][j]
+                        # normalize
+                        P = P / (p.shape[0]*p.shape[1])
+                        Q = Q / (q.shape[0]*q.shape[1])
+                        index_to_remain = []
+                        for i in range(len(P)):
+                            if P[i] != 0 or Q[i] != 0:
+                                index_to_remain.append(i)
+                        P = P[index_to_remain]
+                        Q = Q[index_to_remain]
+                        idx = np.arange(len(P))
+                        P = np.vstack((idx, P)).T
+                        Q = np.vstack((idx, Q)).T
+                        P = P.copy(order='C')
+                        Q = Q.copy(order='C')
+                        #h_row.append(max(directed_hausdorff(P, Q)[0],directed_hausdorff(Q, P)[0]))
+                        h_row.append(hausdorff(P, Q))
+                    h_matrix.append(h_row)
+                print_h_matrix(heat_map_mean_table_dict, h_matrix)
 
     def plot_histogram_vel_acc(self):
         """ Histogram of DEFENSE's speed and acceleration. (mean,stddev)
@@ -660,7 +666,8 @@ class EvaluationMatrix(object):
                 bin_size = 0.1
                 max_v = np.amax(valid_speed)
                 min_v = 0.0
-                num_bins = int((max_v-min_v)//bin_size)+1
+                # num_bins = int((max_v-min_v)//bin_size)+1
+                num_bins = 500
                 counter = np.zeros(shape=[num_bins, ])
                 for v in valid_speed:
                     counter[int((v-min_v)//bin_size)] += 1
@@ -691,7 +698,8 @@ class EvaluationMatrix(object):
             bin_size = 0.1
             max_v = np.amax(valid_speed)
             min_v = 0.0
-            num_bins = int((max_v-min_v)//bin_size)+1
+            # num_bins = int((max_v-min_v)//bin_size)+1
+            num_bins = 500
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_speed:
                 counter[int((v-min_v)//bin_size)] += 1
@@ -738,7 +746,8 @@ class EvaluationMatrix(object):
                 bin_size = 0.1
                 max_v = np.amax(valid_acc)
                 min_v = np.amin(valid_acc)
-                num_bins = int((max_v-min_v)//bin_size)+1
+                # num_bins = int((max_v-min_v)//bin_size)+1
+                num_bins = 500
                 counter = np.zeros(shape=[num_bins, ])
                 for v in valid_acc:
                     counter[int((v-min_v)//bin_size)] += 1
@@ -770,7 +779,8 @@ class EvaluationMatrix(object):
             bin_size = 0.1
             max_v = np.amax(valid_acc)
             min_v = np.amin(valid_acc)
-            num_bins = int((max_v-min_v)//bin_size)+1
+            # num_bins = int((max_v-min_v)//bin_size)+1
+            num_bins = 500
             counter = np.zeros(shape=[num_bins, ])
             for v in valid_acc:
                 counter[int((v-min_v)//bin_size)] += 1
@@ -1215,7 +1225,8 @@ class EvaluationMatrix(object):
             bin_size = 0.1
             max_v = np.amax(wiball_dist)
             min_v = np.amin(wiball_dist)
-            num_bins = int((max_v-min_v)//bin_size)+1
+            # num_bins = int((max_v-min_v)//bin_size)+1
+            num_bins = 500
             counter = np.zeros(shape=[num_bins, ])
             for v in wiball_dist:
                 counter[int((v-min_v)//bin_size)] += 1
@@ -1242,7 +1253,8 @@ class EvaluationMatrix(object):
             bin_size = 0.1
             max_v = np.amax(woball_dist)
             min_v = np.amin(woball_dist)
-            num_bins = int((max_v-min_v)//bin_size)+1
+            # num_bins = int((max_v-min_v)//bin_size)+1
+            num_bins = 500
             counter = np.zeros(shape=[num_bins, ])
             for v in woball_dist:
                 counter[int((v-min_v)//bin_size)] += 1
@@ -1339,7 +1351,7 @@ class EvaluationMatrix(object):
                 data.shape[0], data.shape[1], 5, 2])
             # defender's distance to offense
             dist = all_dist_dict[key]
-            if_handle_ball = if_handle_ball_dict[key]
+            if_handle_ball = if_handle_ball_dict['real_data']
             handle_ball_dist = np.zeros((dist.shape[0], dist.shape[1], ))
             for epi_idx in range(self._num_episodes):
                 epi_len = self._length[epi_idx]
@@ -1501,29 +1513,40 @@ class EvaluationMatrix(object):
 
 
 def evaluate_new_data():
-    analyze_all_noise = True
+    analyze_all_noise = False
     root_path = '../data/WGAN/all_model_results/'
     # all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
     # all_data_key_list = ['cnn_wo_368k', 'cnn_wi_add_2003k', 'cnn_wi_mul_828k',
     #                      'cnn_wi_add10_1151k', 'rnn_wo_442k', 'rnn_wi_442k',
     #                      'cnn_wo_921k_verify', 'cnn_wo_322k_vanilla', 'cnn_wo_644k_vanilla', 'cnn_wi_mul_598k_nl', 'cnn_wi_mul_828k_nl']
-    all_data_key_list = ['cnn_wi_mul_828k_nl',
-                         'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k', 'supervised_2k', 'supervised_114k']
+    # all_data_key_list = ['cnn_wi_mul_828k_nl',  
+    #                      'cnn_wo_644k_vanilla', 'rnn_wi_442k', 'rnn_wo_442k', 'supervised_2k', 'supervised_114k']
+    all_data_key_list = ['cnn_wi_mul_828k_nl', 'cnn_wo_644k_vanilla']
+    # GAIL result
+    gail_result = np.load(
+        root_path+'GAIL_G30D30/total_output.npy')[:, :, -1, :11]
+    gail_result = np.reshape(gail_result, [
+                             gail_result.shape[0], gail_result.shape[1], gail_result.shape[2]*gail_result.shape[3]])
+    gail_result = np.concatenate([gail_result[:, :, :2], np.zeros_like(
+        gail_result[:, :, :1]), gail_result[:, :, 2:]], axis=-1)
+    length = np.load(
+        root_path+'GAIL_G30D30/total_output_length.npy')
+    all_data = {}
+    real_data = np.load(root_path+'real_data.npy')[:, 1:-1][:, :np.max(length)] # first frame not count
+
     if analyze_all_noise:
-        length = np.tile(np.load(root_path+'length.npy'), [100])
-        all_data = {}
-        all_data['real_data'] = np.tile(
-            np.load(root_path+'real_data.npy'), [100, 1, 1])
+        length = np.tile(length, [100])
+        all_data['real_data'] = np.tile(real_data, [100, 1, 1])
+        all_data['GAIL_G30D30'] = np.tile(gail_result, [100, 1, 1])
         for key in all_data_key_list:
             all_data[key] = np.load(
-                root_path+key+'/results_A_fake_B.npy').reshape([100*100, 235, 23])
+                root_path+key+'/results_A_fake_B.npy').reshape([100*100, 235, 23])[:, 1:][:, :np.max(length)] # first frame not count
     else:
-        length = np.load(root_path+'length.npy')
-        all_data = {}
-        all_data['real_data'] = np.load(root_path+'real_data.npy')
+        all_data['real_data'] = real_data
+        all_data['GAIL_G30D30'] = gail_result
         for key in all_data_key_list:
             all_data[key] = np.load(
-                root_path+key+'/results_A_fake_B.npy')[0]
+                root_path+key+'/results_A_fake_B.npy')[0][:, 1:][:, :np.max(length)] # first frame not count
 
     file_name = 'default'
     if os.path.exists(file_name):

@@ -59,7 +59,7 @@ def main():
                          init_mode=1,
                          if_vis_trajectory=False,
                          if_vis_visual_aid=True,
-                         if_use_real_act=False)
+                         if_use_real_act=True)
     obs = env.reset()
     print(obs)
     print('#########################################')
