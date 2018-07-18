@@ -2,10 +2,10 @@
 
 ## Environment Setting
 
-- docker:
+- [docker](https://docs.docker.com/glossary/?term=installation)/ [nvidia-docker](https://github.com/NVIDIA/nvidia-docker):
 
 ```bash
-docker pull jaycase/bballgail
+docker pull jaycase/bballgail:init
 nvidia-docker run --name {name} -it -p 127.0.0.1:6006:6006 -v {repo_path}RL_strategies/:/RL_strategies -w /RL_strategies jaycase/bballgail bash
 ```
 
@@ -60,16 +60,29 @@ All configurations are in "{repo_path}/RL_strategies/bball_strategies/scripts/ga
 
 ```bash
 cd {repo_path}/RL_strategies/
-python -m bball_strategies.scripts.gail.train --config=double_curiculum
+python3 -m bball_strategies.scripts.gail.train --config=double_curiculum
 ```
 
 ### Monitor training
 
 ```bash
-tensorboard --logdir='logdir/gail_defense/{time stamp}-double_curiculum'
+tensorboard --logdir='logdir/gail_defense/{time stamp}-double_curiculum' --port=6006
 ```
 
-### Basically, the code is built upon the TensorFlow Agents Framework.
+## Custimized Animation Players
+
+### Buid upon [kivy](https://kivy.org/docs/installation/installation.html) framework
+
+- You can drag and drop the '.npz' files (recorded while tranining) into the player.
+
+```bash
+cd {repo_path}/RL_strategies/gui_tool/
+python3 player.py
+```
+
+## Acknowledgement
+
+### Basically, the code is built upon the [TensorFlow Agents](https://github.com/tensorflow/agents) Framework.
 ``` shell
 @article{hafner2017agents,
   title={TensorFlow Agents: Efficient Batched Reinforcement Learning in TensorFlow},
