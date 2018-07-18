@@ -69,15 +69,25 @@ python3 -m bball_strategies.scripts.gail.train --config=double_curiculum
 tensorboard --logdir='logdir/gail_defense/{time stamp}-double_curiculum' --port=6006
 ```
 
-## Custimized Animation Players
+## Analysis
 
-### Buid upon [kivy](https://kivy.org/docs/installation/installation.html) framework
+###Custimized Animation Players
 
+- Buid upon [kivy](https://kivy.org/docs/installation/installation.html) framework
 - You can drag and drop the '.npz' files (recorded while tranining) into the player.
 
 ```bash
 cd {repo_path}/RL_strategies/gui_tool/
 python3 player.py
+```
+
+### Quantitative Analysis
+
+- Visualize results by [plotly](https://plot.ly/python/getting-started/) framework
+
+```bash
+cd {repo_path}/RL_strategies/analysis/
+python3 evaluation.py
 ```
 
 ## Acknowledgement
