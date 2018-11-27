@@ -1,29 +1,27 @@
 # Backetball Strategies with GAIL and BatchPPO
 
-## Environment Setting
-
-- [docker](https://docs.docker.com/glossary/?term=installation)/ [nvidia-docker](https://github.com/NVIDIA/nvidia-docker):
-
-```bash
-docker pull jaycase/bballgail:init
-nvidia-docker run --name {name} -it -p 127.0.0.1:6006:6006 -v {repo_path}RL_strategies/:/RL_strategies -w /RL_strategies jaycase/bballgail bash
-```
-
 ## Getting Started
 
 - Clone this repo:
 
 ```bash
-git clone http://140.113.210.14:30000/nba/RL_strategies.git
-cd RL_strategies
+$ git clone http://140.113.210.14:30000/nba/RL_strategies.git
+```
+
+- Environment Setting
+[docker](https://docs.docker.com/glossary/?term=installation)/ [nvidia-docker](https://github.com/NVIDIA/nvidia-docker):
+
+```bash
+$ docker pull jaycase/bballgail:init
+$ nvidia-docker run --name {name} -it -p 127.0.0.1:6006:6006 -v {repo_path}RL_strategies/:/RL_strategies -w /RL_strategies jaycase/bballgail bash
 ```
 
 - Download the dataset. (You should put dataset right under the folder "{repo_path}/RL_strategies/data/")
 
 ```bash
-cd data
-wget http://140.113.210.14:6006/NBA/data/FPS5.npy
-wget http://140.113.210.14:6006/NBA/data/FPS5Length.npy
+root@7bdb7335cde0:/RL_strategies# cd bball_strategies/data/
+root@7bdb7335cde0:/RL_strategies/bball_strategies/data# wget http://140.113.210.14:6006/NBA/data/FPS5.npy
+root@7bdb7335cde0:/RL_strategies/bball_strategies/data# wget http://140.113.210.14:6006/NBA/data/FPS5Length.npy
 ```
 
 ## Data Preprocessing
@@ -31,22 +29,21 @@ wget http://140.113.210.14:6006/NBA/data/FPS5Length.npy
 - Filter out bad data.
 
 ```bash
-cd bball_strategies/data/
-python3 preprocess.py
+root@7bdb7335cde0:/RL_strategies/bball_strategies/data# python3 preprocess.py
 ```
 
 - Create training dataset for GAIL. (transform data into state-action pair.)
 
 ```bash
-python3 create_gail_data.py
+root@7bdb7335cde0:/RL_strategies/bball_strategies/data# python3 create_gail_data.py
 ```
 
 - Reorder the data offense and defense positions by rule-based method.
 - And, duplicate OrderedGAILTransitionData_52.hdf5 for multi process settings.
 
 ```bash
-python3 postprocess_data_order.py 
-cp OrderedGAILTransitionData_52.hdf5 OrderedGAILTransitionData_522.hdf5
+root@7bdb7335cde0:/RL_strategies/bball_strategies/data# python3 postprocess_data_order.py 
+root@7bdb7335cde0:/RL_strategies/bball_strategies/data# cp OrderedGAILTransitionData_52.hdf5 OrderedGAILTransitionData_522.hdf5
 ```
 
 ## Training
@@ -59,14 +56,13 @@ All configurations are in "{repo_path}/RL_strategies/bball_strategies/scripts/ga
 ### Train Model
 
 ```bash
-cd {repo_path}/RL_strategies/
-python3 -m bball_strategies.scripts.gail.train --config=double_curiculum
+root@7bdb7335cde0:/RL_strategies# python3 -m bball_strategies.scripts.gail.train --config=double_curiculum
 ```
 
 ### Monitor training
 
 ```bash
-tensorboard --logdir='logdir/gail_defense/{time stamp}-double_curiculum' --port=6006
+root@7bdb7335cde0:/RL_strategies# tensorboard --logdir='logdir/gail_defense/{time stamp}-double_curiculum' --port=6006
 ```
 
 ## Analysis
@@ -77,8 +73,8 @@ tensorboard --logdir='logdir/gail_defense/{time stamp}-double_curiculum' --port=
 - You can drag and drop the '.npz' files (recorded while tranining) into the player.
 
 ```bash
-cd {repo_path}/RL_strategies/gui_tool/
-python3 player.py
+root@7bdb7335cde0:/RL_strategies# cd gui_tool/
+root@7bdb7335cde0:/RL_strategies/gui_tool# python3 player.py
 ```
 
 ### Quantitative Analysis
@@ -86,8 +82,8 @@ python3 player.py
 - Visualize results by [plotly](https://plot.ly/python/getting-started/) framework
 
 ```bash
-cd {repo_path}/RL_strategies/analysis/
-python3 evaluation.py
+root@7bdb7335cde0:/RL_strategies# cd analysis/
+root@7bdb7335cde0:/RL_strategies/analysis# python3 evaluation.py
 ```
 
 ## Acknowledgement
