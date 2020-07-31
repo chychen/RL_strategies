@@ -1,5 +1,7 @@
 # Backetball Strategies with GAIL and BatchPPO
 
+[Master Thesis](http://www.airitilibrary.com/Publication/alDetailedMesh?docid=U0030-0205201911102275)
+
 ## Getting Started
 
 - Clone this repo:
