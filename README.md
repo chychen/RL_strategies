@@ -2,12 +2,14 @@
 
 [Master Thesis](http://www.airitilibrary.com/Publication/alDetailedMesh?docid=U0030-0205201911102275)
 
+![](https://github.com/chychen/RL_strategies/blob/master/demo1.gif)
+
 ## Getting Started
 
 - Clone this repo:
 
 ```bash
-$ git clone http://140.113.210.14:30000/nba/RL_strategies.git
+$ git clone https://github.com/chychen/RL_strategies
 ```
 
 - Environment Setting
@@ -19,6 +21,7 @@ $ nvidia-docker run --name {name} -it -p 127.0.0.1:6006:6006 -v {repo_path}RL_st
 ```
 
 - Download the dataset. (You should put dataset right under the folder "{repo_path}/RL_strategies/data/")
+(QQ can't find the files)
 
 ```bash
 root@7bdb7335cde0:/RL_strategies# cd bball_strategies/data/
