@@ -2,6 +2,10 @@
 
 [Master Thesis](http://www.airitilibrary.com/Publication/alDetailedMesh?docid=U0030-0205201911102275)
 
+please go `APPENDIX – B Defensive Strategies Generation by Imitation Learning for this project`.
+
+[(backup, a google drive link)](https://drive.google.com/file/d/1L6dbe6cFnK472ChGPI5SeVygQMfEsdbv/view?usp=sharing)
+
 ![](https://github.com/chychen/RL_strategies/blob/master/demo1.gif)
 
 ## Getting Started
