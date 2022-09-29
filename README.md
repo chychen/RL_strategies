@@ -25,7 +25,7 @@ $ nvidia-docker run --name {name} -it -p 127.0.0.1:6006:6006 -v {repo_path}RL_st
 ```
 
 - Download the dataset. (You should put dataset right under the folder "{repo_path}/RL_strategies/data/")
-(QQ can't find the files)
+(QQ can't find the files, maybe you could try this [one](https://drive.google.com/file/d/1OmC9UB-zoaBz5HzJPja2kREo5P_YlMIa/view?usp=sharing))
 
 ```bash
 root@7bdb7335cde0:/RL_strategies# cd bball_strategies/data/
